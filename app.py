@@ -3,12 +3,11 @@ import requests
 import os
 import json
 from pathlib import Path
-from audiorecorder import audiorecorder
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفسه)
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -219,7 +218,7 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  DEEPL API KEY — قراءة من secrets (مرة واحدة)
+#  DEEPL API KEY
 # ═══════════════════════════════════════════════════════════════════════════════
 try:
     secrets_key = st.secrets.get("DEEPL_API_KEY", "")
@@ -233,14 +232,14 @@ if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = secrets_key
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TRANSLATION ENGINE — المعدل (حذف source_lang)
+#  TRANSLATION ENGINE
 # ═══════════════════════════════════════════════════════════════════════════════
-def translate_deepl(text, source_lang, target_lang):
+def translate_deepl(text, target_lang):
+    """ترجمة النص إلى target_lang بدون تحديد source_lang (اكتشاف تلقائي)"""
     if not st.session_state.deepl_api_key:
         return None, "No API key configured"
         
     tl = target_lang.upper()
-    # لا نرسل source_lang — DeepL يكتشفها تلقائياً
     
     if st.session_state.deepl_api_key.endswith(":fx"):
         endpoint = "https://api-free.deepl.com/v2/translate"
@@ -251,30 +250,20 @@ def translate_deepl(text, source_lang, target_lang):
         resp = requests.post(
             endpoint, 
             headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"}, 
-            data={"text": text, "target_lang": tl},  # source_lang محذوف
+            data={"text": text, "target_lang": tl},
             timeout=15
         )
         
         if resp.status_code == 200:
             return resp.json()["translations"][0]["text"], None
-        elif resp.status_code == 403:
-            return None, "Invalid API key or wrong endpoint"
-        elif resp.status_code == 429:
-            return None, "Rate limit exceeded"
-        elif resp.status_code == 456:
-            return None, "Quota exceeded (You used all your free characters)"
         else:
             return None, f"DeepL error {resp.status_code}: {resp.text}"
             
-    except requests.exceptions.Timeout:
-        return None, "Request timed out"
-    except requests.exceptions.ConnectionError:
-        return None, "Connection error"
     except Exception as e:
-        return None, f"Unexpected error: {str(e)}"
+        return None, f"Request error: {str(e)}"
 
-def fetch_ai_translation(text, source_lang, target_lang):
-    result, error = translate_deepl(text, source_lang, target_lang)
+def fetch_ai_translation(text, target_lang):
+    result, error = translate_deepl(text, target_lang)
     if result: return result, "DeepL"
     return None, error
 
@@ -289,11 +278,9 @@ if "input_text" not in st.session_state:
     st.session_state.input_text = ""
 if "selected_style" not in st.session_state:
     st.session_state.selected_style = "Auto-Detect"
-if "last_speech" not in st.session_state:
-    st.session_state.last_speech = ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  SWAP CALLBACK
+#  SWAP LANGUAGES
 # ═══════════════════════════════════════════════════════════════════════════════
 def swap_languages():
     old_source = st.session_state.source_lang
@@ -335,55 +322,49 @@ target_lang = languages_dict[target_lang_name]
 
 style_col1, style_col2 = st.columns([1, 2])
 with style_col1:
-    selected_style_label = st.selectbox("Translation Style / Domain", style_list, index=style_idx, help="Choose the tone/domain to prioritize. 'Auto-Detect' lets the app decide.")
+    selected_style_label = st.selectbox("Translation Style / Domain", style_list, index=style_idx)
 with style_col2:
     selected_domain = STYLE_OPTIONS[selected_style_label]
     if selected_domain and selected_domain != "general":
         dinfo = DOMAINS[selected_domain]
-        st.markdown(f"<div style='margin-top: 28px; font-size: 13px; color: {dinfo['color']}; font-weight: 600;'>{dinfo['emoji']} Priority: {dinfo['name_en']} translations shown first</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='margin-top: 28px; font-size: 13px; color: {dinfo['color']}; font-weight: 600;'>{dinfo['emoji']} Priority: {dinfo['name_en']}</div>", unsafe_allow_html=True)
     elif selected_domain == "general":
-        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>💬 General / standard translations prioritized</div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>💬 General</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>🔍 Auto-detecting domain from your text...</div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>🔍 Auto-detecting</div>", unsafe_allow_html=True)
 
 st.session_state.selected_style = selected_style_label
 
-if DOMAIN_SPECIFIC_TRANSLATIONS:
-    dict_size = len(DOMAIN_SPECIFIC_TRANSLATIONS)
-    total_entries = sum(len(v) for v in DOMAIN_SPECIFIC_TRANSLATIONS.values())
-    st.markdown(f'<div class="dict-stats">📚 Dictionary loaded: {dict_size} words with {total_entries} total domain entries</div>', unsafe_allow_html=True)
-
 # ═══════════════════════════════════════════════════════════════════════════════
-#  VOICE INPUT — audiorecorder
+#  VOICE INPUT — باستخدام st.audio_input (مدمجة، لا حاجة لمكتبات إضافية)
 # ═══════════════════════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
     st.markdown("""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
-        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input — Auto-insert</div>
+        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input</div>
         <div style="font-size:12px;color:#6b7280;">
-            Click the microphone, speak, and the text will <b>automatically appear</b> in the input box below.
+            Click the microphone, speak, and the audio will be recorded. 
+            <b>Note:</b> The app does not automatically transcribe speech; you can use the recorded audio as a reference and type the text manually below.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    audio = audiorecorder(
-        start_prompt="▶️ ابدأ التسجيل",
-        stop_prompt="⏹️ أوقف التسجيل",
-        pause_prompt="⏸️ وقّت",
-    )
-
-    if len(audio) > 0:
-        st.audio(audio.export().read(), format="audio/wav")
-        st.info("🎤 تم التسجيل! يمكنك الآن كتابة النص في المربع أدناه، أو استخدام خدمة تحويل الصوت إلى نص خارجية.")
-
-    st.caption("🎤 اضغط على زر التسجيل، تحدث، ثم أوقف التسجيل. الصوت يُشغل لك، ويمكنك كتابة النص في المربع أدناه.")
+    # استخدام st.audio_input لتسجيل الصوت (يعمل على HTTPS)
+    audio_value = st.audio_input("🎙️ Record a voice message")
+    
+    if audio_value:
+        # عرض الصوت المسجل
+        st.audio(audio_value)
+        # يمكن حفظ الملف إذا أردت
+        # مع العلم أن st.audio_input لا يوفر نسخاً نصياً، لذلك نكتفي بالتشغيل
+        st.success("✅ تم تسجيل الصوت! يمكنك سماعه أعلاه، ثم كتابة النص في المربع أدناه.")
 else:
-    st.warning("⚠️ يرجى إدخال مفتاح DeepL API أولاً من الشريط الجانبي لتتمكن من استخدام الميكروفون والترجمة.")
+    st.warning("⚠️ يرجى إدخال مفتاح DeepL API أولاً من الشريط الجانبي.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  TEXT INPUT
 # ═══════════════════════════════════════════════════════════════════════════════
-input_text = st.text_area("Enter text to translate", height=140, placeholder="Type, paste, or your voice text will appear here...", value=st.session_state.input_text, key="input_text_area")
+input_text = st.text_area("Enter text to translate", height=140, placeholder="Type, paste, or enter the text you want to translate...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
@@ -400,19 +381,19 @@ if input_text.strip():
         st.markdown(f'<div class="detected-box">🔍 <b>Auto-Detected Context:</b><br><div style="margin-top:6px;">{badges}</div></div>', unsafe_allow_html=True)
     else:
         if selected_style_label == "Auto-Detect":
-            st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>Context:</b> General / Standard</div>', unsafe_allow_html=True)
+            st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>Context:</b> General</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TRANSLATION EXECUTION
+#  TRANSLATION BUTTON
 # ═══════════════════════════════════════════════════════════════════════════════
 if st.button("Translate 🚀", type="primary", use_container_width=True):
     if not st.session_state.deepl_api_key:
-        st.error("❌ مفتاح DeepL API غير موجود. يرجى إدخاله من الشريط الجانبي.")
+        st.error("❌ DeepL API key missing. Please add it in the sidebar.")
     elif not input_text.strip():
-        st.warning("Please enter some text or use the voice input to translate.")
+        st.warning("Please enter some text to translate.")
     else:
         with st.spinner("Translating..."):
-            translation_result, source_engine = fetch_ai_translation(input_text, source_lang_name, target_lang_name)
+            translation_result, source_engine = fetch_ai_translation(input_text, target_lang_name)
 
             if translation_result:
                 active_domain = "general"
@@ -467,7 +448,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                 """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  SIDEBAR — إدارة المفتاح
+#  SIDEBAR — API Key Management
 # ═══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown("### 🔑 DeepL API Key")
@@ -475,12 +456,9 @@ with st.sidebar:
         masked = st.session_state.deepl_api_key[:6] + "..." + st.session_state.deepl_api_key[-4:] if len(st.session_state.deepl_api_key) > 10 else "***"
         st.markdown(f"<div style='font-size:12px;color:#16a34a;font-weight:600;'>✅ Active</div>", unsafe_allow_html=True)
         st.markdown(f"<div style='font-size:10px;color:#6b7280;'>{masked}</div>", unsafe_allow_html=True)
-        
         if st.button("🔄 Change Key", use_container_width=True):
             st.session_state.deepl_api_key = ""
             st.rerun()
-        
-        st.markdown("<div style='font-size:10px;color:#9ca3af;'>Key loaded from secrets or environment.</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div style='font-size:12px;color:#ef4444;'>⚠️ Not configured</div>", unsafe_allow_html=True)
         new_key = st.text_input("Enter DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
