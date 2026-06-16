@@ -4,12 +4,13 @@ import os
 import json
 from pathlib import Path
 import tempfile
-import whisper  # <-- مكتبة Whisper الجديدة
+from moonshine_voice import MoonshineVoice  # الأساسي
+from faster_whisper import WhisperModel     # الاحتياطي
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفسه)
+#  CSS (نفسه، اختصار للطول)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -17,7 +18,6 @@ st.markdown("""
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1100px; }
-
 .hero {
     background: #1a1a2e;
     border-radius: 14px;
@@ -34,7 +34,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .lang-bar { display: flex; gap: 6px; margin-top: 14px; align-items: center; }
 .ldot { width: 8px; height: 8px; border-radius: 50%; background: #5DCAA5; display: inline-block; }
 .lang-bar-txt { font-size: 11px; color: rgba(255,255,255,0.35); margin-left: 4px; }
-
 .rcard { border-radius: 12px; padding: 1.1rem 1.3rem; border: 0.5px solid #e5e7eb; background: #fff; transition: all 0.2s; }
 .rcard-pol { border-top: 3px solid #E63946; }
 .rcard-leg { border-top: 3px solid #534AB7; }
@@ -72,7 +71,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .rlabel-tour { color: #006064; }
 .rlabel-gen { color: #4B5563; }
 .rtext { font-size: 14px; line-height: 1.75; color: #1f2937; direction: auto; }
-
 .detected-box { background: #E6F4F1; border-left: 3px solid #5DCAA5; border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: 13px; color: #04342C; margin-bottom: 1rem; }
 .api-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; margin-right: 4px; }
 .api-deepl { background: #0F2B46; color: #8ECAE6; }
@@ -121,7 +119,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION
+#  CONFIGURATION (نفسه)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Arabic": "ar", "English": "en", "Russian": "ru", "Chinese": "zh",
@@ -215,25 +213,15 @@ if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = secrets_key
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION ENGINE
+#  TRANSLATION ENGINE (نفسه)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang_code):
     if not st.session_state.deepl_api_key:
         return None, "No API key configured"
-        
     tl = target_lang_code.upper()
-    if st.session_state.deepl_api_key.endswith(":fx"):
-        endpoint = "https://api-free.deepl.com/v2/translate"
-    else:
-        endpoint = "https://api.deepl.com/v2/translate"
-        
+    endpoint = "https://api-free.deepl.com/v2/translate" if st.session_state.deepl_api_key.endswith(":fx") else "https://api.deepl.com/v2/translate"
     try:
-        resp = requests.post(
-            endpoint,
-            headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"},
-            data={"text": text, "target_lang": tl},
-            timeout=15
-        )
+        resp = requests.post(endpoint, headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"}, data={"text": text, "target_lang": tl}, timeout=15)
         if resp.status_code == 200:
             return resp.json()["translations"][0]["text"], None
         else:
@@ -248,43 +236,62 @@ def fetch_ai_translation(text, target_lang_code):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  وظيفة تحويل الصوت إلى نص باستخدام Whisper (جديد)
+#  تحميل النماذج (الأساسي Moonshine، الاحتياطي Faster-Whisper)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
-def load_whisper_model():
-    """تحميل نموذج Whisper (مرة واحدة فقط)"""
-    # اختر حجم النموذج: "tiny", "base", "small", "medium", "large"
-    # "base" يوازن بين السرعة والدقة
-    return whisper.load_model("base")
+def load_moonshine_model():
+    """تحميل Moonshine Tiny المتخصص للعربية"""
+    # يمكن تغيير model_id حسب اللغة: "moonshine/tiny-ar" للعربية، 
+    # "moonshine/tiny-zh" للصينية، إلخ.
+    return MoonshineVoice(model_id="moonshine/tiny-ar")
 
-def speech_to_text_whisper(audio_bytes, language="auto"):
+@st.cache_resource
+def load_whisper_fallback():
+    """تحميل Faster-Whisper Tiny كخيار احتياطي"""
+    # استخدم tiny للخفة، أو base للدقة الأعلى قليلاً
+    return WhisperModel("tiny", device="cpu", compute_type="int8")
+
+# قائمة اللغات المدعومة في Moonshine (حسب النماذج المتخصصة)
+MOONSHINE_SUPPORTED = ["ar", "zh", "ja", "ko", "uk", "vi", "en", "es"]
+
+def speech_to_text_smart(audio_bytes, language_code="auto"):
     """
-    يحول الصوت إلى نص باستخدام Whisper.
-    language: "auto" للكشف التلقائي، أو رمز اللغة مثل "ar", "en", "fr", إلخ.
+    استخدام Moonshine للغات المدعومة، وإلا استخدام Faster-Whisper.
+    يعيد (النص, اسم النموذج المستخدم)
     """
+    tmp_path = None
     try:
-        model = load_whisper_model()
-        
-        # حفظ الصوت في ملف مؤقت بصيغة wav
+        # حفظ الصوت في ملف مؤقت
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
             tmp_audio.write(audio_bytes)
             tmp_path = tmp_audio.name
-        
-        # استخدام Whisper للتعرف
-        if language == "auto":
-            result = model.transcribe(tmp_path, fp16=False)
-        else:
-            result = model.transcribe(tmp_path, language=language, fp16=False)
-        
-        text = result["text"].strip()
-        return text, None
+
+        # 1. محاولة Moonshine إذا كانت اللغة مدعومة
+        if language_code in MOONSHINE_SUPPORTED:
+            try:
+                model = load_moonshine_model()
+                result = model.transcribe(tmp_path)
+                text = result["text"].strip()
+                return text, "Moonshine Tiny (متخصص)"
+            except Exception as e:
+                st.warning(f"⚠️ فشل Moonshine، ننتقل إلى Whisper: {e}")
+
+        # 2. الاحتياطي: Faster-Whisper
+        model = load_whisper_fallback()
+        # تحديد اللغة إذا كانت معروفة، وإلا نتركها auto
+        lang = language_code if language_code != "auto" else None
+        segments, info = model.transcribe(tmp_path, language=lang)
+        text = " ".join(seg.text for seg in segments).strip()
+        return text, "Faster-Whisper (احتياطي)"
+
     except Exception as e:
-        return None, f"خطأ في Whisper: {str(e)}"
+        return None, f"خطأ: {str(e)}"
     finally:
-        try:
-            os.unlink(tmp_path)
-        except:
-            pass
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
 
 # ════════════════════════════════════════════════════════════
 #  SESSION STATE
@@ -336,6 +343,7 @@ st.session_state.source_lang = source_lang_name
 st.session_state.target_lang = target_lang_name
 
 target_lang_code = languages_dict[target_lang_name]
+source_lang_code = languages_dict[source_lang_name]
 
 style_col1, style_col2 = st.columns([1, 2])
 with style_col1:
@@ -353,38 +361,30 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT + Whisper (تحويل تلقائي)
+#  VOICE INPUT (مع الاختيار الذكي)
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
     st.markdown("""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
-        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 إدخال صوتي — تحويل تلقائي إلى نص</div>
+        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 إدخال صوتي ذكي</div>
         <div style="font-size:12px;color:#6b7280;">
-            سجل رسالة صوتية، وسيقوم النظام بتحويلها إلى نص وترجمتها فوراً.
-            <b>يدعم 99 لغة</b> مع دقة عالية جداً.
+            يستخدم <b>Moonshine Tiny</b> للغات المدعومة (عربية، صينية، يابانية، كورية، وغيرها) 
+            و <b>Faster-Whisper</b> احتياطياً للغات الأخرى. دقة عالية جداً وسرعة فائقة.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # تحديد لغة المصدر للتعرف (من اختيار المستخدم)
-    # لاحظ أننا نأخذ رمز اللغة المصدر من languages_dict
-    source_lang_code = languages_dict[source_lang_name]
-    # Whisper يستخدم رموزاً مثل "ar", "en", "fr", إلخ.
-    # إذا كانت "auto" سنمرر None للكشف التلقائي
-    whisper_lang = None if source_lang_name == "Auto" else source_lang_code
-    
     audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
     
     if audio_value:
         st.audio(audio_value)
-        with st.spinner("جاري تحويل الصوت إلى نص باستخدام Whisper (قد يستغرق بضع ثوانٍ)..."):
-            # تحويل الصوت إلى نص باستخدام Whisper
-            recognized_text, error = speech_to_text_whisper(
-                audio_value.getvalue(), 
-                language=whisper_lang if whisper_lang else "auto"
+        with st.spinner("جاري التعرف على الصوت (قد يستغرق بضع ثوانٍ)..."):
+            recognized_text, model_used = speech_to_text_smart(
+                audio_value.getvalue(),
+                language_code=source_lang_code  # نمرر رمز اللغة المصدر
             )
             if recognized_text:
-                st.success(f"✅ تم التعرف على النص: {recognized_text}")
+                st.success(f"✅ تم التعرف ({model_used}): {recognized_text}")
                 st.session_state.input_text = recognized_text
                 # الترجمة التلقائية
                 with st.spinner("جاري الترجمة..."):
@@ -396,12 +396,12 @@ if st.session_state.deepl_api_key:
                     else:
                         st.error(f"فشلت الترجمة: {translation_result}")
             else:
-                st.error(f"فشل التعرف على الصوت: {error}")
+                st.error(f"فشل التعرف على الصوت: {model_used}")  # model_used يحمل رسالة الخطأ
 else:
     st.warning("⚠️ يرجى إدخال مفتاح DeepL API أولاً من الشريط الجانبي.")
 
 # ════════════════════════════════════════════════════════════
-#  TEXT INPUT (يدوي)
+#  TEXT INPUT
 # ════════════════════════════════════════════════════════════
 input_text = st.text_area("أدخل النص للترجمة (أو عدّله)", height=140, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
@@ -422,7 +422,7 @@ if input_text.strip():
             st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>السياق:</b> عام</div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  زر الترجمة اليدوي
+#  زر الترجمة
 # ════════════════════════════════════════════════════════════
 if st.button("ترجم 🚀", type="primary", use_container_width=True):
     if not st.session_state.deepl_api_key:
