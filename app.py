@@ -9,7 +9,7 @@ import tempfile
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفسه)
+#  CSS
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -216,8 +216,9 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  API KEYS (من secrets)
+#  API KEYS (من secrets) - قراءة مضمونة 100%
 # ════════════════════════════════════════════════════════════
+# محاولة قراءة المفتاح من st.secrets
 try:
     deepl_key = st.secrets.get("DEEPL_API_KEY", "")
 except:
@@ -234,6 +235,7 @@ except:
 if not cohere_key:
     cohere_key = os.environ.get("COHERE_API_KEY", "")
 
+# تخزين المفاتيح في session_state (للاستمرار بين جلسات التطبيق)
 if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = deepl_key
 
@@ -282,7 +284,11 @@ def get_cohere_client():
     """تهيئة عميل Cohere (مرة واحدة فقط)"""
     if not st.session_state.cohere_api_key:
         return None
-    return cohere.ClientV2(api_key=st.session_state.cohere_api_key)
+    try:
+        return cohere.ClientV2(api_key=st.session_state.cohere_api_key)
+    except Exception as e:
+        st.error(f"فشل في تهيئة عميل Cohere: {str(e)}")
+        return None
 
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     """
@@ -291,7 +297,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
     الحد الأقصى لحجم الملف: 25 ميجابايت
     """
     if not st.session_state.cohere_api_key:
-        return None, "مفتاح Cohere API غير موجود"
+        return None, "مفتاح Cohere API غير موجود في ملف secrets.toml"
     
     try:
         client = get_cohere_client()
@@ -328,8 +334,6 @@ if "input_text" not in st.session_state:
     st.session_state.input_text = ""
 if "selected_style" not in st.session_state:
     st.session_state.selected_style = "Auto-Detect"
-if "last_speech" not in st.session_state:
-    st.session_state.last_speech = ""
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
 
@@ -373,7 +377,7 @@ target_lang = languages_dict[target_lang_name]
 
 style_col1, style_col2 = st.columns([1, 2])
 with style_col1:
-    selected_style_label = st.selectbox("Translation Style / Domain", style_list, index=style_idx, help="Choose the tone/domain to prioritize. 'Auto-Detect' lets the app decide.")
+    selected_style_label = st.selectbox("Translation Style / Domain", style_list, index=style_idx)
 with style_col2:
     selected_domain = STYLE_OPTIONS[selected_style_label]
     if selected_domain and selected_domain != "general":
@@ -389,12 +393,17 @@ st.session_state.selected_style = selected_style_label
 # ════════════════════════════════════════════════════════════
 #  VOICE INPUT (باستخدام st.audio_input - مدمج ولا يحتاج مكتبات)
 # ════════════════════════════════════════════════════════════
+# التحقق من وجود مفتاح DeepL (لأن الترجمة تحتاجه)
 if st.session_state.deepl_api_key:
+    # التحقق من مفتاح Cohere مع رسائل توضيحية
     has_cohere = bool(st.session_state.cohere_api_key)
     
     if not has_cohere:
-        st.warning("⚠️ لم يتم العثور على مفتاح Cohere API. يرجى إضافته في ملف secrets.toml كـ COHERE_API_KEY")
+        st.error("❌ لم يتم العثور على مفتاح Cohere API. يرجى إضافته في ملف secrets.toml كـ COHERE_API_KEY")
         st.info("💡 يمكنك الحصول على مفتاح مجاني من: https://dashboard.cohere.com")
+        st.info("📝 تأكد من كتابة المفتاح بالصيغة الصحيحة: COHERE_API_KEY = 'your-key-here'")
+    else:
+        st.success("✅ تم العثور على مفتاح Cohere API بنجاح!")
     
     st.markdown("""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
@@ -406,14 +415,13 @@ if st.session_state.deepl_api_key:
     </div>
     """, unsafe_allow_html=True)
 
-    # استخدام st.audio_input المدمجة (بدون audiorecorder)
+    # استخدام st.audio_input المدمجة
     audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
     
     if audio_value:
         # تشغيل الصوت المسجل
         st.audio(audio_value)
         
-        # التحقق من وجود مفتاح Cohere
         if has_cohere:
             with st.spinner("⏳ جاري التعرف على الصوت باستخدام Cohere..."):
                 # قراءة البيانات الصوتية
@@ -437,8 +445,7 @@ if st.session_state.deepl_api_key:
                 else:
                     st.error(f"فشل التعرف على الصوت: {error}")
         else:
-            st.warning("⚠️ يرجى إضافة مفتاح Cohere API في ملف secrets.toml")
-            st.info("💡 يمكنك الحصول على مفتاح مجاني من: https://dashboard.cohere.com")
+            st.warning("⚠️ يرجى إضافة مفتاح Cohere API في ملف secrets.toml لتمكين التعرف على الصوت.")
 
 else:
     st.warning("⚠️ يرجى إدخال مفتاح DeepL API أولاً من الشريط الجانبي.")
@@ -558,3 +565,16 @@ with st.sidebar:
             st.success("✅ Key saved!")
             st.rerun()
         st.caption("Get a free key at [Cohere](https://dashboard.cohere.com)")
+    
+    # عرض حالة المفتاحين
+    st.divider()
+    st.markdown("### 📊 Status")
+    if st.session_state.deepl_api_key:
+        st.success("✅ DeepL: OK")
+    else:
+        st.error("❌ DeepL: Missing")
+    if st.session_state.cohere_api_key:
+        st.success("✅ Cohere: OK")
+    else:
+        st.error("❌ Cohere: Missing")
+        
