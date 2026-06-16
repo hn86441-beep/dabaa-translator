@@ -3,8 +3,9 @@ import requests
 import os
 import json
 from pathlib import Path
+from audiorecorder import audiorecorder
+import cohere
 import tempfile
-from faster_whisper import WhisperModel
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
@@ -17,6 +18,7 @@ st.markdown("""
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1100px; }
+
 .hero {
     background: #1a1a2e;
     border-radius: 14px;
@@ -33,6 +35,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .lang-bar { display: flex; gap: 6px; margin-top: 14px; align-items: center; }
 .ldot { width: 8px; height: 8px; border-radius: 50%; background: #5DCAA5; display: inline-block; }
 .lang-bar-txt { font-size: 11px; color: rgba(255,255,255,0.35); margin-left: 4px; }
+
 .rcard { border-radius: 12px; padding: 1.1rem 1.3rem; border: 0.5px solid #e5e7eb; background: #fff; transition: all 0.2s; }
 .rcard-pol { border-top: 3px solid #E63946; }
 .rcard-leg { border-top: 3px solid #534AB7; }
@@ -51,6 +54,8 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .rcard-med2 { border-top: 3px solid #5E35B1; }
 .rcard-tour { border-top: 3px solid #00838F; }
 .rcard-gen { border-top: 3px solid #6B7280; }
+.rcard-priority { box-shadow: 0 0 0 2px rgba(93,202,165,0.5); background: #f6fffd; }
+
 .rlabel { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; margin-bottom: 8px; }
 .rlabel-pol { color: #9B2226; }
 .rlabel-leg { color: #3C3489; }
@@ -70,9 +75,13 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .rlabel-tour { color: #006064; }
 .rlabel-gen { color: #4B5563; }
 .rtext { font-size: 14px; line-height: 1.75; color: #1f2937; direction: auto; }
+
 .detected-box { background: #E6F4F1; border-left: 3px solid #5DCAA5; border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: 13px; color: #04342C; margin-bottom: 1rem; }
+
 .api-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; margin-right: 4px; }
 .api-deepl { background: #0F2B46; color: #8ECAE6; }
+.api-cohere { background: #1a1a2e; color: #8ECAE6; }
+
 .domain-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; margin-right: 6px; margin-bottom: 4px; }
 .db-pol { background: #E63946; color: white; }
 .db-leg { background: #534AB7; color: white; }
@@ -91,8 +100,11 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .db-med2 { background: #5E35B1; color: white; }
 .db-tour { background: #00838F; color: white; }
 .db-gen { background: #6B7280; color: white; }
+
 .priority-badge { display: inline-block; background: #5DCAA5; color: white; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 6px; }
+
 .error-box { background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 0 8px 8px 0; padding: 12px 16px; font-size: 14px; color: #991b1b; margin-bottom: 1rem; }
+
 textarea { border-radius: 8px !important; border: 0.5px solid #d1d5db !important; font-size: 14px !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -105,7 +117,7 @@ st.markdown("""
         <span class="pill pill-active">🎤 Voice Input</span>
         <span class="pill pill-active">Auto-Domain Detect</span>
         <span class="pill pill-muted">DeepL Precision</span>
-        <span class="pill pill-muted">Smart Swap</span>
+        <span class="pill pill-muted">Cohere Transcribe</span>
         <span class="pill pill-muted">Style Selector</span>
     </div>
     <div class="lang-bar">
@@ -177,57 +189,79 @@ STYLE_OPTIONS = {
 #  DOMAIN KEYWORDS
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
-    "political": ["minister", "government", "parliament", "political", "diplomatic", "treaty", "election", "policy", "president", "وزير", "حكومة", "برلمان", "سياسة", "دبلوماسي", "معاهدة", "انتخابات", "رئيس"],
-    "legal": ["contract", "agreement", "clause", "legal", "court", "judgment", "law", "عقد", "اتفاق", "قانون", "محكمة", "حكم"],
-    "economic": ["economic", "financial", "investment", "cost", "budget", "revenue", "profit", "loss", "اقتصاد", "مالية", "استثمار", "تكلفة", "ميزانية", "ربح"],
-    "medical": ["doctor", "hospital", "treatment", "disease", "diagnosis", "surgery", "patient", "طبيب", "مستشفى", "علاج", "مرض", "تشخيص", "عملية", "مريض"],
-    "scientific": ["research", "study", "experiment", "theory", "scientific", "technology", "data", "بحث", "دراسة", "تجربة", "نظرية", "علمي", "تقنية", "بيانات"],
-    "engineering": ["engineering", "structural", "civil", "electrical", "mechanical", "concrete", "construction", "هندسة", "إنشائي", "مدني", "كهرباء", "ميكانيك", "خرسانة", "بناء"],
-    "military": ["military", "army", "defense", "war", "weapon", "base", "جيش", "عسكري", "دفاع", "حرب", "سلاح", "قاعدة"],
-    "educational": ["school", "university", "education", "teacher", "student", "exam", "مدرسة", "جامعة", "تعليم", "معلم", "طالب", "امتحان"],
-    "religious": ["mosque", "church", "prayer", "Quran", "Bible", "religion", "faith", "مسجد", "كنيسة", "صلاة", "قرآن", "إنجيل", "دين"],
-    "sports": ["sports", "football", "basketball", "tennis", "stadium", "team", "player", "رياضة", "كرة القدم", "كرة السلة", "تنس", "ملعب", "فريق"],
-    "literary": ["literature", "story", "novel", "poetry", "writer", "author", "text", "أدب", "قصة", "رواية", "شعر", "كاتب", "نص"],
-    "it": ["programming", "computer", "network", "software", "application", "website", "database", "برمجة", "حاسوب", "شبكة", "برنامج", "موقع", "قاعدة بيانات"],
-    "environmental": ["environment", "pollution", "climate", "renewable", "solar", "wind", "بيئة", "تلوث", "مناخ", "متجددة", "شمسية", "رياح"],
-    "agricultural": ["agriculture", "farm", "crop", "wheat", "rice", "trees", "irrigation", "زراعة", "مزرعة", "محصول", "قمح", "أرز", "أشجار"],
-    "media": ["media", "journalism", "television", "radio", "news", "report", "إعلام", "صحافة", "تلفزيون", "إذاعة", "خبر", "تقرير"],
-    "tourism": ["tourism", "hotel", "travel", "airport", "passport", "visa", "tour", "سياحة", "فندق", "سفر", "مطار", "جواز", "تأشيرة"],
+    "political": ["minister", "government", "council", "ministry", "parliament", "political", "diplomatic", "treaty", "election", "vote", "policy", "embassy", "summit", "legislation", "constitution", "foreign affairs", "national security", "coalition", "sanctions", "bilateral", "president", "state", "capital", "وزير", "حكومة", "مجلس", "وزارة", "برلمان", "سياسة", "دبلوماسي", "سفير", "معاهدة", "اتفاقية دولية", "حزب", "انتخابات", "تصويت", "أمن قومي", "استراتيجية وطنية", "بيان", "تصريح", "قمة", "مؤتمر", "جلسة", "تشريع", "دستور", "حقوق", "مواطن", "رئيس", "دولة", "عاصمة"],
+    "legal": ["contract", "agreement", "clause", "appendix", "legal", "stipulation", "liable", "penalty", "compensation", "arbitration", "court", "judgment", "license", "obligation", "terms and conditions", "binding", "jurisdiction", "warranty", "indemnity", "breach", "bill", "law", "code", "عقد", "اتفاقية", "بند", "ملحق", "تعاقد", "قانون", "مرسوم", "لائحة", "نظام", "شرط", "جزاء", "تعويض", "مسؤولية", "ضمان", "FIDIC", "تحكيم", "دعوى", "محكمة", "قاضي", "حكم", "قرار", "تنظيمي", "ترخيص", "التزام", "حق", "ملكية", "إثبات", "مشروع قانون"],
+    "economic": ["economic", "financial", "investment", "cost", "budget", "revenue", "profit", "loss", "loan", "bank", "market", "trade", "import", "export", "tax", "fee", "pricing", "tender", "bid", "currency", "inflation", "growth", "GDP", "fiscal", "monetary", "capital", "اقتصاد", "مالية", "استثمار", "تكلفة", "سعر", "ميزانية", "عائد", "ربح", "خسارة", "تمويل", "قرض", "بنك", "سوق", "تجارة", "استيراد", "تصدير", "عمولة", "ضريبة", "رسوم", "تسعير", "عطاء", "مناقصة", "صرف", "عملة", "تضخم", "نمو", "تجاري", "رأس مال"],
+    "medical": ["doctor", "hospital", "treatment", "medication", "dose", "disease", "symptoms", "diagnosis", "laboratory", "clinical", "surgery", "patient", "health", "epidemic", "vaccine", "radiology", "bacteria", "virus", "immunity", "tissue", "cardiac", "renal", "cell", "pupil", "طبيب", "مستشفى", "علاج", "دواء", "جرعة", "مرض", "أعراض", "تشخيص", "فحص", "تحليل", "مختبر", "سريري", "جراحة", "عملية", "مريض", "صحة", "وباء", "تطعيم", "أشعة", "بكتيريا", "فيروس", "مناعة", "أنسجة", "أعضاء", "قلب", "كبد", "كلى", "خلية", "بؤبؤ"],
+    "scientific": ["research", "study", "experiment", "hypothesis", "theory", "scientific", "discovery", "innovation", "technology", "analysis", "data", "statistical", "model", "simulation", "algorithm", "AI", "machine learning", "physics", "chemistry", "biology", "astronomy", "بحث", "دراسة", "مختبر", "تجربة", "فرضية", "نظرية", "علمي", "اكتشاف", "ابتكار", "تقنية", "تكنولوجيا", "تحليل", "بيانات", "إحصائية", "نموذج", "محاكاة", "خوارزمية", "ذكاء اصطناعي", "تعلم آلي", "طاقة", "فيزياء", "كيمياء", "بيولوجيا", "فلك"],
+    "engineering": ["engineering", "structural", "civil", "architectural", "electrical", "mechanical", "concrete", "rebar", "foundation", "excavation", "backfill", "pouring", "drawings", "specifications", "construction", "supervision", "quality", "inspection", "survey", "plane", "spring", "lead", "هندسة", "إنشائي", "مدني", "معماري", "كهرباء", "ميكانيك", "صرف", "مياه", "طرق", "جسور", "أنفاق", "خرسانة", "حديد", "تسليح", "صب", "ردم", "حفر", "أساسات", "تصميم", "مخططات", "مواصفات", "بناء", "تشييد", "إشراف", "جودة", "اختبار", "مساحة", "مستوى", "نابض", "رصاص"],
+    "military": ["military", "army", "defense", "war", "battle", "weapon", "air force", "navy", "tank", "missile", "bomb", "base", "recruitment", "officer", "soldier", "rank", "operation", "watch", "جيش", "عسكري", "دفاع", "حرب", "معركة", "سلاح", "سلاح الجو", "بحرية", "دبابة", "صاروخ", "قنبلة", "قاعدة عسكرية", "تجنيد", "ضابط", "جندي", "رتبة", "عملية عسكرية", "حرس"],
+    "educational": ["school", "university", "education", "teaching", "teacher", "professor", "student", "curriculum", "exam", "test", "certificate", "thesis", "dissertation", "training", "doctor", "pupil", "مدرسة", "جامعة", "تعليم", "تدريس", "معلم", "أستاذ", "طالب", "دراسة", "مناهج", "امتحان", "اختبار", "شهادة", "بحث علمي", "رسالة", "أطروحة", "تدريب", "دورة", "دكتوراه", "تلميذ"],
+    "religious": ["mosque", "church", "temple", "prayer", "Quran", "Bible", "hadith", "jurisprudence", "sharia", "pilgrimage", "fasting", "charity", "imam", "sermon", "religion", "faith", "مسجد", "كنيسة", "معبد", "صلاة", "قرآن", "إنجيل", "حديث", "فقه", "شريعة", "حج", "عمرة", "صوم", "زكاة", "إمام", "خطيب", "دين", "عقيدة", "عبادة", "تفسير"],
+    "sports": ["sports", "football", "soccer", "basketball", "tennis", "swimming", "running", "stadium", "club", "team", "player", "coach", "referee", "championship", "cup", "match", "fitness", "court", "ring", "bat", "رياضة", "كرة القدم", "كرة السلة", "تنس", "سباحة", "جري", "ملعب", "نادي", "فريق", "لاعب", "مدرب", "حكم", "بطولة", "كأس", "مباراة", "تدريب", "لياقة", "مسابقة", "ملعب", "حلبة", "مضرب"],
+    "literary": ["literature", "story", "novel", "poetry", "poem", "writer", "author", "text", "style", "rhetoric", "metaphor", "simile", "chapter", "paragraph", "narrative", "plot", "character", "أدب", "قصة", "رواية", "شعر", "قصيدة", "كاتب", "مؤلف", "نص", "أسلوب", "بلاغة", "مجاز", "استعارة", "تشبيه", "فصل", "فقرة", "سرد", "حبكة", "شخصية", "حوار"],
+    "it": ["programming", "code", "computer", "network", "internet", "software", "application", "website", "server", "database", "cybersecurity", "hacker", "AI", "machine learning", "cloud", "API", "cell", "برمجة", "كود", "حاسوب", "كمبيوتر", "شبكة", "إنترنت", "برنامج", "تطبيق", "موقع", "خادم", "قاعدة بيانات", "أمن سيبراني", "هاكر", "ذكاء اصطناعي", "تعلم آلي", "سحابي", "خلية"],
+    "environmental": ["environment", "pollution", "climate", "global warming", "renewable", "solar", "wind", "seal", "بيئة", "تلوث", "مناخ", "احتباس حراري", "طاقة متجددة", "شمسية", "رياح", "مياه جوفية", "غابة", "صحراء", "تصحر", "تنوع حيوي", "محمية", "طبيعة", "أوزون", "كربون", "فقمة"],
+    "agricultural": ["agriculture", "farm", "crop", "wheat", "rice", "corn", "trees", "irrigation", "soil", "date", "زراعة", "مزرعة", "محصول", "قمح", "أرز", "ذرة", "أشجار", "ماء ري", "تربة", "سماد", "مبيد", "حصاد", "حصادة", "ثروة حيوانية", "مواشي", "أغنام", "دواجن", "سمك", "تمر"],
+    "media": ["media", "journalism", "television", "radio", "newspaper", "news", "report", "anchor", "إعلام", "صحافة", "تلفزيون", "إذاعة", "صحيفة", "خبر", "تقرير", "مذيع", "مراسل", "تحقيق", "صحفي", "إعلان", "دعاية", "بث", "قناة", "برنامج إعلامي"],
+    "tourism": ["tourism", "hotel", "travel", "trip", "airport", "aviation", "passport", "visa", "tour", "plane", "سياحة", "فندق", "سفر", "رحلة", "مطار", "طيران", "جواز", "تأشيرة", "جولة", "أثر", "تاريخي", "معلم", "منتجع", "شاطئ", "جبل", "صحراء", "متحف", "تراث", "طائرة"],
 }
 
 def detect_domains(text):
     text_lower = text.lower()
     scores = {}
     for domain, keywords in DOMAIN_KEYWORDS.items():
-        score = sum(text_lower.count(kw.lower()) for kw in keywords)
+        score = sum(text_lower.count(kw.lower()) * (1 + len(kw)/50) for kw in keywords)
         if score > 0:
             scores[domain] = score
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  DEEPL API KEY
+#  API KEYS (من secrets)
 # ════════════════════════════════════════════════════════════
 try:
-    secrets_key = st.secrets.get("DEEPL_API_KEY", "")
+    deepl_key = st.secrets.get("DEEPL_API_KEY", "")
 except:
-    secrets_key = ""
+    deepl_key = ""
 
-if not secrets_key:
-    secrets_key = os.environ.get("DEEPL_API_KEY", "")
+if not deepl_key:
+    deepl_key = os.environ.get("DEEPL_API_KEY", "")
+
+try:
+    cohere_key = st.secrets.get("COHERE_API_KEY", "")
+except:
+    cohere_key = ""
+
+if not cohere_key:
+    cohere_key = os.environ.get("COHERE_API_KEY", "")
 
 if "deepl_api_key" not in st.session_state:
-    st.session_state.deepl_api_key = secrets_key
+    st.session_state.deepl_api_key = deepl_key
+
+if "cohere_api_key" not in st.session_state:
+    st.session_state.cohere_api_key = cohere_key
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION ENGINE
+#  TRANSLATION ENGINE (DeepL)
 # ════════════════════════════════════════════════════════════
-def translate_deepl(text, target_lang_code):
+def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
-        return None, "No API key configured"
-    tl = target_lang_code.upper()
-    endpoint = "https://api-free.deepl.com/v2/translate" if st.session_state.deepl_api_key.endswith(":fx") else "https://api.deepl.com/v2/translate"
+        return None, "No DeepL API key configured"
+        
+    tl = target_lang.upper()
+    
+    if st.session_state.deepl_api_key.endswith(":fx"):
+        endpoint = "https://api-free.deepl.com/v2/translate"
+    else:
+        endpoint = "https://api.deepl.com/v2/translate"
+        
     try:
-        resp = requests.post(endpoint, headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"}, data={"text": text, "target_lang": tl}, timeout=15)
+        resp = requests.post(
+            endpoint,
+            headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"},
+            data={"text": text, "target_lang": tl},
+            timeout=15
+        )
         if resp.status_code == 200:
             return resp.json()["translations"][0]["text"], None
         else:
@@ -235,74 +269,54 @@ def translate_deepl(text, target_lang_code):
     except Exception as e:
         return None, f"Request error: {str(e)}"
 
-def fetch_ai_translation(text, target_lang_code):
-    result, error = translate_deepl(text, target_lang_code)
+def fetch_ai_translation(text, target_lang):
+    result, error = translate_deepl(text, target_lang)
     if result:
         return result, "DeepL"
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  تحميل نموذج Faster-Whisper (OpenAI Whisper المحسّن)
+#  SPEECH-TO-TEXT (Cohere Transcribe)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
-def load_whisper_model():
-    """
-    تحميل نموذج Faster-Whisper (مرة واحدة فقط)
-    - "base" = توازن بين السرعة والدقة (ممتاز)
-    - "small" = دقة أعلى، أبطأ قليلاً
-    - "medium" = دقة عالية جداً
-    - "large" = أعلى دقة، أبطأ
-    """
-    return WhisperModel("base", device="cpu", compute_type="int8")
+def get_cohere_client():
+    """تهيئة عميل Cohere (مرة واحدة فقط)"""
+    if not st.session_state.cohere_api_key:
+        return None
+    return cohere.ClientV2(api_key=st.session_state.cohere_api_key)
 
-def speech_to_text_whisper(audio_bytes, language_code="auto"):
+def speech_to_text_cohere(audio_bytes, language_code="auto"):
     """
-    تحويل الصوت إلى نص باستخدام Faster-Whisper.
-    language_code: "auto" للكشف التلقائي، أو رمز اللغة مثل "ar", "en", إلخ.
+    تحويل الصوت إلى نص باستخدام Cohere Transcribe.
+    يدعم صيغ: FLAC, MP3, MPEG, MPGA, OGG, WAV
+    الحد الأقصى لحجم الملف: 25 ميجابايت
     """
-    tmp_path = None
+    if not st.session_state.cohere_api_key:
+        return None, "مفتاح Cohere API غير موجود"
+    
     try:
-        # حفظ الصوت في ملف مؤقت
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
-            tmp_audio.write(audio_bytes)
-            tmp_path = tmp_audio.name
-
-        # تحميل النموذج
-        model = load_whisper_model()
+        client = get_cohere_client()
+        if not client:
+            return None, "فشل في تهيئة عميل Cohere"
         
-        # تحديد اللغة
+        # تحديد اللغة (اختياري)
         lang = None if language_code == "auto" else language_code
         
-        # تشغيل التعرف مع إعدادات محسّنة
-        segments, info = model.transcribe(
-            tmp_path,
-            language=lang,
-            beam_size=5,              # تحسين الدقة
-            temperature=0.0,          # جعل النموذج أكثر حزماً
-            vad_filter=True,          # تصفية الصمت لتحسين الدقة
-            condition_on_previous_text=False
+        # إرسال الطلب
+        response = client.audio.transcriptions.create(
+            file=audio_bytes,
+            model="cohere-transcribe-03-2026",
+            language=lang
         )
         
-        # تجميع النص من جميع المقاطع
-        text = " ".join(segment.text for segment in segments).strip()
-        
-        # تحديد النموذج المستخدم
-        model_name = f"Faster-Whisper (base)"
-        if lang:
-            model_name += f" - لغة: {language_code}"
+        text = response.text.strip()
+        if text:
+            return text, None
         else:
-            model_name += " - كشف تلقائي"
-        
-        return text, model_name
-        
+            return None, "لم يتم التعرف على أي كلام"
+            
     except Exception as e:
-        return None, f"خطأ في التعرف: {str(e)}"
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except:
-                pass
+        return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
 #  SESSION STATE
@@ -315,8 +329,12 @@ if "input_text" not in st.session_state:
     st.session_state.input_text = ""
 if "selected_style" not in st.session_state:
     st.session_state.selected_style = "Auto-Detect"
+if "last_speech" not in st.session_state:
+    st.session_state.last_speech = ""
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
+if "speech_engine" not in st.session_state:
+    st.session_state.speech_engine = "Cohere Transcribe (مفضل)"
 
 def swap_languages():
     old_source = st.session_state.source_lang
@@ -353,76 +371,89 @@ with right:
 st.session_state.source_lang = source_lang_name
 st.session_state.target_lang = target_lang_name
 
-source_lang_code = languages_dict[source_lang_name]
-target_lang_code = languages_dict[target_lang_name]
+source_lang = languages_dict[source_lang_name]
+target_lang = languages_dict[target_lang_name]
 
 style_col1, style_col2 = st.columns([1, 2])
 with style_col1:
-    selected_style_label = st.selectbox("Translation Style / Domain", style_list, index=style_idx)
+    selected_style_label = st.selectbox("Translation Style / Domain", style_list, index=style_idx, help="Choose the tone/domain to prioritize. 'Auto-Detect' lets the app decide.")
 with style_col2:
     selected_domain = STYLE_OPTIONS[selected_style_label]
     if selected_domain and selected_domain != "general":
         dinfo = DOMAINS[selected_domain]
         st.markdown(f"<div style='margin-top: 28px; font-size: 13px; color: {dinfo['color']}; font-weight: 600;'>{dinfo['emoji']} Priority: {dinfo['name_en']}</div>", unsafe_allow_html=True)
     elif selected_domain == "general":
-        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>💬 General</div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>💬 General / standard translations prioritized</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>🔍 Auto-detecting</div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>🔍 Auto-detecting domain from your text...</div>", unsafe_allow_html=True)
 
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT (باستخدام Faster-Whisper)
+#  اختيار محرك التعرف على الصوت (Cohere أو البديل)
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
-    if source_lang_code == "auto":
-        lang_mode = "🔄 كشف تلقائي للغة"
-        model_info = "سيستخدم Faster-Whisper للكشف عن اللغة تلقائياً."
-    else:
-        lang_mode = f"🎯 لغة محددة: {source_lang_name} ({source_lang_code})"
-        model_info = f"سيستخدم Faster-Whisper مع تحديد اللغة {source_lang_name}."
-
-    st.markdown(f"""
+    # التحقق من وجود مفتاح Cohere
+    has_cohere = bool(st.session_state.cohere_api_key)
+    
+    if not has_cohere:
+        st.warning("⚠️ لم يتم العثور على مفتاح Cohere API. يرجى إضافته في ملف secrets.toml كـ COHERE_API_KEY")
+        st.info("💡 يمكنك الحصول على مفتاح مجاني من: https://dashboard.cohere.com")
+    
+    st.markdown("""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
-        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 إدخال صوتي - OpenAI Whisper</div>
+        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input</div>
         <div style="font-size:12px;color:#6b7280;">
-            {lang_mode}<br>
-            {model_info}<br>
-            <span style="color:#16a34a;">⚡ يستخدم Faster-Whisper (أسرع 4 مرات من Whisper الأصلي)</span>
+            Click the microphone, speak, and the text will <b>automatically appear</b> in the input box below.
+            <br>⚡ Using <b>Cohere Transcribe</b> (دقة عالية جداً، يدعم 14 لغة)
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
-    
-    if audio_value:
-        st.audio(audio_value)
-        with st.spinner("جاري التعرف على الصوت باستخدام Whisper..."):
-            recognized_text, model_used = speech_to_text_whisper(
-                audio_value.getvalue(),
-                language_code=source_lang_code
-            )
-            if recognized_text:
-                st.success(f"✅ تم التعرف ({model_used}): {recognized_text}")
-                st.session_state.input_text = recognized_text
-                # الترجمة التلقائية
-                with st.spinner("جاري الترجمة..."):
-                    translation_result, source_engine = fetch_ai_translation(recognized_text, target_lang_code)
-                    if translation_result:
-                        st.session_state.translated_text = translation_result
-                        st.markdown("### الترجمة")
-                        st.markdown(f">>> {translation_result}")
-                    else:
-                        st.error(f"فشلت الترجمة: {translation_result}")
-            else:
-                st.error(f"فشل التعرف على الصوت: {model_used}")
+    # تسجيل الصوت
+    audio = audiorecorder(
+        start_prompt="▶️ ابدأ التسجيل",
+        stop_prompt="⏹️ أوقف التسجيل",
+        pause_prompt="⏸️ وقّت",
+    )
+
+    # معالجة الصوت المسجل
+    if len(audio) > 0:
+        st.audio(audio.export().read(), format="audio/wav")
+        
+        # استخدام Cohere للتعرف
+        if has_cohere:
+            with st.spinner("⏳ جاري التعرف على الصوت باستخدام Cohere..."):
+                audio_bytes = audio.export().read()
+                recognized_text, error = speech_to_text_cohere(audio_bytes, source_lang)
+                
+                if recognized_text:
+                    st.success(f"✅ تم التعرف: {recognized_text}")
+                    st.session_state.input_text = recognized_text
+                    
+                    # الترجمة التلقائية
+                    if st.button("ترجم الآن 🚀", type="primary"):
+                        with st.spinner("⏳ جاري الترجمة..."):
+                            translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
+                            if translated_text:
+                                st.session_state.translated_text = translated_text
+                                st.markdown("### الترجمة")
+                                st.markdown(f">>> {translated_text}")
+                            else:
+                                st.error(f"فشلت الترجمة: {engine}")
+                else:
+                    st.error(f"فشل التعرف على الصوت: {error}")
+        else:
+            st.warning("⚠️ يرجى إضافة مفتاح Cohere API في ملف secrets.toml")
+            st.info("💡 يمكنك الحصول على مفتاح مجاني من: https://dashboard.cohere.com")
+
 else:
     st.warning("⚠️ يرجى إدخال مفتاح DeepL API أولاً من الشريط الجانبي.")
 
 # ════════════════════════════════════════════════════════════
 #  TEXT INPUT
 # ════════════════════════════════════════════════════════════
-input_text = st.text_area("أدخل النص للترجمة (أو عدّله)", height=140, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
+input_text = st.text_area("Enter text to translate", height=140, placeholder="Type, paste, or your voice text will appear here...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
@@ -435,46 +466,102 @@ if input_text.strip():
             emoji = DOMAINS[d]["emoji"]
             css_class = f"db-{d}" if d in DOMAINS else "db-gen"
             badges += f'<span class="domain-badge {css_class}">{emoji} {dn}</span>'
-        st.markdown(f'<div class="detected-box">🔍 <b>السياق المكتشف:</b><br><div style="margin-top:6px;">{badges}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="detected-box">🔍 <b>Auto-Detected Context:</b><br><div style="margin-top:6px;">{badges}</div></div>', unsafe_allow_html=True)
     else:
         if selected_style_label == "Auto-Detect":
-            st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>السياق:</b> عام</div>', unsafe_allow_html=True)
+            st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>Context:</b> General / Standard</div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  زر الترجمة
+#  زر الترجمة اليدوي
 # ════════════════════════════════════════════════════════════
-if st.button("ترجم 🚀", type="primary", use_container_width=True):
+if st.button("Translate 🚀", type="primary", use_container_width=True):
     if not st.session_state.deepl_api_key:
-        st.error("❌ مفتاح DeepL API مفقود.")
+        st.error("❌ DeepL API key missing. Please add it in the sidebar.")
     elif not input_text.strip():
-        st.warning("الرجاء إدخال نص للترجمة.")
+        st.warning("Please enter some text to translate.")
     else:
-        with st.spinner("جاري الترجمة..."):
-            translation_result, source_engine = fetch_ai_translation(input_text, target_lang_code)
+        with st.spinner("Translating..."):
+            translation_result, source_engine = fetch_ai_translation(input_text, target_lang)
+
             if translation_result:
-                st.session_state.translated_text = translation_result
-                st.markdown("### نتيجة الترجمة")
-                st.markdown(f">>> {translation_result}")
+                active_domain = "general"
+                if selected_domain and selected_domain != "general":
+                    active_domain = selected_domain
+                elif detected:
+                    active_domain = detected[0]
+
+                final_translation = translation_result
+                swaps_made = 0
+
+                card_class = f"rcard-{active_domain}" if active_domain in DOMAINS else "rcard-gen"
+                label_class = f"rlabel-{active_domain}" if active_domain in DOMAINS else "rlabel-gen"
+                domain_info = DOMAINS.get(active_domain, DOMAINS["general"])
+
+                st.markdown("### Translation Result")
+                
+                card_html = f"""
+                <div class="rcard {card_class}">
+                    <div class="rlabel {label_class}">
+                        {domain_info['emoji']} {domain_info['name_en'].upper()} TRANSLATION
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <span class="api-badge api-deepl">⚡ {source_engine}</span>
+                        <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
+                    </div>
+                    <div class="rtext">{final_translation}</div>
+                </div>
+                """
+                
+                st.markdown(card_html, unsafe_allow_html=True)
+                st.code(final_translation, language=None)
             else:
-                st.error(f"فشلت الترجمة: {translation_result}")
+                st.markdown(f"""
+                <div class="error-box">
+                    <b>Translation Failed:</b> {source_engine}
+                    <br><span style="font-size:12px;">Please check your DeepL API key and internet connection.</span>
+                </div>
+                """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
 #  SIDEBAR
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("### 🔑 مفتاح DeepL API")
+    st.markdown("### 🔑 API Keys")
+    
+    # DeepL
+    st.markdown("**DeepL API**")
     if st.session_state.deepl_api_key:
         masked = st.session_state.deepl_api_key[:6] + "..." + st.session_state.deepl_api_key[-4:] if len(st.session_state.deepl_api_key) > 10 else "***"
-        st.markdown(f"<div style='font-size:12px;color:#16a34a;font-weight:600;'>✅ مفعّل</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size:12px;color:#16a34a;font-weight:600;'>✅ Active</div>", unsafe_allow_html=True)
         st.markdown(f"<div style='font-size:10px;color:#6b7280;'>{masked}</div>", unsafe_allow_html=True)
-        if st.button("🔄 تغيير المفتاح", use_container_width=True):
+        if st.button("🔄 Change DeepL Key", use_container_width=True):
             st.session_state.deepl_api_key = ""
             st.rerun()
     else:
-        st.markdown("<div style='font-size:12px;color:#ef4444;'>⚠️ غير مضبوط</div>", unsafe_allow_html=True)
-        new_key = st.text_input("أدخل مفتاح DeepL API", type="password", placeholder="مثل: abc...xyz:fx")
+        st.markdown("<div style='font-size:12px;color:#ef4444;'>⚠️ Not configured</div>", unsafe_allow_html=True)
+        new_key = st.text_input("Enter DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
         if new_key:
             st.session_state.deepl_api_key = new_key
-            st.success("✅ تم حفظ المفتاح!")
+            st.success("✅ Key saved!")
             st.rerun()
-        st.caption("احصل على مفتاح مجاني من [DeepL](https://www.deepl.com/pro-api)")
+        st.caption("Get a free key at [DeepL](https://www.deepl.com/pro-api)")
+    
+    st.divider()
+    
+    # Cohere
+    st.markdown("**Cohere API (للتعرف على الصوت)**")
+    if st.session_state.cohere_api_key:
+        masked = st.session_state.cohere_api_key[:6] + "..." + st.session_state.cohere_api_key[-4:] if len(st.session_state.cohere_api_key) > 10 else "***"
+        st.markdown(f"<div style='font-size:12px;color:#16a34a;font-weight:600;'>✅ Active</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size:10px;color:#6b7280;'>{masked}</div>", unsafe_allow_html=True)
+        if st.button("🔄 Change Cohere Key", use_container_width=True):
+            st.session_state.cohere_api_key = ""
+            st.rerun()
+    else:
+        st.markdown("<div style='font-size:12px;color:#ef4444;'>⚠️ Not configured</div>", unsafe_allow_html=True)
+        new_key = st.text_input("Enter Cohere API Key", type="password", placeholder="e.g., abcd-1234-efgh-5678")
+        if new_key:
+            st.session_state.cohere_api_key = new_key
+            st.success("✅ Key saved!")
+            st.rerun()
+        st.caption("Get a free key at [Cohere](https://dashboard.cohere.com)")
