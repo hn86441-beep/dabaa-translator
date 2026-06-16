@@ -4,13 +4,12 @@ import os
 import json
 from pathlib import Path
 import tempfile
-from moonshine_voice import Transcriber
 from faster_whisper import WhisperModel
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفسه مختصر)
+#  CSS
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -243,88 +242,61 @@ def fetch_ai_translation(text, target_lang_code):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  تحميل النماذج (مع ترقية إلى Small للحصول على دقة أفضل)
+#  تحميل نموذج Faster-Whisper (OpenAI Whisper المحسّن)
 # ════════════════════════════════════════════════════════════
-# خريطة رموز اللغات إلى معرفات النماذج المتخصصة في Moonshine
-MOONSHINE_MODEL_MAP = {
-    'ar': 'moonshine/tiny-ar',
-    'zh': 'moonshine/tiny-zh',
-    'ja': 'moonshine/tiny-ja',
-    'ko': 'moonshine/tiny-ko',
-    'uk': 'moonshine/tiny-uk',
-    'vi': 'moonshine/tiny-vi',
-}
-
-# اللغات المدعومة بنماذج متخصصة
-MOONSHINE_SUPPORTED_LANGUAGES = set(MOONSHINE_MODEL_MAP.keys())
-
 @st.cache_resource
-def load_moonshine_model(lang_code):
+def load_whisper_model():
     """
-    تحميل نموذج Moonshine المتخصص حسب اللغة.
+    تحميل نموذج Faster-Whisper (مرة واحدة فقط)
+    - "base" = توازن بين السرعة والدقة (ممتاز)
+    - "small" = دقة أعلى، أبطأ قليلاً
+    - "medium" = دقة عالية جداً
+    - "large" = أعلى دقة، أبطأ
     """
-    if lang_code in MOONSHINE_MODEL_MAP:
-        model_id = MOONSHINE_MODEL_MAP[lang_code]
-    else:
-        model_id = 'moonshine/tiny'  # النموذج العام
-    return Transcriber(model_id=model_id, language=None)
+    return WhisperModel("base", device="cpu", compute_type="int8")
 
-@st.cache_resource
-def load_whisper_fallback():
+def speech_to_text_whisper(audio_bytes, language_code="auto"):
     """
-    تحميل Faster-Whisper Small (أكثر دقة من Base) كخيار احتياطي.
-    يمكن تغيير "small" إلى "base" إذا كانت الذاكرة محدودة.
-    """
-    return WhisperModel("small", device="cpu", compute_type="int8")
-
-# ════════════════════════════════════════════════════════════
-#  دالة التعرف على الصوت الذكية
-# ════════════════════════════════════════════════════════════
-def speech_to_text_smart(audio_bytes, language_code="auto"):
-    """
-    يحول الصوت إلى نص باستخدام النموذج المناسب مع إعدادات محسّنة للدقة.
+    تحويل الصوت إلى نص باستخدام Faster-Whisper.
+    language_code: "auto" للكشف التلقائي، أو رمز اللغة مثل "ar", "en", إلخ.
     """
     tmp_path = None
     try:
+        # حفظ الصوت في ملف مؤقت
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
             tmp_audio.write(audio_bytes)
             tmp_path = tmp_audio.name
 
-        use_auto = (language_code == "auto" or language_code is None)
-        lang = None if use_auto else language_code
-
-        # 1. المحاولة الأساسية: Moonshine
-        try:
-            if not use_auto and language_code in MOONSHINE_SUPPORTED_LANGUAGES:
-                model = load_moonshine_model(language_code)
-                model_name = f"Moonshine Tiny متخصص ({language_code})"
-            else:
-                model = load_moonshine_model("general")
-                model_name = "Moonshine Tiny (عام)" + (" (كشف تلقائي)" if use_auto else f" (لغة: {language_code})")
-            
-            # استخدام beam_size=5 لتحسين الدقة
-            result = model.transcribe(tmp_path, language=lang, beam_size=5)
-            text = result.text.strip()
-            return text, model_name
-        except Exception as e:
-            st.warning(f"⚠️ فشل Moonshine، ننتقل إلى Whisper: {e}")
-
-        # 2. الاحتياطي: Faster-Whisper Small مع إعدادات محسّنة
-        model = load_whisper_fallback()
+        # تحميل النموذج
+        model = load_whisper_model()
+        
+        # تحديد اللغة
+        lang = None if language_code == "auto" else language_code
+        
+        # تشغيل التعرف مع إعدادات محسّنة
         segments, info = model.transcribe(
             tmp_path,
             language=lang,
-            beam_size=5,
-            temperature=0.0,
-            condition_on_previous_text=False,
-            vad_filter=True  # تصفية الصمت لتحسين الدقة
+            beam_size=5,              # تحسين الدقة
+            temperature=0.0,          # جعل النموذج أكثر حزماً
+            vad_filter=True,          # تصفية الصمت لتحسين الدقة
+            condition_on_previous_text=False
         )
-        text = " ".join(seg.text for seg in segments).strip()
-        model_name = "Faster-Whisper Small (احتياطي)" + (" (كشف تلقائي)" if use_auto else f" (لغة: {language_code})")
+        
+        # تجميع النص من جميع المقاطع
+        text = " ".join(segment.text for segment in segments).strip()
+        
+        # تحديد النموذج المستخدم
+        model_name = f"Faster-Whisper (base)"
+        if lang:
+            model_name += f" - لغة: {language_code}"
+        else:
+            model_name += " - كشف تلقائي"
+        
         return text, model_name
-
+        
     except Exception as e:
-        return None, f"خطأ: {str(e)}"
+        return None, f"خطأ في التعرف: {str(e)}"
     finally:
         if tmp_path and os.path.exists(tmp_path):
             try:
@@ -400,26 +372,23 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT
+#  VOICE INPUT (باستخدام Faster-Whisper)
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
     if source_lang_code == "auto":
         lang_mode = "🔄 كشف تلقائي للغة"
-        model_info = "سيتم استخدام النموذج العام مع الكشف التلقائي."
+        model_info = "سيستخدم Faster-Whisper للكشف عن اللغة تلقائياً."
     else:
         lang_mode = f"🎯 لغة محددة: {source_lang_name} ({source_lang_code})"
-        if source_lang_code in MOONSHINE_SUPPORTED_LANGUAGES:
-            model_info = f"✅ سيتم استخدام نموذج Moonshine المتخصص للغة {source_lang_name}"
-        else:
-            model_info = f"⚠️ لا يوجد نموذج متخصص، سيتم استخدام النموذج العام أو Faster-Whisper."
+        model_info = f"سيستخدم Faster-Whisper مع تحديد اللغة {source_lang_name}."
 
     st.markdown(f"""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
-        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 إدخال صوتي ذكي</div>
+        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 إدخال صوتي - OpenAI Whisper</div>
         <div style="font-size:12px;color:#6b7280;">
             {lang_mode}<br>
             {model_info}<br>
-            <span style="color:#16a34a;">⚡ يستخدم Faster-Whisper Small (دقة أعلى) + VAD لتحسين النتائج</span>
+            <span style="color:#16a34a;">⚡ يستخدم Faster-Whisper (أسرع 4 مرات من Whisper الأصلي)</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -428,14 +397,15 @@ if st.session_state.deepl_api_key:
     
     if audio_value:
         st.audio(audio_value)
-        with st.spinner("جاري التعرف على الصوت (قد يستغرق 3-5 ثوانٍ)..."):
-            recognized_text, model_used = speech_to_text_smart(
+        with st.spinner("جاري التعرف على الصوت باستخدام Whisper..."):
+            recognized_text, model_used = speech_to_text_whisper(
                 audio_value.getvalue(),
                 language_code=source_lang_code
             )
             if recognized_text:
                 st.success(f"✅ تم التعرف ({model_used}): {recognized_text}")
                 st.session_state.input_text = recognized_text
+                # الترجمة التلقائية
                 with st.spinner("جاري الترجمة..."):
                     translation_result, source_engine = fetch_ai_translation(recognized_text, target_lang_code)
                     if translation_result:
