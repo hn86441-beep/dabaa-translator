@@ -2,3 +2,4 @@ streamlit
 requests
 moonshine-voice
 faster-whisper
+pyspellchecker
