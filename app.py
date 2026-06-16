@@ -261,7 +261,7 @@ MOONSHINE_MODEL_MAP = {
     'es': 'moonshine/tiny-es',      # إذا كان متاحاً
 }
 
-# اللغات المدعومة بنماذج متخصصة (للكشف السريع)
+# اللغات المدعومة بنماذج متخصصة
 MOONSHINE_SUPPORTED_LANGUAGES = set(MOONSHINE_MODEL_MAP.keys())
 
 @st.cache_resource
@@ -271,8 +271,6 @@ def load_moonshine_model(lang_code):
     إذا لم يكن هناك نموذج متخصص، يتم تحميل النموذج العام.
     """
     model_id = MOONSHINE_MODEL_MAP.get(lang_code, 'moonshine/tiny')
-    # لاحظ: استخدام language=None للكشف التلقائي داخل النموذج،
-    # ولكننا سنمرر اللغة المحددة إذا كانت موجودة.
     return Transcriber(model_id=model_id, language=None)
 
 @st.cache_resource
@@ -283,13 +281,9 @@ def load_whisper_fallback():
 # ════════════════════════════════════════════════════════════
 #  دالة التصحيح الإملائي (اختيارية)
 # ════════════════════════════════════════════════════════════
-# ملاحظة: pyspellchecker لا يدعم العربية بشكل جيد، لذا سنستثنيها.
-# للغات الأخرى، سنقوم بالتصحيح إذا كانت اللغة مدعومة.
-
 @st.cache_resource
 def load_spell_checker(lang_code):
     """تحميل مصحح إملائي حسب اللغة (لللغات المدعومة فقط)"""
-    # اللغات المدعومة في pyspellchecker
     supported = ['en', 'es', 'fr', 'de', 'pt', 'ru']
     if lang_code in supported:
         return SpellChecker(language=lang_code)
@@ -308,7 +302,6 @@ def correct_spelling(text, lang_code):
     words = text.split()
     corrected_words = []
     for word in words:
-        # تجاهل الكلمات التي تحتوي على أرقام أو رموز
         if word.isalpha():
             corrected = checker.correction(word)
             if corrected and corrected != word:
@@ -331,41 +324,32 @@ def speech_to_text_smart(audio_bytes, language_code="auto"):
     """
     tmp_path = None
     try:
-        # حفظ الصوت في ملف مؤقت
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
             tmp_audio.write(audio_bytes)
             tmp_path = tmp_audio.name
 
-        # تحديد ما إذا كنا سنستخدم الكشف التلقائي أم لغة محددة
         use_auto = (language_code == "auto" or language_code is None)
         lang = None if use_auto else language_code
 
         # 1. المحاولة الأساسية: Moonshine
         try:
-            # إذا كانت اللغة محددة ومدعومة بنموذج متخصص، نستخدمه
             if not use_auto and language_code in MOONSHINE_SUPPORTED_LANGUAGES:
                 model = load_moonshine_model(language_code)
                 model_name = f"Moonshine Tiny متخصص ({language_code})"
             else:
-                # نستخدم النموذج العام مع الكشف التلقائي أو اللغة المحددة
-                model = load_moonshine_model("general")  # النموذج العام
+                model = load_moonshine_model("general")
                 model_name = "Moonshine Tiny (عام)" + (" (كشف تلقائي)" if use_auto else f" (لغة: {language_code})")
             
-            # الترجمة مع تمرير اللغة إذا كانت محددة
             result = model.transcribe(tmp_path, language=lang)
             text = result.text.strip()
-            
-            # تصحيح إملائي اختياري
             if not use_auto and language_code:
                 text = correct_spelling(text, language_code)
-            
             return text, model_name
         except Exception as e:
             st.warning(f"⚠️ فشل Moonshine، ننتقل إلى Whisper: {e}")
 
-        # 2. الاحتياطي: Faster-Whisper مع إعدادات محسّنة
+        # 2. الاحتياطي: Faster-Whisper
         model = load_whisper_fallback()
-        # تمرير اللغة إذا كانت محددة
         segments, info = model.transcribe(
             tmp_path,
             language=lang,
@@ -374,10 +358,8 @@ def speech_to_text_smart(audio_bytes, language_code="auto"):
             condition_on_previous_text=False
         )
         text = " ".join(seg.text for seg in segments).strip()
-        # تصحيح إملائي اختياري
         if not use_auto and language_code:
             text = correct_spelling(text, language_code)
-        
         model_name = "Faster-Whisper Base (احتياطي)" + (" (كشف تلقائي)" if use_auto else f" (لغة: {language_code})")
         return text, model_name
 
@@ -461,17 +443,16 @@ st.session_state.selected_style = selected_style_label
 #  VOICE INPUT (مع النماذج المتخصصة)
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
-    # عرض رسالة توضيحية حسب اختيار المستخدم
+    # تحديد النص التوضيحي حسب اختيار المستخدم
     if source_lang_code == "auto":
         lang_mode = "🔄 كشف تلقائي للغة (Moonshine يكتشف اللغة بنفسه)"
         model_info = "سيتم استخدام النموذج العام مع الكشف التلقائي."
     else:
-        lang_name = source_lang_name
-        lang_code = source_lang_code
-        if lang_code in MOONSHINE_SUPPORTED_LANGUAGES:
-            model_info = f"✅ سيتم استخدام نموذج Moonshine المتخصص للغة {lang_name}"
+        lang_mode = f"🎯 لغة محددة: {source_lang_name} ({source_lang_code})"
+        if source_lang_code in MOONSHINE_SUPPORTED_LANGUAGES:
+            model_info = f"✅ سيتم استخدام نموذج Moonshine المتخصص للغة {source_lang_name}"
         else:
-            model_info = f"⚠️ لا يوجد نموذج متخصص للغة {lang_name}، سيتم استخدام النموذج العام أو Faster-Whisper."
+            model_info = f"⚠️ لا يوجد نموذج متخصص للغة {source_lang_name}، سيتم استخدام النموذج العام أو Faster-Whisper."
 
     st.markdown(f"""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
