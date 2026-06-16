@@ -6,13 +6,16 @@ from pathlib import Path
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
-# CSS (نفسه مع اختصار بسيط)
+# ════════════════════════════════════════════════════════════
+#  CSS
+# ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1100px; }
+
 .hero {
     background: #1a1a2e;
     border-radius: 14px;
@@ -29,6 +32,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .lang-bar { display: flex; gap: 6px; margin-top: 14px; align-items: center; }
 .ldot { width: 8px; height: 8px; border-radius: 50%; background: #5DCAA5; display: inline-block; }
 .lang-bar-txt { font-size: 11px; color: rgba(255,255,255,0.35); margin-left: 4px; }
+
 .rcard { border-radius: 12px; padding: 1.1rem 1.3rem; border: 0.5px solid #e5e7eb; background: #fff; transition: all 0.2s; }
 .rcard-pol { border-top: 3px solid #E63946; }
 .rcard-leg { border-top: 3px solid #534AB7; }
@@ -66,6 +70,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .rlabel-tour { color: #006064; }
 .rlabel-gen { color: #4B5563; }
 .rtext { font-size: 14px; line-height: 1.75; color: #1f2937; direction: auto; }
+
 .detected-box { background: #E6F4F1; border-left: 3px solid #5DCAA5; border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: 13px; color: #04342C; margin-bottom: 1rem; }
 .api-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; margin-right: 4px; }
 .api-deepl { background: #0F2B46; color: #8ECAE6; }
@@ -208,13 +213,13 @@ if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = secrets_key
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION ENGINE
+#  TRANSLATION ENGINE (يستقبل رمز اللغة وليس الاسم)
 # ════════════════════════════════════════════════════════════
-def translate_deepl(text, target_lang):
+def translate_deepl(text, target_lang_code):
     if not st.session_state.deepl_api_key:
         return None, "No API key configured"
         
-    tl = target_lang.upper()
+    tl = target_lang_code.upper()   # تحويل "ar" → "AR"
     if st.session_state.deepl_api_key.endswith(":fx"):
         endpoint = "https://api-free.deepl.com/v2/translate"
     else:
@@ -234,8 +239,8 @@ def translate_deepl(text, target_lang):
     except Exception as e:
         return None, f"Request error: {str(e)}"
 
-def fetch_ai_translation(text, target_lang):
-    result, error = translate_deepl(text, target_lang)
+def fetch_ai_translation(text, target_lang_code):
+    result, error = translate_deepl(text, target_lang_code)
     if result:
         return result, "DeepL"
     return None, error
@@ -287,7 +292,8 @@ with right:
 st.session_state.source_lang = source_lang_name
 st.session_state.target_lang = target_lang_name
 
-target_lang = languages_dict[target_lang_name]
+# استخراج رمز اللغة الهدف (مثل "ar")
+target_lang_code = languages_dict[target_lang_name]
 
 style_col1, style_col2 = st.columns([1, 2])
 with style_col1:
@@ -305,7 +311,7 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT (مدمج، يعمل على HTTPS)
+#  VOICE INPUT (مدمج)
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
     st.markdown("""
@@ -356,7 +362,8 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
         st.warning("Please enter some text to translate.")
     else:
         with st.spinner("Translating..."):
-            translation_result, source_engine = fetch_ai_translation(input_text, target_lang_name)
+            # تمرير رمز اللغة وليس الاسم
+            translation_result, source_engine = fetch_ai_translation(input_text, target_lang_code)
             if translation_result:
                 active_domain = "general"
                 if selected_domain and selected_domain != "general":
@@ -367,7 +374,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                 final_translation = translation_result
                 swaps_made = 0
 
-                # (اختياري) يمكن إضافة استبدال القاموس هنا إذا كان لديك ملف domain_dict.json
+                # (اختياري) يمكن إضافة استبدال القاموس هنا
                 card_class = f"rcard-{active_domain}" if active_domain in DOMAINS else "rcard-gen"
                 label_class = f"rlabel-{active_domain}" if active_domain in DOMAINS else "rlabel-gen"
                 domain_info = DOMAINS.get(active_domain, DOMAINS["general"])
