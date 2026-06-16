@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 from moonshine_voice import Transcriber
 from faster_whisper import WhisperModel
+from spellchecker import SpellChecker
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
@@ -124,9 +125,8 @@ st.markdown("""
 # ════════════════════════════════════════════════════════════
 #  CONFIGURATION
 # ════════════════════════════════════════════════════════════
-# إضافة "Auto-Detect" في قائمة اللغات المصدر
 languages_dict = {
-    "Auto-Detect": "auto",  # الكشف التلقائي
+    "Auto-Detect": "auto",
     "Arabic": "ar",
     "English": "en",
     "Russian": "ru",
@@ -247,27 +247,87 @@ def fetch_ai_translation(text, target_lang_code):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  تحميل النماذج (مع إمكانية تحديد اللغة أو الكشف التلقائي)
+#  تحميل النماذج (متخصصة حسب اللغة مع خيار احتياطي)
 # ════════════════════════════════════════════════════════════
+# خريطة رموز اللغات إلى معرفات النماذج المتخصصة في Moonshine
+MOONSHINE_MODEL_MAP = {
+    'ar': 'moonshine/tiny-ar',
+    'zh': 'moonshine/tiny-zh',
+    'ja': 'moonshine/tiny-ja',
+    'ko': 'moonshine/tiny-ko',
+    'uk': 'moonshine/tiny-uk',
+    'vi': 'moonshine/tiny-vi',
+    'en': 'moonshine/tiny-en',      # إذا كان متاحاً
+    'es': 'moonshine/tiny-es',      # إذا كان متاحاً
+}
+
+# اللغات المدعومة بنماذج متخصصة (للكشف السريع)
+MOONSHINE_SUPPORTED_LANGUAGES = set(MOONSHINE_MODEL_MAP.keys())
+
 @st.cache_resource
-def load_moonshine_model():
+def load_moonshine_model(lang_code):
     """
-    تحميل نموذج Moonshine Tiny مع إمكانية تحديد اللغة لاحقاً.
-    language=None يعني أن النموذج يستخدم الكشف التلقائي.
+    تحميل نموذج Moonshine المتخصص حسب اللغة.
+    إذا لم يكن هناك نموذج متخصص، يتم تحميل النموذج العام.
     """
-    return Transcriber(model_arch="tiny", language=None)
+    model_id = MOONSHINE_MODEL_MAP.get(lang_code, 'moonshine/tiny')
+    # لاحظ: استخدام language=None للكشف التلقائي داخل النموذج،
+    # ولكننا سنمرر اللغة المحددة إذا كانت موجودة.
+    return Transcriber(model_id=model_id, language=None)
 
 @st.cache_resource
 def load_whisper_fallback():
-    """تحميل Faster-Whisper Tiny كخيار احتياطي"""
-    return WhisperModel("tiny", device="cpu", compute_type="int8")
+    """تحميل Faster-Whisper Base كخيار احتياطي مع إعدادات محسّنة"""
+    return WhisperModel("base", device="cpu", compute_type="int8")
 
+# ════════════════════════════════════════════════════════════
+#  دالة التصحيح الإملائي (اختيارية)
+# ════════════════════════════════════════════════════════════
+# ملاحظة: pyspellchecker لا يدعم العربية بشكل جيد، لذا سنستثنيها.
+# للغات الأخرى، سنقوم بالتصحيح إذا كانت اللغة مدعومة.
+
+@st.cache_resource
+def load_spell_checker(lang_code):
+    """تحميل مصحح إملائي حسب اللغة (لللغات المدعومة فقط)"""
+    # اللغات المدعومة في pyspellchecker
+    supported = ['en', 'es', 'fr', 'de', 'pt', 'ru']
+    if lang_code in supported:
+        return SpellChecker(language=lang_code)
+    return None
+
+def correct_spelling(text, lang_code):
+    """
+    تصحيح الأخطاء الإملائية باستخدام pyspellchecker.
+    إذا كانت اللغة غير مدعومة أو كانت 'ar'، يتم تخطي التصحيح.
+    """
+    if not text or not lang_code or lang_code == 'auto' or lang_code == 'ar':
+        return text
+    checker = load_spell_checker(lang_code)
+    if not checker:
+        return text
+    words = text.split()
+    corrected_words = []
+    for word in words:
+        # تجاهل الكلمات التي تحتوي على أرقام أو رموز
+        if word.isalpha():
+            corrected = checker.correction(word)
+            if corrected and corrected != word:
+                corrected_words.append(corrected)
+            else:
+                corrected_words.append(word)
+        else:
+            corrected_words.append(word)
+    return " ".join(corrected_words)
+
+# ════════════════════════════════════════════════════════════
+#  دالة التعرف على الصوت الذكية
+# ════════════════════════════════════════════════════════════
 def speech_to_text_smart(audio_bytes, language_code="auto"):
     """
-    يحول الصوت إلى نص باستخدام Moonshine أو Whisper.
-    - language_code: إذا كانت "auto" أو None، يستخدم الكشف التلقائي.
-      وإلا يستخدم الرمز المحدد (مثل "ar", "en").
-    يعيد (النص, اسم النموذج المستخدم)
+    يحول الصوت إلى نص باستخدام النموذج المناسب:
+    - إذا كانت اللغة مدعومة في Moonshine المتخصص، يستخدم النموذج المتخصص.
+    - وإلا يستخدم النموذج العام Moonshine أو Faster-Whisper كاحتياطي.
+    - في حالة 'auto' يستخدم النموذج العام مع الكشف التلقائي.
     """
     tmp_path = None
     try:
@@ -276,23 +336,50 @@ def speech_to_text_smart(audio_bytes, language_code="auto"):
             tmp_audio.write(audio_bytes)
             tmp_path = tmp_audio.name
 
+        # تحديد ما إذا كنا سنستخدم الكشف التلقائي أم لغة محددة
+        use_auto = (language_code == "auto" or language_code is None)
+        lang = None if use_auto else language_code
+
         # 1. المحاولة الأساسية: Moonshine
         try:
-            model = load_moonshine_model()
-            # إذا كانت اللغة محددة وليست "auto"، نمررها، وإلا نمرر None (كشف تلقائي)
-            lang = language_code if language_code != "auto" and language_code is not None else None
+            # إذا كانت اللغة محددة ومدعومة بنموذج متخصص، نستخدمه
+            if not use_auto and language_code in MOONSHINE_SUPPORTED_LANGUAGES:
+                model = load_moonshine_model(language_code)
+                model_name = f"Moonshine Tiny متخصص ({language_code})"
+            else:
+                # نستخدم النموذج العام مع الكشف التلقائي أو اللغة المحددة
+                model = load_moonshine_model("general")  # النموذج العام
+                model_name = "Moonshine Tiny (عام)" + (" (كشف تلقائي)" if use_auto else f" (لغة: {language_code})")
+            
+            # الترجمة مع تمرير اللغة إذا كانت محددة
             result = model.transcribe(tmp_path, language=lang)
             text = result.text.strip()
-            return text, "Moonshine Tiny" + (f" (لغة: {language_code})" if lang else " (كشف تلقائي)")
+            
+            # تصحيح إملائي اختياري
+            if not use_auto and language_code:
+                text = correct_spelling(text, language_code)
+            
+            return text, model_name
         except Exception as e:
             st.warning(f"⚠️ فشل Moonshine، ننتقل إلى Whisper: {e}")
 
-        # 2. الاحتياطي: Faster-Whisper
+        # 2. الاحتياطي: Faster-Whisper مع إعدادات محسّنة
         model = load_whisper_fallback()
-        lang = language_code if language_code != "auto" and language_code is not None else None
-        segments, info = model.transcribe(tmp_path, language=lang)
+        # تمرير اللغة إذا كانت محددة
+        segments, info = model.transcribe(
+            tmp_path,
+            language=lang,
+            beam_size=5,
+            temperature=0.0,
+            condition_on_previous_text=False
+        )
         text = " ".join(seg.text for seg in segments).strip()
-        return text, "Faster-Whisper" + (f" (لغة: {language_code})" if lang else " (كشف تلقائي)")
+        # تصحيح إملائي اختياري
+        if not use_auto and language_code:
+            text = correct_spelling(text, language_code)
+        
+        model_name = "Faster-Whisper Base (احتياطي)" + (" (كشف تلقائي)" if use_auto else f" (لغة: {language_code})")
+        return text, model_name
 
     except Exception as e:
         return None, f"خطأ: {str(e)}"
@@ -307,7 +394,7 @@ def speech_to_text_smart(audio_bytes, language_code="auto"):
 #  SESSION STATE
 # ════════════════════════════════════════════════════════════
 if "source_lang" not in st.session_state:
-    st.session_state.source_lang = "Auto-Detect"  # افتراضي: كشف تلقائي
+    st.session_state.source_lang = "Auto-Detect"
 if "target_lang" not in st.session_state:
     st.session_state.target_lang = "Arabic"
 if "input_text" not in st.session_state:
@@ -326,7 +413,7 @@ def swap_languages():
 # ════════════════════════════════════════════════════════════
 #  UI
 # ════════════════════════════════════════════════════════════
-lang_list = list(languages_dict.keys())  # يحتوي على "Auto-Detect" + اللغات
+lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
 
 if st.session_state.target_lang == st.session_state.source_lang:
@@ -352,7 +439,6 @@ with right:
 st.session_state.source_lang = source_lang_name
 st.session_state.target_lang = target_lang_name
 
-# استخراج رمز اللغة المصدر (قد يكون "auto" للكشف التلقائي)
 source_lang_code = languages_dict[source_lang_name]
 target_lang_code = languages_dict[target_lang_name]
 
@@ -372,21 +458,27 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT (مع تحديد اللغة أو الكشف التلقائي)
+#  VOICE INPUT (مع النماذج المتخصصة)
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
     # عرض رسالة توضيحية حسب اختيار المستخدم
     if source_lang_code == "auto":
         lang_mode = "🔄 كشف تلقائي للغة (Moonshine يكتشف اللغة بنفسه)"
+        model_info = "سيتم استخدام النموذج العام مع الكشف التلقائي."
     else:
-        lang_mode = f"🎯 لغة محددة: {source_lang_name} ({source_lang_code})"
+        lang_name = source_lang_name
+        lang_code = source_lang_code
+        if lang_code in MOONSHINE_SUPPORTED_LANGUAGES:
+            model_info = f"✅ سيتم استخدام نموذج Moonshine المتخصص للغة {lang_name}"
+        else:
+            model_info = f"⚠️ لا يوجد نموذج متخصص للغة {lang_name}، سيتم استخدام النموذج العام أو Faster-Whisper."
 
     st.markdown(f"""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
         <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 إدخال صوتي ذكي</div>
         <div style="font-size:12px;color:#6b7280;">
-            {lang_mode}
-            <br>يستخدم <b>Moonshine Tiny</b> مع خيار احتياطي <b>Faster-Whisper</b>.
+            {lang_mode}<br>
+            {model_info}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -395,10 +487,10 @@ if st.session_state.deepl_api_key:
     
     if audio_value:
         st.audio(audio_value)
-        with st.spinner("جاري التعرف على الصوت..."):
+        with st.spinner("جاري التعرف على الصوت باستخدام النموذج المناسب..."):
             recognized_text, model_used = speech_to_text_smart(
                 audio_value.getvalue(),
-                language_code=source_lang_code  # نمرر "auto" أو رمز اللغة
+                language_code=source_lang_code
             )
             if recognized_text:
                 st.success(f"✅ تم التعرف ({model_used}): {recognized_text}")
