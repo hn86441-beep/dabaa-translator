@@ -3,15 +3,13 @@ import requests
 import os
 import json
 from pathlib import Path
-import io
-import speech_recognition as sr
-from pydub import AudioSegment
 import tempfile
+import whisper  # <-- مكتبة Whisper الجديدة
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفسه لكن مختصر)
+#  CSS (نفسه)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -250,33 +248,39 @@ def fetch_ai_translation(text, target_lang_code):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  وظيفة تحويل الصوت إلى نص (Speech-to-Text)
+#  وظيفة تحويل الصوت إلى نص باستخدام Whisper (جديد)
 # ════════════════════════════════════════════════════════════
-def speech_to_text(audio_bytes):
-    """يحول الصوت (بايت) إلى نص باستخدام Google Speech Recognition"""
+@st.cache_resource
+def load_whisper_model():
+    """تحميل نموذج Whisper (مرة واحدة فقط)"""
+    # اختر حجم النموذج: "tiny", "base", "small", "medium", "large"
+    # "base" يوازن بين السرعة والدقة
+    return whisper.load_model("base")
+
+def speech_to_text_whisper(audio_bytes, language="auto"):
+    """
+    يحول الصوت إلى نص باستخدام Whisper.
+    language: "auto" للكشف التلقائي، أو رمز اللغة مثل "ar", "en", "fr", إلخ.
+    """
     try:
-        # 1. حفظ الصوت في ملف مؤقت بصيغة WAV
+        model = load_whisper_model()
+        
+        # حفظ الصوت في ملف مؤقت بصيغة wav
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
             tmp_audio.write(audio_bytes)
             tmp_path = tmp_audio.name
         
-        # 2. استخدام speech_recognition
-        recognizer = sr.Recognizer()
-        with sr.AudioFile(tmp_path) as source:
-            audio_data = recognizer.record(source)
+        # استخدام Whisper للتعرف
+        if language == "auto":
+            result = model.transcribe(tmp_path, fp16=False)
+        else:
+            result = model.transcribe(tmp_path, language=language, fp16=False)
         
-        # 3. التعرف على النص (Google Speech Recognition)
-        text = recognizer.recognize_google(audio_data, language="ar-AR")  # العربية
-        # إذا أردت دعم لغات متعددة، يمكن تغييرها حسب اللغة المصدر
+        text = result["text"].strip()
         return text, None
-    except sr.UnknownValueError:
-        return None, "لم يتم التعرف على أي كلام"
-    except sr.RequestError as e:
-        return None, f"خطأ في خدمة Google: {e}"
     except Exception as e:
-        return None, f"خطأ عام: {e}"
+        return None, f"خطأ في Whisper: {str(e)}"
     finally:
-        # حذف الملف المؤقت
         try:
             os.unlink(tmp_path)
         except:
@@ -349,49 +353,55 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT + تحويل تلقائي إلى نص
+#  VOICE INPUT + Whisper (تحويل تلقائي)
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
     st.markdown("""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
-        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input — تلقائي إلى نص</div>
+        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 إدخال صوتي — تحويل تلقائي إلى نص</div>
         <div style="font-size:12px;color:#6b7280;">
-            سجل رسالة صوتية، وسيتم تحويلها إلى نص وترجمتها تلقائياً.
+            سجل رسالة صوتية، وسيقوم النظام بتحويلها إلى نص وترجمتها فوراً.
+            <b>يدعم 99 لغة</b> مع دقة عالية جداً.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # تحديد لغة المصدر للتعرف (من اختيار المستخدم)
+    # لاحظ أننا نأخذ رمز اللغة المصدر من languages_dict
+    source_lang_code = languages_dict[source_lang_name]
+    # Whisper يستخدم رموزاً مثل "ar", "en", "fr", إلخ.
+    # إذا كانت "auto" سنمرر None للكشف التلقائي
+    whisper_lang = None if source_lang_name == "Auto" else source_lang_code
+    
     audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
     
     if audio_value:
-        # تشغيل الصوت
         st.audio(audio_value)
-        
-        with st.spinner("جاري تحويل الصوت إلى نص..."):
-            # تحويل الصوت إلى نص
-            recognized_text, error = speech_to_text(audio_value.getvalue())
+        with st.spinner("جاري تحويل الصوت إلى نص باستخدام Whisper (قد يستغرق بضع ثوانٍ)..."):
+            # تحويل الصوت إلى نص باستخدام Whisper
+            recognized_text, error = speech_to_text_whisper(
+                audio_value.getvalue(), 
+                language=whisper_lang if whisper_lang else "auto"
+            )
             if recognized_text:
                 st.success(f"✅ تم التعرف على النص: {recognized_text}")
-                # وضع النص في مربع الإدخال
                 st.session_state.input_text = recognized_text
-                # الآن نقوم بالترجمة تلقائياً
+                # الترجمة التلقائية
                 with st.spinner("جاري الترجمة..."):
                     translation_result, source_engine = fetch_ai_translation(recognized_text, target_lang_code)
                     if translation_result:
                         st.session_state.translated_text = translation_result
-                        # عرض النتيجة مباشرة
                         st.markdown("### الترجمة")
                         st.markdown(f">>> {translation_result}")
                     else:
                         st.error(f"فشلت الترجمة: {translation_result}")
             else:
                 st.error(f"فشل التعرف على الصوت: {error}")
-                # نترك المستخدم يكتب يدوياً
 else:
     st.warning("⚠️ يرجى إدخال مفتاح DeepL API أولاً من الشريط الجانبي.")
 
 # ════════════════════════════════════════════════════════════
-#  TEXT INPUT
+#  TEXT INPUT (يدوي)
 # ════════════════════════════════════════════════════════════
 input_text = st.text_area("أدخل النص للترجمة (أو عدّله)", height=140, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
@@ -412,7 +422,7 @@ if input_text.strip():
             st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>السياق:</b> عام</div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  زر الترجمة اليدوي (اختياري)
+#  زر الترجمة اليدوي
 # ════════════════════════════════════════════════════════════
 if st.button("ترجم 🚀", type="primary", use_container_width=True):
     if not st.session_state.deepl_api_key:
