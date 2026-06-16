@@ -3,11 +3,15 @@ import requests
 import os
 import json
 from pathlib import Path
+import io
+import speech_recognition as sr
+from pydub import AudioSegment
+import tempfile
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفسه لكن مختصر)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -213,13 +217,13 @@ if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = secrets_key
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION ENGINE (يستقبل رمز اللغة وليس الاسم)
+#  TRANSLATION ENGINE
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang_code):
     if not st.session_state.deepl_api_key:
         return None, "No API key configured"
         
-    tl = target_lang_code.upper()   # تحويل "ar" → "AR"
+    tl = target_lang_code.upper()
     if st.session_state.deepl_api_key.endswith(":fx"):
         endpoint = "https://api-free.deepl.com/v2/translate"
     else:
@@ -246,6 +250,39 @@ def fetch_ai_translation(text, target_lang_code):
     return None, error
 
 # ════════════════════════════════════════════════════════════
+#  وظيفة تحويل الصوت إلى نص (Speech-to-Text)
+# ════════════════════════════════════════════════════════════
+def speech_to_text(audio_bytes):
+    """يحول الصوت (بايت) إلى نص باستخدام Google Speech Recognition"""
+    try:
+        # 1. حفظ الصوت في ملف مؤقت بصيغة WAV
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
+            tmp_audio.write(audio_bytes)
+            tmp_path = tmp_audio.name
+        
+        # 2. استخدام speech_recognition
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(tmp_path) as source:
+            audio_data = recognizer.record(source)
+        
+        # 3. التعرف على النص (Google Speech Recognition)
+        text = recognizer.recognize_google(audio_data, language="ar-AR")  # العربية
+        # إذا أردت دعم لغات متعددة، يمكن تغييرها حسب اللغة المصدر
+        return text, None
+    except sr.UnknownValueError:
+        return None, "لم يتم التعرف على أي كلام"
+    except sr.RequestError as e:
+        return None, f"خطأ في خدمة Google: {e}"
+    except Exception as e:
+        return None, f"خطأ عام: {e}"
+    finally:
+        # حذف الملف المؤقت
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
+
+# ════════════════════════════════════════════════════════════
 #  SESSION STATE
 # ════════════════════════════════════════════════════════════
 if "source_lang" not in st.session_state:
@@ -256,6 +293,8 @@ if "input_text" not in st.session_state:
     st.session_state.input_text = ""
 if "selected_style" not in st.session_state:
     st.session_state.selected_style = "Auto-Detect"
+if "translated_text" not in st.session_state:
+    st.session_state.translated_text = ""
 
 def swap_languages():
     old_source = st.session_state.source_lang
@@ -292,7 +331,6 @@ with right:
 st.session_state.source_lang = source_lang_name
 st.session_state.target_lang = target_lang_name
 
-# استخراج رمز اللغة الهدف (مثل "ar")
 target_lang_code = languages_dict[target_lang_name]
 
 style_col1, style_col2 = st.columns([1, 2])
@@ -311,30 +349,51 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT (مدمج)
+#  VOICE INPUT + تحويل تلقائي إلى نص
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
     st.markdown("""
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
-        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input</div>
+        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input — تلقائي إلى نص</div>
         <div style="font-size:12px;color:#6b7280;">
-            Click the microphone, speak, and the audio will be recorded.
-            <b>Note:</b> The app does not automatically transcribe speech; you can use the recorded audio as a reference and type the text manually below.
+            سجل رسالة صوتية، وسيتم تحويلها إلى نص وترجمتها تلقائياً.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    audio_value = st.audio_input("🎙️ Record a voice message")
+    audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
+    
     if audio_value:
+        # تشغيل الصوت
         st.audio(audio_value)
-        st.success("✅ تم تسجيل الصوت! يمكنك سماعه أعلاه، ثم كتابة النص في المربع أدناه.")
+        
+        with st.spinner("جاري تحويل الصوت إلى نص..."):
+            # تحويل الصوت إلى نص
+            recognized_text, error = speech_to_text(audio_value.getvalue())
+            if recognized_text:
+                st.success(f"✅ تم التعرف على النص: {recognized_text}")
+                # وضع النص في مربع الإدخال
+                st.session_state.input_text = recognized_text
+                # الآن نقوم بالترجمة تلقائياً
+                with st.spinner("جاري الترجمة..."):
+                    translation_result, source_engine = fetch_ai_translation(recognized_text, target_lang_code)
+                    if translation_result:
+                        st.session_state.translated_text = translation_result
+                        # عرض النتيجة مباشرة
+                        st.markdown("### الترجمة")
+                        st.markdown(f">>> {translation_result}")
+                    else:
+                        st.error(f"فشلت الترجمة: {translation_result}")
+            else:
+                st.error(f"فشل التعرف على الصوت: {error}")
+                # نترك المستخدم يكتب يدوياً
 else:
     st.warning("⚠️ يرجى إدخال مفتاح DeepL API أولاً من الشريط الجانبي.")
 
 # ════════════════════════════════════════════════════════════
 #  TEXT INPUT
 # ════════════════════════════════════════════════════════════
-input_text = st.text_area("Enter text to translate", height=140, placeholder="Type, paste, or enter the text you want to translate...", value=st.session_state.input_text, key="input_text_area")
+input_text = st.text_area("أدخل النص للترجمة (أو عدّله)", height=140, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
@@ -347,77 +406,46 @@ if input_text.strip():
             emoji = DOMAINS[d]["emoji"]
             css_class = f"db-{d}" if d in DOMAINS else "db-gen"
             badges += f'<span class="domain-badge {css_class}">{emoji} {dn}</span>'
-        st.markdown(f'<div class="detected-box">🔍 <b>Auto-Detected Context:</b><br><div style="margin-top:6px;">{badges}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="detected-box">🔍 <b>السياق المكتشف:</b><br><div style="margin-top:6px;">{badges}</div></div>', unsafe_allow_html=True)
     else:
         if selected_style_label == "Auto-Detect":
-            st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>Context:</b> General</div>', unsafe_allow_html=True)
+            st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>السياق:</b> عام</div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION
+#  زر الترجمة اليدوي (اختياري)
 # ════════════════════════════════════════════════════════════
-if st.button("Translate 🚀", type="primary", use_container_width=True):
+if st.button("ترجم 🚀", type="primary", use_container_width=True):
     if not st.session_state.deepl_api_key:
-        st.error("❌ DeepL API key missing. Please add it in the sidebar.")
+        st.error("❌ مفتاح DeepL API مفقود.")
     elif not input_text.strip():
-        st.warning("Please enter some text to translate.")
+        st.warning("الرجاء إدخال نص للترجمة.")
     else:
-        with st.spinner("Translating..."):
-            # تمرير رمز اللغة وليس الاسم
+        with st.spinner("جاري الترجمة..."):
             translation_result, source_engine = fetch_ai_translation(input_text, target_lang_code)
             if translation_result:
-                active_domain = "general"
-                if selected_domain and selected_domain != "general":
-                    active_domain = selected_domain
-                elif detected:
-                    active_domain = detected[0]
-
-                final_translation = translation_result
-                swaps_made = 0
-
-                # (اختياري) يمكن إضافة استبدال القاموس هنا
-                card_class = f"rcard-{active_domain}" if active_domain in DOMAINS else "rcard-gen"
-                label_class = f"rlabel-{active_domain}" if active_domain in DOMAINS else "rlabel-gen"
-                domain_info = DOMAINS.get(active_domain, DOMAINS["general"])
-
-                st.markdown("### Translation Result")
-                card_html = f"""
-                <div class="rcard {card_class}">
-                    <div class="rlabel {label_class}">
-                        {domain_info['emoji']} {domain_info['name_en'].upper()} TRANSLATION
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <span class="api-badge api-deepl">⚡ {source_engine}</span>
-                    </div>
-                    <div class="rtext">{final_translation}</div>
-                </div>
-                """
-                st.markdown(card_html, unsafe_allow_html=True)
-                st.code(final_translation, language=None)
+                st.session_state.translated_text = translation_result
+                st.markdown("### نتيجة الترجمة")
+                st.markdown(f">>> {translation_result}")
             else:
-                st.markdown(f"""
-                <div class="error-box">
-                    <b>Translation Failed:</b> {source_engine}
-                    <br><span style="font-size:12px;">Please check your DeepL API key and internet connection.</span>
-                </div>
-                """, unsafe_allow_html=True)
+                st.error(f"فشلت الترجمة: {translation_result}")
 
 # ════════════════════════════════════════════════════════════
 #  SIDEBAR
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("### 🔑 DeepL API Key")
+    st.markdown("### 🔑 مفتاح DeepL API")
     if st.session_state.deepl_api_key:
         masked = st.session_state.deepl_api_key[:6] + "..." + st.session_state.deepl_api_key[-4:] if len(st.session_state.deepl_api_key) > 10 else "***"
-        st.markdown(f"<div style='font-size:12px;color:#16a34a;font-weight:600;'>✅ Active</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size:12px;color:#16a34a;font-weight:600;'>✅ مفعّل</div>", unsafe_allow_html=True)
         st.markdown(f"<div style='font-size:10px;color:#6b7280;'>{masked}</div>", unsafe_allow_html=True)
-        if st.button("🔄 Change Key", use_container_width=True):
+        if st.button("🔄 تغيير المفتاح", use_container_width=True):
             st.session_state.deepl_api_key = ""
             st.rerun()
     else:
-        st.markdown("<div style='font-size:12px;color:#ef4444;'>⚠️ Not configured</div>", unsafe_allow_html=True)
-        new_key = st.text_input("Enter DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
+        st.markdown("<div style='font-size:12px;color:#ef4444;'>⚠️ غير مضبوط</div>", unsafe_allow_html=True)
+        new_key = st.text_input("أدخل مفتاح DeepL API", type="password", placeholder="مثل: abc...xyz:fx")
         if new_key:
             st.session_state.deepl_api_key = new_key
-            st.success("✅ Key saved in session!")
+            st.success("✅ تم حفظ المفتاح!")
             st.rerun()
-        st.caption("Get a free key at [DeepL](https://www.deepl.com/pro-api)")
+        st.caption("احصل على مفتاح مجاني من [DeepL](https://www.deepl.com/pro-api)")
