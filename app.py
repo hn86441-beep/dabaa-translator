@@ -577,4 +577,3 @@ with st.sidebar:
         st.success("✅ Cohere: OK")
     else:
         st.error("❌ Cohere: Missing")
-        
