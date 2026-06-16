@@ -218,7 +218,7 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  إدارة المفاتيح (من secrets أو من واجهة المستخدم)
+#  API KEYS (من secrets أو واجهة المستخدم)
 # ════════════════════════════════════════════════════════════
 
 # قراءة المفاتيح من secrets
@@ -328,7 +328,7 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe)
+#  SPEECH-TO-TEXT (Cohere Transcribe - لجميع اللغات ما عدا الروسية)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def get_cohere_client():
@@ -521,7 +521,7 @@ st.session_state.selected_style = selected_style_label
 # ════════════════════════════════════════════════════════════
 # عرض المحرك المستخدم حسب اللغة
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Yandex SpeechKit** (للغة الروسية)"
+    engine_info = "⚡ يستخدم **Yandex SpeechKit** (دقة عالية للغة الروسية)"
 else:
     engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية لجميع اللغات)"
 
