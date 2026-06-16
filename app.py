@@ -3,14 +3,13 @@ import requests
 import os
 import json
 from pathlib import Path
-from audiorecorder import audiorecorder
 import cohere
 import tempfile
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفسه)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -186,7 +185,7 @@ STYLE_OPTIONS = {
 }
 
 # ════════════════════════════════════════════════════════════
-#  DOMAIN KEYWORDS
+#  DOMAIN KEYWORDS (مختصر)
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
     "political": ["minister", "government", "council", "ministry", "parliament", "political", "diplomatic", "treaty", "election", "vote", "policy", "embassy", "summit", "legislation", "constitution", "foreign affairs", "national security", "coalition", "sanctions", "bilateral", "president", "state", "capital", "وزير", "حكومة", "مجلس", "وزارة", "برلمان", "سياسة", "دبلوماسي", "سفير", "معاهدة", "اتفاقية دولية", "حزب", "انتخابات", "تصويت", "أمن قومي", "استراتيجية وطنية", "بيان", "تصريح", "قمة", "مؤتمر", "جلسة", "تشريع", "دستور", "حقوق", "مواطن", "رئيس", "دولة", "عاصمة"],
@@ -333,8 +332,6 @@ if "last_speech" not in st.session_state:
     st.session_state.last_speech = ""
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
-if "speech_engine" not in st.session_state:
-    st.session_state.speech_engine = "Cohere Transcribe (مفضل)"
 
 def swap_languages():
     old_source = st.session_state.source_lang
@@ -390,10 +387,9 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  اختيار محرك التعرف على الصوت (Cohere أو البديل)
+#  VOICE INPUT (باستخدام st.audio_input - مدمج ولا يحتاج مكتبات)
 # ════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
-    # التحقق من وجود مفتاح Cohere
     has_cohere = bool(st.session_state.cohere_api_key)
     
     if not has_cohere:
@@ -404,27 +400,24 @@ if st.session_state.deepl_api_key:
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
         <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input</div>
         <div style="font-size:12px;color:#6b7280;">
-            Click the microphone, speak, and the text will <b>automatically appear</b> in the input box below.
-            <br>⚡ Using <b>Cohere Transcribe</b> (دقة عالية جداً، يدعم 14 لغة)
+            Click the microphone button below, speak, and the text will be recognized using <b>Cohere Transcribe</b>.
+            <br>⚡ دقة عالية جداً، يدعم 14 لغة (بما فيها العربية، الإنجليزية، الصينية، وغيرها)
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # تسجيل الصوت
-    audio = audiorecorder(
-        start_prompt="▶️ ابدأ التسجيل",
-        stop_prompt="⏹️ أوقف التسجيل",
-        pause_prompt="⏸️ وقّت",
-    )
-
-    # معالجة الصوت المسجل
-    if len(audio) > 0:
-        st.audio(audio.export().read(), format="audio/wav")
+    # استخدام st.audio_input المدمجة (بدون audiorecorder)
+    audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
+    
+    if audio_value:
+        # تشغيل الصوت المسجل
+        st.audio(audio_value)
         
-        # استخدام Cohere للتعرف
+        # التحقق من وجود مفتاح Cohere
         if has_cohere:
             with st.spinner("⏳ جاري التعرف على الصوت باستخدام Cohere..."):
-                audio_bytes = audio.export().read()
+                # قراءة البيانات الصوتية
+                audio_bytes = audio_value.getvalue()
                 recognized_text, error = speech_to_text_cohere(audio_bytes, source_lang)
                 
                 if recognized_text:
