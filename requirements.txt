@@ -3,3 +3,6 @@ requests
 moonshine-voice
 faster-whisper
 pyspellchecker
+pydub
+noisereduce
+qutuf  # أو farasa للعربية
