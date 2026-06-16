@@ -3,7 +3,7 @@ import requests
 import os
 import json
 from pathlib import Path
-from audiorecorder import audiorecorder  # <-- الحل الجديد للميكروفون
+from audiorecorder import audiorecorder
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
@@ -221,37 +221,27 @@ def detect_domains(text):
 # ═══════════════════════════════════════════════════════════════════════════════
 #  DEEPL API KEY — قراءة من secrets (مرة واحدة)
 # ═══════════════════════════════════════════════════════════════════════════════
-# محاولة قراءة المفتاح من secrets أولاً
 try:
     secrets_key = st.secrets.get("DEEPL_API_KEY", "")
 except:
     secrets_key = ""
 
-# إذا لم يوجد في secrets، نقرأ من متغير البيئة
 if not secrets_key:
     secrets_key = os.environ.get("DEEPL_API_KEY", "")
 
-# نستخدم session_state لتخزين المفتاح بشكل دائم
 if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = secrets_key
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TRANSLATION ENGINE
+#  TRANSLATION ENGINE — المعدل (حذف source_lang)
 # ═══════════════════════════════════════════════════════════════════════════════
 def translate_deepl(text, source_lang, target_lang):
     if not st.session_state.deepl_api_key:
         return None, "No API key configured"
         
-    sl = source_lang.upper()
     tl = target_lang.upper()
+    # لا نرسل source_lang — DeepL يكتشفها تلقائياً
     
-    # DeepL format adjustments
-    if sl == "AR": sl = "AR"
-    elif sl == "ZH": sl = "ZH"
-    if tl == "AR": tl = "AR"
-    elif tl == "ZH": tl = "ZH"
-    
-    # Smart Endpoint Selection: Free keys end with ':fx'
     if st.session_state.deepl_api_key.endswith(":fx"):
         endpoint = "https://api-free.deepl.com/v2/translate"
     else:
@@ -261,7 +251,7 @@ def translate_deepl(text, source_lang, target_lang):
         resp = requests.post(
             endpoint, 
             headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"}, 
-            data={"text": text, "source_lang": sl, "target_lang": tl}, 
+            data={"text": text, "target_lang": tl},  # source_lang محذوف
             timeout=15
         )
         
@@ -364,7 +354,7 @@ if DOMAIN_SPECIFIC_TRANSLATIONS:
     st.markdown(f'<div class="dict-stats">📚 Dictionary loaded: {dict_size} words with {total_entries} total domain entries</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  VOICE INPUT — باستخدام audiorecorder (الحل الجديد الذي يعمل)
+#  VOICE INPUT — audiorecorder
 # ═══════════════════════════════════════════════════════════════════════════════
 if st.session_state.deepl_api_key:
     st.markdown("""
@@ -376,22 +366,14 @@ if st.session_state.deepl_api_key:
     </div>
     """, unsafe_allow_html=True)
 
-    # استخدام audiorecorder بدلاً من JavaScript
     audio = audiorecorder(
         start_prompt="▶️ ابدأ التسجيل",
         stop_prompt="⏹️ أوقف التسجيل",
         pause_prompt="⏸️ وقّت",
     )
 
-    # عندما يتم تسجيل صوت
     if len(audio) > 0:
-        # تشغيل الصوت للمستخدم
         st.audio(audio.export().read(), format="audio/wav")
-        
-        # زر لنسخ الصوت إلى نص (نستخدم خدمة تحويل الصوت إلى نص)
-        # ملاحظة: audiorecorder لا يحول الصوت إلى نص بنفسه، لكن يمكن للمستخدم
-        # استخدام أي خدمة خارجية (مثل Google Speech) أو الكتابة يدوياً.
-        # سنعرض رسالة إرشادية.
         st.info("🎤 تم التسجيل! يمكنك الآن كتابة النص في المربع أدناه، أو استخدام خدمة تحويل الصوت إلى نص خارجية.")
 
     st.caption("🎤 اضغط على زر التسجيل، تحدث، ثم أوقف التسجيل. الصوت يُشغل لك، ويمكنك كتابة النص في المربع أدناه.")
@@ -485,7 +467,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                 """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  SIDEBAR — إدارة المفتاح (مع إمكانية تغييره)
+#  SIDEBAR — إدارة المفتاح
 # ═══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown("### 🔑 DeepL API Key")
