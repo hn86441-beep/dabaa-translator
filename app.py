@@ -548,138 +548,81 @@ if key_entered:
             badges = ""
             for d in detected[:3]:
                 dn = DOMAINS[d]["name_en"]
-                dc = DOMAINS[d]["color"]
-                badges += f'<span class="domain-badge" style="background:{dc};color:white;">{dn}</span>'
-            st.markdown(f'<div class="detected-box"><b>Detected domains:</b> {badges}</div>', unsafe_allow_html=True)
+                emoji = DOMAINS[d]["emoji"]
+                css_class = f"db-{d}" if d in DOMAINS else "db-gen"
+                badges += f'<span class="domain-badge {css_class}">{emoji} {dn}</span>'
+            
+            st.markdown(f'<div class="detected-box">🔍 <b>Auto-Detected Context:</b><br><div style="margin-top:6px;">{badges}</div></div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="detected-box">No specific domain detected — using General context.</div>', unsafe_allow_html=True)
+            if selected_style_label == "Auto-Detect":
+                st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>Context:</b> General / Standard</div>', unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    #  TRANSLATE BUTTON
+    #  TRANSLATION EXECUTION
     # ═══════════════════════════════════════════════════════════════════════════════
-    if st.button("Translate", type="primary"):
+    if st.button("Translate 🚀", type="primary", use_container_width=True):
         if not input_text.strip():
-            st.warning("Please enter text to translate.")
-        elif not DEEPL_API_KEY:
-            st.markdown('<div class="error-box"><b>🔑 DeepL API Key Required</b><br>Please enter your key in the sidebar to start translating. Get a free key at <a href="https://www.deepl.com/pro-api" target="_blank">deepl.com/pro-api</a>.</div>', unsafe_allow_html=True)
+            st.warning("Please enter some text or use the voice input to translate.")
         else:
-            with st.spinner("Translating via DeepL..."):
-                base_translation, api_used = fetch_ai_translation(input_text, source_lang, target_lang)
-                if not base_translation:
-                    st.markdown(f'<div class="error-box"><b>❌ Translation Failed</b><br>{api_used}<br><span style="font-size:12px;color:#7f1d1d;">Please check your API key and quota.</span></div>', unsafe_allow_html=True)
-                else:
-                    api_badge = f'<span class="api-badge api-deepl">{api_used}</span>'
-                    st.markdown(f"{api_badge} <b>Base Translation:</b>", unsafe_allow_html=True)
-                    st.markdown(f'<div class="rtext">{base_translation}</div>', unsafe_allow_html=True)
+            with st.spinner("Translating..."):
+                # Fetch translation from API
+                translation_result, source_engine = fetch_ai_translation(input_text, source_lang_name, target_lang_name)
 
-                    # DICTIONARY LOOKUP
-                    all_meanings = {}
-                    lookup_word = input_text.strip().lower()
-                    is_single_word = len(lookup_word.split()) == 1
+                if translation_result:
+                    # 1. Determine active domain for styling and dictionary lookup
+                    active_domain = "general"
+                    if selected_domain and selected_domain != "general":
+                        active_domain = selected_domain  # User forced a domain
+                    elif detected:
+                        active_domain = detected[0]      # Auto-detected top domain
 
-                    if is_single_word and lookup_word in DOMAIN_SPECIFIC_TRANSLATIONS:
-                        word_data = DOMAIN_SPECIFIC_TRANSLATIONS[lookup_word]
-                        for domain, trans in word_data.items():
-                            if domain not in all_meanings:
-                                all_meanings[domain] = []
-                            all_meanings[domain].append({"translation": trans.get(target_lang, trans.get("en", "")), "desc": trans.get("desc", ""), "source": f"Direct: '{lookup_word}'"})
+                    # 2. Smart Swap / Dictionary Override
+                    final_translation = translation_result
+                    swaps_made = 0
+                    
+                    if DOMAIN_SPECIFIC_TRANSLATIONS and active_domain in DOMAIN_SPECIFIC_TRANSLATIONS:
+                        domain_dict = DOMAIN_SPECIFIC_TRANSLATIONS[active_domain]
+                        for original_term, custom_translation in domain_dict.items():
+                            if original_term.lower() in final_translation.lower():
+                                final_translation = final_translation.replace(original_term, custom_translation)
+                                swaps_made += 1
 
-                    english_word = None
-                    if source_lang != "en":
-                        eng_result, eng_err = translate_deepl(input_text.strip(), source_lang, "en")
-                        if eng_result:
-                            english_word = eng_result.strip().lower()
-                    else:
-                        english_word = lookup_word
+                    # 3. Render Output Card
+                    card_class = f"rcard-{active_domain}" if active_domain in DOMAINS else "rcard-gen"
+                    label_class = f"rlabel-{active_domain}" if active_domain in DOMAINS else "rlabel-gen"
+                    domain_info = DOMAINS.get(active_domain, DOMAINS["general"])
 
-                    if english_word and is_single_word and english_word in DOMAIN_SPECIFIC_TRANSLATIONS:
-                        word_data = DOMAIN_SPECIFIC_TRANSLATIONS[english_word]
-                        for domain, trans in word_data.items():
-                            if domain not in all_meanings:
-                                all_meanings[domain] = []
-                            existing = [m["translation"] for m in all_meanings.get(domain, [])]
-                            t = trans.get(target_lang, trans.get("en", ""))
-                            if t not in existing:
-                                all_meanings[domain].append({"translation": t, "desc": trans.get("desc", ""), "source": f"English: '{english_word}'"})
-
-                    if not all_meanings and is_single_word and english_word:
-                        for dict_word, word_data in DOMAIN_SPECIFIC_TRANSLATIONS.items():
-                            if english_word in dict_word or dict_word in english_word:
-                                for domain, trans in word_data.items():
-                                    if domain not in all_meanings:
-                                        all_meanings[domain] = []
-                                    existing = [m["translation"] for m in all_meanings.get(domain, [])]
-                                    t = trans.get(target_lang, trans.get("en", ""))
-                                    if t not in existing:
-                                        all_meanings[domain].append({"translation": t, "desc": trans.get("desc", ""), "source": f"Fuzzy: '{dict_word}'"})
-
-                    # DISPLAY MEANINGS
-                    if all_meanings:
-                        total_meanings = sum(len(v) for v in all_meanings.values())
-                        st.markdown("---")
-                        st.markdown(f'<div class="all-meanings-header">📚 All Possible Meanings & Contexts <span class="meaning-count">{total_meanings}</span></div>', unsafe_allow_html=True)
-                        st.caption("Showing every domain-specific translation found in dictionary")
-
-                        domain_keys = [d for d in all_meanings.keys() if d != "general"]
-                        if selected_domain and selected_domain in domain_keys:
-                            domain_keys.remove(selected_domain)
-                            domain_keys.insert(0, selected_domain)
-                        if "general" in all_meanings:
-                            domain_keys.append("general")
-
-                        for domain in domain_keys:
-                            dinfo = DOMAINS.get(domain, DOMAINS["general"])
-                            meanings = all_meanings[domain]
-                            is_priority = (selected_domain == domain)
-
-                            for meaning in meanings:
-                                priority_html = '<span class="priority-badge">★ SELECTED</span>' if is_priority else ''
-                                border_color = dinfo["color"]
-                                st.markdown(
-                                    f'<div class="meaning-card" style="border-left: 4px solid {border_color};">' +
-                                    f'<div class="meaning-domain" style="color: {border_color};">{dinfo["emoji"]} {dinfo["name_en"]}{priority_html}</div>' +
-                                    f'<div class="meaning-text">{meaning["translation"]}</div>' +
-                                    f'<div class="meaning-desc">{meaning["desc"]}</div>' +
-                                    f'<div class="meaning-context">Source: {meaning["source"]}</div>' +
-                                    '</div>',
-                                    unsafe_allow_html=True
-                                )
-
-                                # TTS button for each meaning
-                                tts_lang = {"ar": "ar-SA", "en": "en-US", "ru": "ru-RU", "zh": "zh-CN", "de": "de-DE", "es": "es-ES", "pt": "pt-PT", "ko": "ko-KR"}.get(target_lang, "en-US")
-                                safe_text = meaning["translation"].replace("'", "\'")
-                                st.components.v1.html(f"""
-                                <div style="margin-top:4px;margin-bottom:12px;">
-                                    <button onclick="(function(){{ if(!('speechSynthesis' in window)) return; window.speechSynthesis.cancel(); var u=new SpeechSynthesisUtterance('{safe_text}'); u.lang='{tts_lang}'; u.rate=0.9; window.speechSynthesis.speak(u); }})()" 
-                                        style="background:#f8fafc;color:#4b5563;border:0.5px solid #d1d5db;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">
-                                        🔊 Listen
-                                    </button>
-                                </div>
-                                """, height=35)
-                    else:
-                        st.markdown("---")
-                        st.info("ℹ️ No specialized dictionary meanings found for this word. Showing general translation only.")
-
-                    # General translation with TTS
-                    st.markdown("---")
-                    st.markdown('<div class="all-meanings-header">💬 General Translation (DeepL)</div>', unsafe_allow_html=True)
-                    st.markdown(
-                        f'<div class="meaning-card" style="border-left: 4px solid #6B7280;">' +
-                        f'<div class="meaning-domain" style="color: #6B7280;">💬 General</div>' +
-                        f'<div class="meaning-text">{base_translation}</div>' +
-                        f'<div class="meaning-desc">Standard translation via DeepL API</div>' +
-                        '</div>',
-                        unsafe_allow_html=True
-                    )
-
-                    tts_lang_general = {"ar": "ar-SA", "en": "en-US", "ru": "ru-RU", "zh": "zh-CN", "de": "de-DE", "es": "es-ES", "pt": "pt-PT", "ko": "ko-KR"}.get(target_lang, "en-US")
-                    safe_general = base_translation.replace("'", "\'")
-                    st.components.v1.html(f"""
-                    <div style="margin-top:8px;">
-                        <button onclick="(function(){{ if(!('speechSynthesis' in window)){{ document.getElementById('tts-status').textContent='❌ TTS not supported'; return; }} window.speechSynthesis.cancel(); var u=new SpeechSynthesisUtterance('{safe_general}'); u.lang='{tts_lang_general}'; u.rate=0.9; window.speechSynthesis.speak(u); }})()" 
-                            style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;">
-                            🔊 Listen to Translation
-                        </button>
-                        <span id="tts-status" style="margin-left:8px;font-size:12px;color:#6b7280;"></span>
+                    st.markdown("### Translation Result")
+                    
+                    # Build the card HTML
+                    card_html = f"""
+                    <div class="rcard {card_class}">
+                        <div class="rlabel {label_class}">
+                            {domain_info['emoji']} {domain_info['name_en'].upper()} TRANSLATION
+                        </div>
+                        <div style="margin-bottom: 12px;">
+                            <span class="api-badge api-deepl">⚡ {source_engine}</span>
+                    """
+                    
+                    if swaps_made > 0:
+                        card_html += f'<span class="priority-badge">🔄 {swaps_made} Smart Swaps Applied</span>'
+                        
+                    card_html += f"""
+                        </div>
+                        <div class="rtext">{final_translation}</div>
                     </div>
-                    """, height=60)
+                    """
+                    
+                    st.markdown(card_html, unsafe_allow_html=True)
+                    
+                    # Copy to clipboard feature
+                    st.code(final_translation, language=None)
+                    
+                else:
+                    # Render Error Box
+                    st.markdown(f"""
+                    <div class="error-box">
+                        <b>Translation Failed:</b> {source_engine}
+                        <br><span style="font-size:12px;">Please check your DeepL API key and internet connection.</span>
+                    </div>
+                    """, unsafe_allow_html=True)
