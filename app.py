@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import cohere
 import tempfile
+import io
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
@@ -185,7 +186,7 @@ STYLE_OPTIONS = {
 }
 
 # ════════════════════════════════════════════════════════════
-#  DOMAIN KEYWORDS (مختصر)
+#  DOMAIN KEYWORDS
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
     "political": ["minister", "government", "council", "ministry", "parliament", "political", "diplomatic", "treaty", "election", "vote", "policy", "embassy", "summit", "legislation", "constitution", "foreign affairs", "national security", "coalition", "sanctions", "bilateral", "president", "state", "capital", "وزير", "حكومة", "مجلس", "وزارة", "برلمان", "سياسة", "دبلوماسي", "سفير", "معاهدة", "اتفاقية دولية", "حزب", "انتخابات", "تصويت", "أمن قومي", "استراتيجية وطنية", "بيان", "تصريح", "قمة", "مؤتمر", "جلسة", "تشريع", "دستور", "حقوق", "مواطن", "رئيس", "دولة", "عاصمة"],
@@ -216,31 +217,64 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  API KEYS (من secrets) - قراءة مضمونة 100%
+#  إدارة المفاتيح (من secrets أو من واجهة المستخدم)
 # ════════════════════════════════════════════════════════════
-# محاولة قراءة المفتاح من st.secrets
-try:
-    deepl_key = st.secrets.get("DEEPL_API_KEY", "")
-except:
-    deepl_key = ""
 
-if not deepl_key:
-    deepl_key = os.environ.get("DEEPL_API_KEY", "")
+# محاولة قراءة المفاتيح من secrets
+try:
+    deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
+except:
+    deepl_from_secrets = ""
 
 try:
-    cohere_key = st.secrets.get("COHERE_API_KEY", "")
+    cohere_from_secrets = st.secrets.get("COHERE_API_KEY", "")
 except:
-    cohere_key = ""
+    cohere_from_secrets = ""
 
-if not cohere_key:
-    cohere_key = os.environ.get("COHERE_API_KEY", "")
-
-# تخزين المفاتيح في session_state (للاستمرار بين جلسات التطبيق)
+# إذا لم تكن المفاتيح في session_state، استخدمها من secrets
 if "deepl_api_key" not in st.session_state:
-    st.session_state.deepl_api_key = deepl_key
+    st.session_state.deepl_api_key = deepl_from_secrets
 
 if "cohere_api_key" not in st.session_state:
-    st.session_state.cohere_api_key = cohere_key
+    st.session_state.cohere_api_key = cohere_from_secrets
+
+# إذا كانت المفاتيح مفقودة، اعرض حقول الإدخال (مرة واحدة فقط)
+if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
+    st.markdown("""
+    <div style="background:#1a1a2e;border-radius:14px;padding:2rem;margin-bottom:1.5rem;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#ffffff;margin-bottom:10px;">🔑 API Keys Required</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:20px;">
+            Please enter your API keys below. They will be saved for this session only.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if not st.session_state.deepl_api_key:
+            deepl_input = st.text_input("🔐 DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
+            if deepl_input:
+                st.session_state.deepl_api_key = deepl_input
+                st.success("✅ DeepL key saved!")
+                st.rerun()
+        else:
+            st.success("✅ DeepL API Key: OK")
+    
+    with col2:
+        if not st.session_state.cohere_api_key:
+            cohere_input = st.text_input("🔐 Cohere API Key", type="password", placeholder="e.g., abcd-1234-efgh-5678")
+            if cohere_input:
+                st.session_state.cohere_api_key = cohere_input
+                st.success("✅ Cohere key saved!")
+                st.rerun()
+        else:
+            st.success("✅ Cohere API Key: OK")
+    
+    st.info("💡 Your keys are stored only in your browser session and will not be saved permanently.")
+    
+    # إيقاف تنفيذ باقي التطبيق حتى يتم إدخال المفتاحين
+    st.stop()
 
 # ════════════════════════════════════════════════════════════
 #  TRANSLATION ENGINE (DeepL)
@@ -277,7 +311,7 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe)
+#  SPEECH-TO-TEXT (Cohere Transcribe) - النسخة المعدلة
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def get_cohere_client():
@@ -293,26 +327,31 @@ def get_cohere_client():
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     """
     تحويل الصوت إلى نص باستخدام Cohere Transcribe.
-    يدعم صيغ: FLAC, MP3, MPEG, MPGA, OGG, WAV
-    الحد الأقصى لحجم الملف: 25 ميجابايت
+    يحفظ الصوت في ملف مؤقت بصيغة WAV ثم يرسله إلى Cohere.
     """
     if not st.session_state.cohere_api_key:
-        return None, "مفتاح Cohere API غير موجود في ملف secrets.toml"
+        return None, "مفتاح Cohere API غير موجود."
     
+    tmp_path = None
     try:
         client = get_cohere_client()
         if not client:
             return None, "فشل في تهيئة عميل Cohere"
         
-        # تحديد اللغة (اختياري)
-        lang = None if language_code == "auto" else language_code
+        # حفظ الصوت في ملف مؤقت بصيغة WAV
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
         
-        # إرسال الطلب
-        response = client.audio.transcriptions.create(
-            file=audio_bytes,
-            model="cohere-transcribe-03-2026",
-            language=lang
-        )
+        # فتح الملف وإرساله إلى Cohere
+        with open(tmp_path, "rb") as audio_file:
+            lang = None if language_code == "auto" else language_code
+            
+            response = client.audio.transcriptions.create(
+                file=audio_file,
+                model="cohere-transcribe-03-2026",
+                language=lang
+            )
         
         text = response.text.strip()
         if text:
@@ -322,6 +361,13 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
             
     except Exception as e:
         return None, f"خطأ في Cohere: {str(e)}"
+    finally:
+        # حذف الملف المؤقت
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
 
 # ════════════════════════════════════════════════════════════
 #  SESSION STATE
@@ -384,71 +430,49 @@ with style_col2:
         dinfo = DOMAINS[selected_domain]
         st.markdown(f"<div style='margin-top: 28px; font-size: 13px; color: {dinfo['color']}; font-weight: 600;'>{dinfo['emoji']} Priority: {dinfo['name_en']}</div>", unsafe_allow_html=True)
     elif selected_domain == "general":
-        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>💬 General / standard translations prioritized</div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>💬 General</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>🔍 Auto-detecting domain from your text...</div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 28px; font-size: 13px; color: #6B7280;'>🔍 Auto-detecting</div>", unsafe_allow_html=True)
 
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT (باستخدام st.audio_input - مدمج ولا يحتاج مكتبات)
+#  VOICE INPUT
 # ════════════════════════════════════════════════════════════
-# التحقق من وجود مفتاح DeepL (لأن الترجمة تحتاجه)
-if st.session_state.deepl_api_key:
-    # التحقق من مفتاح Cohere مع رسائل توضيحية
-    has_cohere = bool(st.session_state.cohere_api_key)
-    
-    if not has_cohere:
-        st.error("❌ لم يتم العثور على مفتاح Cohere API. يرجى إضافته في ملف secrets.toml كـ COHERE_API_KEY")
-        st.info("💡 يمكنك الحصول على مفتاح مجاني من: https://dashboard.cohere.com")
-        st.info("📝 تأكد من كتابة المفتاح بالصيغة الصحيحة: COHERE_API_KEY = 'your-key-here'")
-    else:
-        st.success("✅ تم العثور على مفتاح Cohere API بنجاح!")
-    
-    st.markdown("""
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
-        <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input</div>
-        <div style="font-size:12px;color:#6b7280;">
-            Click the microphone button below, speak, and the text will be recognized using <b>Cohere Transcribe</b>.
-            <br>⚡ دقة عالية جداً، يدعم 14 لغة (بما فيها العربية، الإنجليزية، الصينية، وغيرها)
-        </div>
+st.markdown("""
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
+    <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">🎤 Voice Input</div>
+    <div style="font-size:12px;color:#6b7280;">
+        Click the microphone button below, speak, and the text will be recognized using <b>Cohere Transcribe</b>.
+        <br>⚡ دقة عالية جداً، يدعم 14 لغة (بما فيها العربية، الإنجليزية، الصينية، وغيرها)
     </div>
-    """, unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
 
-    # استخدام st.audio_input المدمجة
-    audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
+audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
+
+if audio_value:
+    st.audio(audio_value)
     
-    if audio_value:
-        # تشغيل الصوت المسجل
-        st.audio(audio_value)
+    with st.spinner("⏳ جاري التعرف على الصوت باستخدام Cohere..."):
+        audio_bytes = audio_value.getvalue()
+        recognized_text, error = speech_to_text_cohere(audio_bytes, source_lang)
         
-        if has_cohere:
-            with st.spinner("⏳ جاري التعرف على الصوت باستخدام Cohere..."):
-                # قراءة البيانات الصوتية
-                audio_bytes = audio_value.getvalue()
-                recognized_text, error = speech_to_text_cohere(audio_bytes, source_lang)
-                
-                if recognized_text:
-                    st.success(f"✅ تم التعرف: {recognized_text}")
-                    st.session_state.input_text = recognized_text
-                    
-                    # الترجمة التلقائية
-                    if st.button("ترجم الآن 🚀", type="primary"):
-                        with st.spinner("⏳ جاري الترجمة..."):
-                            translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
-                            if translated_text:
-                                st.session_state.translated_text = translated_text
-                                st.markdown("### الترجمة")
-                                st.markdown(f">>> {translated_text}")
-                            else:
-                                st.error(f"فشلت الترجمة: {engine}")
-                else:
-                    st.error(f"فشل التعرف على الصوت: {error}")
+        if recognized_text:
+            st.success(f"✅ تم التعرف: {recognized_text}")
+            st.session_state.input_text = recognized_text
+            
+            if st.button("ترجم الآن 🚀", type="primary"):
+                with st.spinner("⏳ جاري الترجمة..."):
+                    translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
+                    if translated_text:
+                        st.session_state.translated_text = translated_text
+                        st.markdown("### الترجمة")
+                        st.markdown(f">>> {translated_text}")
+                    else:
+                        st.error(f"فشلت الترجمة: {engine}")
         else:
-            st.warning("⚠️ يرجى إضافة مفتاح Cohere API في ملف secrets.toml لتمكين التعرف على الصوت.")
-
-else:
-    st.warning("⚠️ يرجى إدخال مفتاح DeepL API أولاً من الشريط الجانبي.")
+            st.error(f"فشل التعرف على الصوت: {error}")
 
 # ════════════════════════════════════════════════════════════
 #  TEXT INPUT
@@ -469,14 +493,14 @@ if input_text.strip():
         st.markdown(f'<div class="detected-box">🔍 <b>Auto-Detected Context:</b><br><div style="margin-top:6px;">{badges}</div></div>', unsafe_allow_html=True)
     else:
         if selected_style_label == "Auto-Detect":
-            st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>Context:</b> General / Standard</div>', unsafe_allow_html=True)
+            st.markdown('<div class="detected-box" style="border-left-color: #6B7280; background: #F3F4F6; color: #4B5563;">💬 <b>Context:</b> General</div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
 #  زر الترجمة اليدوي
 # ════════════════════════════════════════════════════════════
 if st.button("Translate 🚀", type="primary", use_container_width=True):
     if not st.session_state.deepl_api_key:
-        st.error("❌ DeepL API key missing. Please add it in the sidebar.")
+        st.error("❌ DeepL API key missing.")
     elif not input_text.strip():
         st.warning("Please enter some text to translate.")
     else:
@@ -521,59 +545,3 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <br><span style="font-size:12px;">Please check your DeepL API key and internet connection.</span>
                 </div>
                 """, unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════
-#  SIDEBAR
-# ════════════════════════════════════════════════════════════
-with st.sidebar:
-    st.markdown("### 🔑 API Keys")
-    
-    # DeepL
-    st.markdown("**DeepL API**")
-    if st.session_state.deepl_api_key:
-        masked = st.session_state.deepl_api_key[:6] + "..." + st.session_state.deepl_api_key[-4:] if len(st.session_state.deepl_api_key) > 10 else "***"
-        st.markdown(f"<div style='font-size:12px;color:#16a34a;font-weight:600;'>✅ Active</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size:10px;color:#6b7280;'>{masked}</div>", unsafe_allow_html=True)
-        if st.button("🔄 Change DeepL Key", use_container_width=True):
-            st.session_state.deepl_api_key = ""
-            st.rerun()
-    else:
-        st.markdown("<div style='font-size:12px;color:#ef4444;'>⚠️ Not configured</div>", unsafe_allow_html=True)
-        new_key = st.text_input("Enter DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
-        if new_key:
-            st.session_state.deepl_api_key = new_key
-            st.success("✅ Key saved!")
-            st.rerun()
-        st.caption("Get a free key at [DeepL](https://www.deepl.com/pro-api)")
-    
-    st.divider()
-    
-    # Cohere
-    st.markdown("**Cohere API (للتعرف على الصوت)**")
-    if st.session_state.cohere_api_key:
-        masked = st.session_state.cohere_api_key[:6] + "..." + st.session_state.cohere_api_key[-4:] if len(st.session_state.cohere_api_key) > 10 else "***"
-        st.markdown(f"<div style='font-size:12px;color:#16a34a;font-weight:600;'>✅ Active</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size:10px;color:#6b7280;'>{masked}</div>", unsafe_allow_html=True)
-        if st.button("🔄 Change Cohere Key", use_container_width=True):
-            st.session_state.cohere_api_key = ""
-            st.rerun()
-    else:
-        st.markdown("<div style='font-size:12px;color:#ef4444;'>⚠️ Not configured</div>", unsafe_allow_html=True)
-        new_key = st.text_input("Enter Cohere API Key", type="password", placeholder="e.g., abcd-1234-efgh-5678")
-        if new_key:
-            st.session_state.cohere_api_key = new_key
-            st.success("✅ Key saved!")
-            st.rerun()
-        st.caption("Get a free key at [Cohere](https://dashboard.cohere.com)")
-    
-    # عرض حالة المفتاحين
-    st.divider()
-    st.markdown("### 📊 Status")
-    if st.session_state.deepl_api_key:
-        st.success("✅ DeepL: OK")
-    else:
-        st.error("❌ DeepL: Missing")
-    if st.session_state.cohere_api_key:
-        st.success("✅ Cohere: OK")
-    else:
-        st.error("❌ Cohere: Missing")
