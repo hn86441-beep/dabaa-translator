@@ -1,4 +1,4 @@
 streamlit
 requests
-audiorecorder
+streamlit-audiorecorder
 cohere
