@@ -218,8 +218,9 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  DEEPL API KEY
+#  DEEPL API KEY — Main body (shows once, saves to session_state)
 # ═══════════════════════════════════════════════════════════════════════════════
+# Attempt to load from Streamlit Secrets, fallback to environment variables
 try:
     env_key = st.secrets["0d40f1a7-553b-44eb-9aab-837a828ca913:fx"]
 except (KeyError, FileNotFoundError):
@@ -421,7 +422,7 @@ if DOMAIN_SPECIFIC_TRANSLATIONS:
     st.markdown(f'<div class="dict-stats">📚 Dictionary loaded: {dict_size} words with {total_entries} total domain entries</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  VOICE INPUT — Inline JavaScript
+#  VOICE INPUT — Inline JavaScript (no iframe)
 # ═══════════════════════════════════════════════════════════════════════════════
 if key_entered:
     st.markdown("""
@@ -630,3 +631,5 @@ if key_entered:
                         <br><span style="font-size:12px;">Please check your DeepL API key and internet connection.</span>
                     </div>
                     """, unsafe_allow_html=True)
+
+```
