@@ -631,5 +631,3 @@ if key_entered:
                         <br><span style="font-size:12px;">Please check your DeepL API key and internet connection.</span>
                     </div>
                     """, unsafe_allow_html=True)
-
-```
