@@ -3,14 +3,13 @@ import requests
 import os
 import json
 from pathlib import Path
-import cohere
 import tempfile
 import io
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفسه، اختصار للطول)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -146,8 +145,7 @@ languages_dict = {
 }
 
 # ===== YANDEX FOLDER ID =====
-# احصل عليه من: https://console.cloud.yandex.ru/ → اختر المجلد → انسخ الرقم من الأعلى
-YANDEX_FOLDER_ID = "b1gpgicfudvf1upju50h"  # ضع رقم مجلدك هنا
+YANDEX_FOLDER_ID = "b1gpgicfudvf1upju50h"
 
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political",     "color": "#E63946"},
@@ -284,55 +282,55 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe)
+#  SPEECH-TO-TEXT (Cohere Transcribe - بدون مكتبة cohere)
 # ════════════════════════════════════════════════════════════
-@st.cache_resource
-def get_cohere_client():
-    if not st.session_state.cohere_api_key:
-        return None
-    try:
-        return cohere.ClientV2(api_key=st.session_state.cohere_api_key)
-    except Exception as e:
-        st.error(f"فشل في تهيئة عميل Cohere: {str(e)}")
-        return None
-
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
+    """
+    تحويل الصوت إلى نص باستخدام Cohere Transcribe عبر طلب HTTP مباشر.
+    """
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
     
-    tmp_path = None
     try:
-        client = get_cohere_client()
-        if not client:
-            return None, "فشل في تهيئة عميل Cohere"
+        # إعداد البيانات للـ multipart/form-data
+        # يجب أن تأتي الحقول النصية قبل الملف
+        lang = None if language_code == "auto" else language_code
         
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_bytes)
-            tmp_path = tmp_file.name
+        # بناء الطلب مع ترتيب صحيح
+        data = {}
         
-        with open(tmp_path, "rb") as audio_file:
-            lang = None if language_code == "auto" else language_code
-            
-            response = client.audio.transcriptions.create(
-                file=audio_file,
-                model="cohere-transcribe-03-2026",
-                language=lang
-            )
+        # أولاً: الحقول النصية (language, model)
+        if lang:
+            data["language"] = lang
+        data["model"] = "cohere-transcribe-03-2026"
         
-        text = response.text.strip()
-        if text:
-            return text, None
+        # ثانياً: الملف (يجب أن يأتي بعد الحقول النصية)
+        files = {
+            "file": ("audio.wav", audio_bytes, "audio/wav")
+        }
+        
+        # إرسال الطلب
+        response = requests.post(
+            "https://api.cohere.com/v2/audio/transcriptions",
+            headers={"Authorization": f"Bearer {st.session_state.cohere_api_key}"},
+            data=data,
+            files=files,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            text = result.get("text", "").strip()
+            if text:
+                return text, None
+            else:
+                return None, "لم يتم التعرف على أي كلام"
         else:
-            return None, "لم يتم التعرف على أي كلام"
+            error_msg = response.text
+            return None, f"Cohere error {response.status_code}: {error_msg}"
             
     except Exception as e:
         return None, f"خطأ في Cohere: {str(e)}"
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except:
-                pass
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط)
@@ -389,11 +387,6 @@ def speech_to_text_yandex(audio_bytes):
 #  SPEECH-TO-TEXT (المحرك الذكي - يختار حسب اللغة)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_smart(audio_bytes, language_code="auto"):
-    """
-    يختار محرك التعرف المناسب حسب اللغة:
-    - إذا كانت اللغة الروسية (ru) → يستخدم Yandex SpeechKit
-    - وإلا → يستخدم Cohere Transcribe
-    """
     if language_code == "ru":
         return speech_to_text_yandex(audio_bytes)
     else:
