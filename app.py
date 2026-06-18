@@ -145,6 +145,10 @@ languages_dict = {
     "Korean": "ko"
 }
 
+# ضع رقم مجلدك (Folder ID) هنا
+# يمكنك الحصول عليه من: https://console.cloud.yandex.ru/ → اختيار المجلد → نسخ الرقم من الأعلى
+FOLDER_ID = "b1gpgicfudvf1upju50h"  # <-- استبدل هذا برقم مجلدك الحقيقي
+
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political",     "color": "#E63946"},
     "legal":      {"emoji": "⚖️", "name_en": "Legal",         "color": "#534AB7"},
@@ -218,7 +222,7 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  API KEYS (من secrets أو واجهة المستخدم)
+#  API KEYS
 # ════════════════════════════════════════════════════════════
 
 # قراءة المفاتيح من secrets
@@ -383,7 +387,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
                 pass
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط)
+#  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط) - مع FOLDER_ID
 # ════════════════════════════════════════════════════════════
 def speech_to_text_yandex(audio_bytes, language_code="ru"):
     """
@@ -407,6 +411,7 @@ def speech_to_text_yandex(audio_bytes, language_code="ru"):
             "lang": "ru-RU",
             "format": "lpcm",
             "sampleRateHertz": "16000",
+            "folderId": FOLDER_ID,  # <-- هذا هو المفتاح لحل مشكلة PermissionDenied!
         }
         
         with open(tmp_path, "rb") as f:
@@ -442,11 +447,9 @@ def speech_to_text_smart(audio_bytes, language_code="auto"):
     - إذا كانت اللغة الروسية (ru) → يستخدم Yandex SpeechKit
     - وإلا → يستخدم Cohere Transcribe
     """
-    # إذا كانت اللغة الروسية، استخدم Yandex
     if language_code == "ru":
         return speech_to_text_yandex(audio_bytes, "ru")
     else:
-        # وإلا استخدم Cohere
         return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
@@ -519,7 +522,6 @@ st.session_state.selected_style = selected_style_label
 # ════════════════════════════════════════════════════════════
 #  VOICE INPUT (مع المحرك الذكي)
 # ════════════════════════════════════════════════════════════
-# عرض المحرك المستخدم حسب اللغة
 if source_lang == "ru":
     engine_info = "⚡ يستخدم **Yandex SpeechKit** (دقة عالية للغة الروسية)"
 else:
