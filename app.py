@@ -10,7 +10,7 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفسه، اختصار للطول)
+#  CSS
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -145,6 +145,7 @@ languages_dict = {
     "Korean": "ko"
 }
 
+# ===== YANDEX FOLDER ID (تم إضافته بناءً على طلبك) =====
 YANDEX_FOLDER_ID = "b1gpgicfudvf1upju50h"
 
 DOMAINS = {
@@ -292,21 +293,14 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, "مفتاح Cohere API غير موجود."
     
     try:
-        # تحضير الأجزاء بالترتيب الصحيح: الحقول النصية أولاً، ثم الملف
         parts = []
-        
-        # 1. الحقول النصية
         if language_code != "auto":
             parts.append(("language", language_code))
         parts.append(("model", "cohere-transcribe-03-2026"))
-        
-        # 2. الملف أخيراً
         parts.append(("file", ("audio.wav", audio_bytes, "audio/wav")))
         
-        # بناء الطلب باستخدام MultipartEncoder
         encoder = MultipartEncoder(fields=parts)
         
-        # إرسال الطلب
         response = requests.post(
             "https://api.cohere.com/v2/audio/transcriptions",
             headers={
@@ -336,7 +330,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
 # ════════════════════════════════════════════════════════════
 def speech_to_text_yandex(audio_bytes):
     if not st.session_state.yandex_api_key:
-        return None, "مفتاح Yandex API غير موجود."
+        return None, "مفتاح Yandex API غير موجود. تأكد من إضافته في secrets.toml"
     
     tmp_path = None
     try:
@@ -352,7 +346,7 @@ def speech_to_text_yandex(audio_bytes):
             "lang": "ru-RU",
             "format": "lpcm",
             "sampleRateHertz": "16000",
-            "folderId": YANDEX_FOLDER_ID,
+            "folderId": YANDEX_FOLDER_ID,  # تم إضافة معرف المجلد
         }
         
         with open(tmp_path, "rb") as f:
@@ -370,7 +364,7 @@ def speech_to_text_yandex(audio_bytes):
         else:
             error_msg = response.text
             if "PermissionDenied" in error_msg:
-                return None, "خطأ في الصلاحيات: تأكد من أن حساب الخدمة لديه صلاحية 'ai.speechkit-stt.user' على المجلد."
+                return None, "خطأ في الصلاحيات: تأكد من أن حساب الخدمة لديه صلاحية 'editor' على المجلد، والمفتاح من نوع API Key."
             return None, f"Yandex error {response.status_code}: {error_msg}"
             
     except Exception as e:
