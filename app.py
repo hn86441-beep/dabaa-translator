@@ -145,9 +145,9 @@ languages_dict = {
     "Korean": "ko"
 }
 
-# ضع رقم مجلدك (Folder ID) هنا
-# يمكنك الحصول عليه من: https://console.cloud.yandex.ru/ → اختيار المجلد → نسخ الرقم من الأعلى
-FOLDER_ID = "b1gpgicfudvf1upju50h"  # <-- استبدل هذا برقم مجلدك الحقيقي
+# ===== YANDEX FOLDER ID =====
+# احصل عليه من: https://console.cloud.yandex.ru/ → اختر المجلد → انسخ الرقم من الأعلى
+YANDEX_FOLDER_ID = "b1gpgicfudvf1upju50h"  # ضع رقم مجلدك هنا
 
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political",     "color": "#E63946"},
@@ -225,7 +225,6 @@ def detect_domains(text):
 #  API KEYS
 # ════════════════════════════════════════════════════════════
 
-# قراءة المفاتيح من secrets
 try:
     deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
 except:
@@ -241,7 +240,6 @@ try:
 except:
     yandex_from_secrets = ""
 
-# تخزين المفاتيح في session_state
 if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = deepl_from_secrets
 
@@ -250,52 +248,6 @@ if "cohere_api_key" not in st.session_state:
 
 if "yandex_api_key" not in st.session_state:
     st.session_state.yandex_api_key = yandex_from_secrets
-
-# إذا كانت المفاتيح مفقودة، اعرض حقول الإدخال
-if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
-    st.markdown("""
-    <div style="background:#1a1a2e;border-radius:14px;padding:2rem;margin-bottom:1.5rem;text-align:center;">
-        <div style="font-size:24px;font-weight:700;color:#ffffff;margin-bottom:10px;">🔑 API Keys Required</div>
-        <div style="font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:20px;">
-            Please enter your API keys below. They will be saved for this session only.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if not st.session_state.deepl_api_key:
-            deepl_input = st.text_input("🔐 DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
-            if deepl_input:
-                st.session_state.deepl_api_key = deepl_input
-                st.success("✅ DeepL key saved!")
-                st.rerun()
-        else:
-            st.success("✅ DeepL API Key: OK")
-    
-    with col2:
-        if not st.session_state.cohere_api_key:
-            cohere_input = st.text_input("🔐 Cohere API Key", type="password", placeholder="e.g., abcd-1234-efgh-5678")
-            if cohere_input:
-                st.session_state.cohere_api_key = cohere_input
-                st.success("✅ Cohere key saved!")
-                st.rerun()
-        else:
-            st.success("✅ Cohere API Key: OK")
-    
-    with col3:
-        if not st.session_state.yandex_api_key:
-            yandex_input = st.text_input("🔐 Yandex API Key (للروسية)", type="password", placeholder="e.g., yandex-api-key")
-            if yandex_input:
-                st.session_state.yandex_api_key = yandex_input
-                st.success("✅ Yandex key saved!")
-                st.rerun()
-        else:
-            st.success("✅ Yandex API Key: OK")
-    
-    st.info("💡 Your keys are stored only in your browser session and will not be saved permanently.")
-    st.stop()
 
 # ════════════════════════════════════════════════════════════
 #  TRANSLATION ENGINE (DeepL)
@@ -332,11 +284,10 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe - لجميع اللغات ما عدا الروسية)
+#  SPEECH-TO-TEXT (Cohere Transcribe)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def get_cohere_client():
-    """تهيئة عميل Cohere (مرة واحدة فقط)"""
     if not st.session_state.cohere_api_key:
         return None
     try:
@@ -346,9 +297,6 @@ def get_cohere_client():
         return None
 
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
-    """
-    تحويل الصوت إلى نص باستخدام Cohere Transcribe.
-    """
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
     
@@ -387,15 +335,11 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
                 pass
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط) - مع FOLDER_ID
+#  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط)
 # ════════════════════════════════════════════════════════════
-def speech_to_text_yandex(audio_bytes, language_code="ru"):
-    """
-    تحويل الصوت إلى نص باستخدام Yandex SpeechKit.
-    مخصص للغة الروسية فقط.
-    """
+def speech_to_text_yandex(audio_bytes):
     if not st.session_state.yandex_api_key:
-        return None, "مفتاح Yandex API غير موجود. يرجى إدخاله في الشريط الجانبي."
+        return None, "مفتاح Yandex API غير موجود."
     
     tmp_path = None
     try:
@@ -411,7 +355,7 @@ def speech_to_text_yandex(audio_bytes, language_code="ru"):
             "lang": "ru-RU",
             "format": "lpcm",
             "sampleRateHertz": "16000",
-            "folderId": FOLDER_ID,  # <-- هذا هو المفتاح لحل مشكلة PermissionDenied!
+            "folderId": YANDEX_FOLDER_ID,
         }
         
         with open(tmp_path, "rb") as f:
@@ -423,11 +367,14 @@ def speech_to_text_yandex(audio_bytes, language_code="ru"):
             result = response.json()
             text = result.get("result", "").strip()
             if text:
-                return text, None
+                return text, "Yandex SpeechKit"
             else:
                 return None, "لم يتم التعرف على أي كلام بالروسية"
         else:
-            return None, f"Yandex error {response.status_code}: {response.text}"
+            error_msg = response.text
+            if "PermissionDenied" in error_msg:
+                return None, "خطأ في الصلاحيات: تأكد من أن حساب الخدمة لديه صلاحية 'ai.speechkit-stt.user' على المجلد."
+            return None, f"Yandex error {response.status_code}: {error_msg}"
             
     except Exception as e:
         return None, f"خطأ في Yandex: {str(e)}"
@@ -448,7 +395,7 @@ def speech_to_text_smart(audio_bytes, language_code="auto"):
     - وإلا → يستخدم Cohere Transcribe
     """
     if language_code == "ru":
-        return speech_to_text_yandex(audio_bytes, "ru")
+        return speech_to_text_yandex(audio_bytes)
     else:
         return speech_to_text_cohere(audio_bytes, language_code)
 
@@ -520,10 +467,58 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT (مع المحرك الذكي)
+#  إدارة المفاتيح (عرض في أعلى الصفحة إذا كانت مفقودة)
+# ════════════════════════════════════════════════════════════
+if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
+    st.markdown("""
+    <div style="background:#1a1a2e;border-radius:14px;padding:2rem;margin-bottom:1.5rem;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#ffffff;margin-bottom:10px;">🔑 API Keys Required</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:20px;">
+            Please enter your API keys below. They will be saved for this session only.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if not st.session_state.deepl_api_key:
+            deepl_input = st.text_input("🔐 DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
+            if deepl_input:
+                st.session_state.deepl_api_key = deepl_input
+                st.success("✅ DeepL key saved!")
+                st.rerun()
+        else:
+            st.success("✅ DeepL API Key: OK")
+    
+    with col2:
+        if not st.session_state.cohere_api_key:
+            cohere_input = st.text_input("🔐 Cohere API Key", type="password", placeholder="e.g., abcd-1234-efgh-5678")
+            if cohere_input:
+                st.session_state.cohere_api_key = cohere_input
+                st.success("✅ Cohere key saved!")
+                st.rerun()
+        else:
+            st.success("✅ Cohere API Key: OK")
+    
+    with col3:
+        if not st.session_state.yandex_api_key:
+            yandex_input = st.text_input("🔐 Yandex API Key (للروسية)", type="password", placeholder="e.g., yandex-api-key")
+            if yandex_input:
+                st.session_state.yandex_api_key = yandex_input
+                st.success("✅ Yandex key saved!")
+                st.rerun()
+        else:
+            st.success("✅ Yandex API Key: OK")
+    
+    st.info("💡 Your keys are stored only in your browser session.")
+    st.stop()
+
+# ════════════════════════════════════════════════════════════
+#  VOICE INPUT
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Yandex SpeechKit** (دقة عالية للغة الروسية)"
+    engine_info = "⚡ يستخدم **Yandex SpeechKit** (للغة الروسية)"
 else:
     engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية لجميع اللغات)"
 
@@ -544,10 +539,10 @@ if audio_value:
     
     with st.spinner("⏳ جاري التعرف على الصوت..."):
         audio_bytes = audio_value.getvalue()
-        recognized_text, error = speech_to_text_smart(audio_bytes, source_lang)
+        recognized_text, engine_used = speech_to_text_smart(audio_bytes, source_lang)
         
         if recognized_text:
-            st.success(f"✅ تم التعرف: {recognized_text}")
+            st.success(f"✅ تم التعرف ({engine_used}): {recognized_text}")
             st.session_state.input_text = recognized_text
             
             if st.button("ترجم الآن 🚀", type="primary"):
@@ -560,7 +555,7 @@ if audio_value:
                     else:
                         st.error(f"فشلت الترجمة: {engine}")
         else:
-            st.error(f"فشل التعرف على الصوت: {error}")
+            st.error(f"فشل التعرف على الصوت: {engine_used}")
 
 # ════════════════════════════════════════════════════════════
 #  TEXT INPUT
@@ -603,7 +598,6 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     active_domain = detected[0]
 
                 final_translation = translation_result
-                swaps_made = 0
 
                 card_class = f"rcard-{active_domain}" if active_domain in DOMAINS else "rcard-gen"
                 label_class = f"rlabel-{active_domain}" if active_domain in DOMAINS else "rlabel-gen"
