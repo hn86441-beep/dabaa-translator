@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import io
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
@@ -144,7 +145,6 @@ languages_dict = {
     "Korean": "ko"
 }
 
-# ===== YANDEX FOLDER ID =====
 YANDEX_FOLDER_ID = "b1gpgicfudvf1upju50h"
 
 DOMAINS = {
@@ -282,39 +282,38 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe - بدون مكتبة cohere)
+#  SPEECH-TO-TEXT (Cohere Transcribe)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     """
-    تحويل الصوت إلى نص باستخدام Cohere Transcribe عبر طلب HTTP مباشر.
+    تحويل الصوت إلى نص باستخدام Cohere Transcribe مع MultipartEncoder.
     """
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
     
     try:
-        # إعداد البيانات للـ multipart/form-data
-        # يجب أن تأتي الحقول النصية قبل الملف
-        lang = None if language_code == "auto" else language_code
+        # تحضير الأجزاء بالترتيب الصحيح: الحقول النصية أولاً، ثم الملف
+        parts = []
         
-        # بناء الطلب مع ترتيب صحيح
-        data = {}
+        # 1. الحقول النصية
+        if language_code != "auto":
+            parts.append(("language", language_code))
+        parts.append(("model", "cohere-transcribe-03-2026"))
         
-        # أولاً: الحقول النصية (language, model)
-        if lang:
-            data["language"] = lang
-        data["model"] = "cohere-transcribe-03-2026"
+        # 2. الملف أخيراً
+        parts.append(("file", ("audio.wav", audio_bytes, "audio/wav")))
         
-        # ثانياً: الملف (يجب أن يأتي بعد الحقول النصية)
-        files = {
-            "file": ("audio.wav", audio_bytes, "audio/wav")
-        }
+        # بناء الطلب باستخدام MultipartEncoder
+        encoder = MultipartEncoder(fields=parts)
         
         # إرسال الطلب
         response = requests.post(
             "https://api.cohere.com/v2/audio/transcriptions",
-            headers={"Authorization": f"Bearer {st.session_state.cohere_api_key}"},
-            data=data,
-            files=files,
+            headers={
+                "Authorization": f"Bearer {st.session_state.cohere_api_key}",
+                "Content-Type": encoder.content_type,
+            },
+            data=encoder,
             timeout=30
         )
         
@@ -384,7 +383,7 @@ def speech_to_text_yandex(audio_bytes):
                 pass
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (المحرك الذكي - يختار حسب اللغة)
+#  SPEECH-TO-TEXT (المحرك الذكي)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_smart(audio_bytes, language_code="auto"):
     if language_code == "ru":
@@ -460,7 +459,7 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  إدارة المفاتيح (عرض في أعلى الصفحة إذا كانت مفقودة)
+#  إدارة المفاتيح
 # ════════════════════════════════════════════════════════════
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
