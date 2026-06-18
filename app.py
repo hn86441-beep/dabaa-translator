@@ -145,9 +145,6 @@ languages_dict = {
     "Korean": "ko"
 }
 
-# ===== YANDEX FOLDER ID (تم إضافته بناءً على طلبك) =====
-YANDEX_FOLDER_ID = "b1gpgicfudvf1upju50h"
-
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political",     "color": "#E63946"},
     "legal":      {"emoji": "⚖️", "name_en": "Legal",         "color": "#534AB7"},
@@ -190,7 +187,7 @@ STYLE_OPTIONS = {
 }
 
 # ════════════════════════════════════════════════════════════
-#  DOMAIN KEYWORDS
+#  DOMAIN KEYWORDS (مختصر للطول)
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
     "political": ["minister", "government", "council", "ministry", "parliament", "political", "diplomatic", "treaty", "election", "vote", "policy", "embassy", "summit", "legislation", "constitution", "foreign affairs", "national security", "coalition", "sanctions", "bilateral", "president", "state", "capital", "وزير", "حكومة", "مجلس", "وزارة", "برلمان", "سياسة", "دبلوماسي", "سفير", "معاهدة", "اتفاقية دولية", "حزب", "انتخابات", "تصويت", "أمن قومي", "استراتيجية وطنية", "بيان", "تصريح", "قمة", "مؤتمر", "جلسة", "تشريع", "دستور", "حقوق", "مواطن", "رئيس", "دولة", "عاصمة"],
@@ -286,9 +283,6 @@ def fetch_ai_translation(text, target_lang):
 #  SPEECH-TO-TEXT (Cohere Transcribe)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
-    """
-    تحويل الصوت إلى نص باستخدام Cohere Transcribe مع MultipartEncoder.
-    """
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
     
@@ -327,6 +321,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط)
+#  🔴 تم إزالة folderId من الطلب - يعتمد على صلاحيات حساب الخدمة
 # ════════════════════════════════════════════════════════════
 def speech_to_text_yandex(audio_bytes):
     if not st.session_state.yandex_api_key:
@@ -342,11 +337,11 @@ def speech_to_text_yandex(audio_bytes):
         headers = {
             "Authorization": f"Api-Key {st.session_state.yandex_api_key}",
         }
+        # 📌 تم إزالة folderId لأنه غير مطلوب عند استخدام مفتاح API لحساب خدمة
         params = {
             "lang": "ru-RU",
             "format": "lpcm",
             "sampleRateHertz": "16000",
-            "folderId": YANDEX_FOLDER_ID,  # تم إضافة معرف المجلد
         }
         
         with open(tmp_path, "rb") as f:
@@ -364,7 +359,7 @@ def speech_to_text_yandex(audio_bytes):
         else:
             error_msg = response.text
             if "PermissionDenied" in error_msg:
-                return None, "خطأ في الصلاحيات: تأكد من أن حساب الخدمة لديه صلاحية 'editor' على المجلد، والمفتاح من نوع API Key."
+                return None, "خطأ في الصلاحيات: تأكد من أن حساب الخدمة لديه صلاحية 'editor' على المجلد، والمفتاح من نوع API Key (يبدأ بـ AQVN أو YC)."
             return None, f"Yandex error {response.status_code}: {error_msg}"
             
     except Exception as e:
