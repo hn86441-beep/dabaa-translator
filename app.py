@@ -6,11 +6,18 @@ from pathlib import Path
 import tempfile
 import io
 from requests_toolbelt.multipart.encoder import MultipartEncoder
-import vosk
-import wave
-import json
-import urllib.request
-import zipfile
+
+# محاولة استيراد Vosk مع معالجة الأخطاء
+try:
+    import vosk
+    import wave
+    import urllib.request
+    import zipfile
+    VOSK_AVAILABLE = True
+except ImportError as e:
+    VOSK_AVAILABLE = False
+    st.error(f"⚠️ مكتبة Vosk غير مثبتة: {str(e)}")
+    st.info("📥 قم بتثبيتها: `pip install vosk`")
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
@@ -192,7 +199,7 @@ STYLE_OPTIONS = {
 }
 
 # ════════════════════════════════════════════════════════════
-#  DOMAIN KEYWORDS (مختصر للطول)
+#  DOMAIN KEYWORDS (مختصر)
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
     "political": ["minister", "government", "council", "ministry", "parliament", "political", "diplomatic", "treaty", "election", "vote", "policy", "embassy", "summit", "legislation", "constitution", "foreign affairs", "national security", "coalition", "sanctions", "bilateral", "president", "state", "capital", "وزير", "حكومة", "مجلس", "وزارة", "برلمان", "سياسة", "دبلوماسي", "سفير", "معاهدة", "اتفاقية دولية", "حزب", "انتخابات", "تصويت", "أمن قومي", "استراتيجية وطنية", "بيان", "تصريح", "قمة", "مؤتمر", "جلسة", "تشريع", "دستور", "حقوق", "مواطن", "رئيس", "دولة", "عاصمة"],
@@ -207,7 +214,7 @@ DOMAIN_KEYWORDS = {
     "sports": ["sports", "football", "soccer", "basketball", "tennis", "swimming", "running", "stadium", "club", "team", "player", "coach", "referee", "championship", "cup", "match", "fitness", "court", "ring", "bat", "رياضة", "كرة القدم", "كرة السلة", "تنس", "سباحة", "جري", "ملعب", "نادي", "فريق", "لاعب", "مدرب", "حكم", "بطولة", "كأس", "مباراة", "تدريب", "لياقة", "مسابقة", "ملعب", "حلبة", "مضرب"],
     "literary": ["literature", "story", "novel", "poetry", "poem", "writer", "author", "text", "style", "rhetoric", "metaphor", "simile", "chapter", "paragraph", "narrative", "plot", "character", "أدب", "قصة", "رواية", "شعر", "قصيدة", "كاتب", "مؤلف", "نص", "أسلوب", "بلاغة", "مجاز", "استعارة", "تشبيه", "فصل", "فقرة", "سرد", "حبكة", "شخصية", "حوار"],
     "it": ["programming", "code", "computer", "network", "internet", "software", "application", "website", "server", "database", "cybersecurity", "hacker", "AI", "machine learning", "cloud", "API", "cell", "برمجة", "كود", "حاسوب", "كمبيوتر", "شبكة", "إنترنت", "برنامج", "تطبيق", "موقع", "خادم", "قاعدة بيانات", "أمن سيبراني", "هاكر", "ذكاء اصطناعي", "تعلم آلي", "سحابي", "خلية"],
-    "environmental": ["environment", "pollution", "climate", "global warming", "renewable", "solar", "wind", "seal", "بيئة", "تلوث", "مناخ", "احتباس حراري", "طاقة متجددة", "شمسية", "رياح", "مياه جوفية", "غابة", "صحراء", "تصحر", "تنوع حيوي", "محمية", "طبيعة", "أوزون", "كربون", "فقمة"],
+    "environmental": ["environment", "pollution", "climate", "global warming", "renewable", "solar", "wind", "seal", "بيئة", "تلوث", "مناخ", "احتباس حراري", "طاقة متجددة", "شمسية", "رياح", "مياه جوفية", "غابة", "صحراء", "تصحر", "تنوع حيوي", "محمية", "طبيعة", "أوزون", "کربون", "فقمة"],
     "agricultural": ["agriculture", "farm", "crop", "wheat", "rice", "corn", "trees", "irrigation", "soil", "date", "زراعة", "مزرعة", "محصول", "قمح", "أرز", "ذرة", "أشجار", "ماء ري", "تربة", "سماد", "مبيد", "حصاد", "حصادة", "ثروة حيوانية", "مواشي", "أغنام", "دواجن", "سمك", "تمر"],
     "media": ["media", "journalism", "television", "radio", "newspaper", "news", "report", "anchor", "إعلام", "صحافة", "تلفزيون", "إذاعة", "صحيفة", "خبر", "تقرير", "مذيع", "مراسل", "تحقيق", "صحفي", "إعلان", "دعاية", "بث", "قناة", "برنامج إعلامي"],
     "tourism": ["tourism", "hotel", "travel", "trip", "airport", "aviation", "passport", "visa", "tour", "plane", "سياحة", "فندق", "سفر", "رحلة", "مطار", "طيران", "جواز", "تأشيرة", "جولة", "أثر", "تاريخي", "معلم", "منتجع", "شاطئ", "جبل", "صحراء", "متحف", "تراث", "طائرة"],
@@ -278,25 +285,17 @@ def fetch_ai_translation(text, target_lang):
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (Cohere Transcribe - لجميع اللغات عدا الروسية)
-#  يتم إرسال language = "auto" إذا لم تكن محددة
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
 
     try:
-        from requests_toolbelt.multipart.encoder import MultipartEncoder
-
-        # تحضير الأجزاء بالترتيب الصحيح
+        # استخدام MultipartEncoder مع ترتيب صحيح
         parts = []
-
-        # الحقول النصية أولاً
-        # إرسال اللغة دائماً، مع "auto" إذا لم تكن محددة
         lang = language_code if language_code != "auto" and language_code is not None else "auto"
         parts.append(("language", lang))
         parts.append(("model", "cohere-transcribe-03-2026"))
-
-        # الملف أخيراً
         parts.append(("file", ("audio.wav", audio_bytes, "audio/wav")))
 
         encoder = MultipartEncoder(fields=parts)
@@ -326,57 +325,72 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Vosk - للروسية فقط) مع تحميل تلقائي
+#  SPEECH-TO-TEXT (Vosk - للروسية فقط)
 # ════════════════════════════════════════════════════════════
-@st.cache_resource
 def load_vosk_model():
-    """تحميل نموذج Vosk (مرة واحدة فقط) - يتم تحميله تلقائياً من الإنترنت"""
-    import os
-    import urllib.request
-    import zipfile
-    
-    model_name = "vosk-model-ru-0.22"
-    model_path = os.path.join(os.getcwd(), model_name)
-    model_url = "https://alphacephei.com/vosk/models/vosk-model-ru-0.22.zip"
-    
-    if os.path.exists(model_path):
-        st.info(f"✅ تم العثور على النموذج: {model_name}")
-        try:
-            return vosk.Model(model_path)
-        except Exception as e:
-            st.warning(f"فشل تحميل النموذج: {e}")
-    
-    st.info(f"📥 جاري تحميل نموذج Vosk (~50 ميجابايت)... قد يستغرق هذا دقيقة أو دقيقتين.")
-    
-    zip_path = os.path.join(os.getcwd(), f"{model_name}.zip")
+    """تحميل نموذج Vosk (مرة واحدة فقط)"""
+    if not VOSK_AVAILABLE:
+        return None
     
     try:
-        with st.spinner("⏳ جاري التحميل... يرجى الانتظار"):
-            urllib.request.urlretrieve(model_url, zip_path)
+        import vosk
+        import urllib.request
+        import zipfile
         
-        with st.spinner("📂 جاري فك الضغط..."):
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(os.getcwd())
+        model_name = "vosk-model-ru-0.22"
+        model_path = os.path.join(os.getcwd(), model_name)
+        model_url = "https://alphacephei.com/vosk/models/vosk-model-ru-0.22.zip"
         
-        os.remove(zip_path)
-        st.success("✅ تم تحميل نموذج Vosk بنجاح!")
-        return vosk.Model(model_path)
+        if os.path.exists(model_path):
+            st.info(f"✅ تم العثور على النموذج: {model_name}")
+            try:
+                return vosk.Model(model_path)
+            except Exception as e:
+                st.warning(f"⚠️ فشل تحميل النموذج: {e}")
+                return None
         
+        st.info(f"📥 جاري تحميل نموذج Vosk...")
+        zip_path = os.path.join(os.getcwd(), f"{model_name}.zip")
+        
+        try:
+            with st.spinner("⏳ جاري التحميل..."):
+                urllib.request.urlretrieve(model_url, zip_path)
+            
+            with st.spinner("📂 جاري فك الضغط..."):
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(os.getcwd())
+            
+            os.remove(zip_path)
+            st.success("✅ تم تحميل نموذج Vosk بنجاح!")
+            return vosk.Model(model_path)
+            
+        except Exception as e:
+            st.error(f"❌ فشل تحميل النموذج: {str(e)}")
+            return None
+            
     except Exception as e:
-        st.error(f"❌ فشل تحميل النموذج: {str(e)}")
-        st.info("💡 يمكنك تحميل النموذج يدوياً من: https://alphacephei.com/vosk/models")
+        st.error(f"❌ خطأ في تحميل Vosk: {str(e)}")
         return None
 
+@st.cache_resource
+def get_vosk_model():
+    """الحصول على نموذج Vosk مع التخزين المؤقت"""
+    return load_vosk_model()
+
 def speech_to_text_vosk(audio_bytes):
-    """
-    تحويل الصوت إلى نص باستخدام Vosk (يعمل بدون إنترنت)
-    """
-    model = load_vosk_model()
+    """تحويل الصوت إلى نص باستخدام Vosk"""
+    if not VOSK_AVAILABLE:
+        return None, "مكتبة Vosk غير مثبتة"
+    
+    model = get_vosk_model()
     if not model:
-        return None, "نموذج Vosk غير متاح. جارٍ محاولة التحميل..."
+        return None, "نموذج Vosk غير متاح"
     
     tmp_path = None
     try:
+        import wave
+        import vosk
+        
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
@@ -396,16 +410,13 @@ def speech_to_text_vosk(audio_bytes):
         final = json.loads(rec.FinalResult())
         result_text += final.get("text", "")
         
-        try:
-            if tmp_path and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-        except:
-            pass
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
         
         if result_text.strip():
-            return result_text.strip(), "Vosk (بدون إنترنت)"
+            return result_text.strip(), "Vosk"
         else:
-            return None, "لم يتم التعرف على أي كلام بالروسية"
+            return None, "لم يتم التعرف على أي كلام"
             
     except Exception as e:
         return None, f"خطأ في Vosk: {str(e)}"
@@ -417,7 +428,7 @@ def speech_to_text_vosk(audio_bytes):
             pass
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (المحرك الذكي - يختار حسب اللغة)
+#  SPEECH-TO-TEXT (المحرك الذكي)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_smart(audio_bytes, language_code="auto"):
     if language_code == "ru":
@@ -493,7 +504,7 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  إدارة المفاتيح (تظهر مرة واحدة فقط)
+#  إدارة المفاتيح
 # ════════════════════════════════════════════════════════════
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
@@ -534,10 +545,10 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Vosk** (يعمل بدون إنترنت، خفيف وسريع)"
-    engine_note = "📥 سيتم تحميل النموذج تلقائياً في المرة الأولى"
+    engine_info = "⚡ يستخدم **Vosk** (يعمل بدون إنترنت)"
+    engine_note = "📥 سيتم تحميل النموذج تلقائياً"
 else:
-    engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية لجميع اللغات)"
+    engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية)"
     engine_note = ""
 
 st.markdown(f"""
