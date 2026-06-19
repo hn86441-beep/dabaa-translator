@@ -282,14 +282,20 @@ def fetch_ai_translation(text, target_lang):
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
-    
+
     try:
+        # تحضير الأجزاء بالترتيب الصحيح
         parts = []
-        if language_code != "auto":
+        
+        # 1. الحقول النصية أولاً (language, model)
+        if language_code != "auto" and language_code is not None:
             parts.append(("language", language_code))
         parts.append(("model", "cohere-transcribe-03-2026"))
+        
+        # 2. الملف أخيراً
         parts.append(("file", ("audio.wav", audio_bytes, "audio/wav")))
         
+        # بناء الطلب باستخدام MultipartEncoder
         encoder = MultipartEncoder(fields=parts)
         
         response = requests.post(
