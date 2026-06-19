@@ -4,25 +4,12 @@ import os
 import json
 from pathlib import Path
 import tempfile
-import io
 from requests_toolbelt.multipart.encoder import MultipartEncoder
-
-# محاولة استيراد Vosk مع معالجة الأخطاء
-try:
-    import vosk
-    import wave
-    import urllib.request
-    import zipfile
-    VOSK_AVAILABLE = True
-except ImportError as e:
-    VOSK_AVAILABLE = False
-    st.error(f"⚠️ مكتبة Vosk غير مثبتة: {str(e)}")
-    st.info("📥 قم بتثبيتها: `pip install vosk`")
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفسه، اختصار للطول)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -93,7 +80,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .api-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; margin-right: 4px; }
 .api-deepl { background: #0F2B46; color: #8ECAE6; }
 .api-cohere { background: #1a1a2e; color: #8ECAE6; }
-.api-vosk { background: #2d7d46; color: #ffffff; }
 
 .domain-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; margin-right: 6px; margin-bottom: 4px; }
 .db-pol { background: #E63946; color: white; }
@@ -131,7 +117,6 @@ st.markdown("""
         <span class="pill pill-active">Auto-Domain Detect</span>
         <span class="pill pill-muted">DeepL Precision</span>
         <span class="pill pill-muted">Cohere Transcribe</span>
-        <span class="pill pill-muted">Vosk (Русский)</span>
     </div>
     <div class="lang-bar">
         <span class="ldot"></span><span class="ldot"></span><span class="ldot"></span>
@@ -199,7 +184,7 @@ STYLE_OPTIONS = {
 }
 
 # ════════════════════════════════════════════════════════════
-#  DOMAIN KEYWORDS (مختصر)
+#  DOMAIN KEYWORDS
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
     "political": ["minister", "government", "council", "ministry", "parliament", "political", "diplomatic", "treaty", "election", "vote", "policy", "embassy", "summit", "legislation", "constitution", "foreign affairs", "national security", "coalition", "sanctions", "bilateral", "president", "state", "capital", "وزير", "حكومة", "مجلس", "وزارة", "برلمان", "سياسة", "دبلوماسي", "سفير", "معاهدة", "اتفاقية دولية", "حزب", "انتخابات", "تصويت", "أمن قومي", "استراتيجية وطنية", "بيان", "تصريح", "قمة", "مؤتمر", "جلسة", "تشريع", "دستور", "حقوق", "مواطن", "رئيس", "دولة", "عاصمة"],
@@ -214,7 +199,7 @@ DOMAIN_KEYWORDS = {
     "sports": ["sports", "football", "soccer", "basketball", "tennis", "swimming", "running", "stadium", "club", "team", "player", "coach", "referee", "championship", "cup", "match", "fitness", "court", "ring", "bat", "رياضة", "كرة القدم", "كرة السلة", "تنس", "سباحة", "جري", "ملعب", "نادي", "فريق", "لاعب", "مدرب", "حكم", "بطولة", "كأس", "مباراة", "تدريب", "لياقة", "مسابقة", "ملعب", "حلبة", "مضرب"],
     "literary": ["literature", "story", "novel", "poetry", "poem", "writer", "author", "text", "style", "rhetoric", "metaphor", "simile", "chapter", "paragraph", "narrative", "plot", "character", "أدب", "قصة", "رواية", "شعر", "قصيدة", "كاتب", "مؤلف", "نص", "أسلوب", "بلاغة", "مجاز", "استعارة", "تشبيه", "فصل", "فقرة", "سرد", "حبكة", "شخصية", "حوار"],
     "it": ["programming", "code", "computer", "network", "internet", "software", "application", "website", "server", "database", "cybersecurity", "hacker", "AI", "machine learning", "cloud", "API", "cell", "برمجة", "كود", "حاسوب", "كمبيوتر", "شبكة", "إنترنت", "برنامج", "تطبيق", "موقع", "خادم", "قاعدة بيانات", "أمن سيبراني", "هاكر", "ذكاء اصطناعي", "تعلم آلي", "سحابي", "خلية"],
-    "environmental": ["environment", "pollution", "climate", "global warming", "renewable", "solar", "wind", "seal", "بيئة", "تلوث", "مناخ", "احتباس حراري", "طاقة متجددة", "شمسية", "رياح", "مياه جوفية", "غابة", "صحراء", "تصحر", "تنوع حيوي", "محمية", "طبيعة", "أوزون", "کربون", "فقمة"],
+    "environmental": ["environment", "pollution", "climate", "global warming", "renewable", "solar", "wind", "seal", "بيئة", "تلوث", "مناخ", "احتباس حراري", "طاقة متجددة", "شمسية", "رياح", "مياه جوفية", "غابة", "صحراء", "تصحر", "تنوع حيوي", "محمية", "طبيعة", "أوزون", "كربون", "فقمة"],
     "agricultural": ["agriculture", "farm", "crop", "wheat", "rice", "corn", "trees", "irrigation", "soil", "date", "زراعة", "مزرعة", "محصول", "قمح", "أرز", "ذرة", "أشجار", "ماء ري", "تربة", "سماد", "مبيد", "حصاد", "حصادة", "ثروة حيوانية", "مواشي", "أغنام", "دواجن", "سمك", "تمر"],
     "media": ["media", "journalism", "television", "radio", "newspaper", "news", "report", "anchor", "إعلام", "صحافة", "تلفزيون", "إذاعة", "صحيفة", "خبر", "تقرير", "مذيع", "مراسل", "تحقيق", "صحفي", "إعلان", "دعاية", "بث", "قناة", "برنامج إعلامي"],
     "tourism": ["tourism", "hotel", "travel", "trip", "airport", "aviation", "passport", "visa", "tour", "plane", "سياحة", "فندق", "سفر", "رحلة", "مطار", "طيران", "جواز", "تأشيرة", "جولة", "أثر", "تاريخي", "معلم", "منتجع", "شاطئ", "جبل", "صحراء", "متحف", "تراث", "طائرة"],
@@ -230,9 +215,8 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  API KEYS (من secrets.toml)
+#  API KEYS
 # ════════════════════════════════════════════════════════════
-
 try:
     deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
 except:
@@ -248,6 +232,44 @@ if "deepl_api_key" not in st.session_state:
 
 if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
+
+# ════════════════════════════════════════════════════════════
+#  إدارة المفاتيح
+# ════════════════════════════════════════════════════════════
+if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
+    st.markdown("""
+    <div style="background:#1a1a2e;border-radius:14px;padding:2rem;margin-bottom:1.5rem;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#ffffff;margin-bottom:10px;">🔑 API Keys Required</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:20px;">
+            Please enter your API keys below. They will be saved for this session only.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if not st.session_state.deepl_api_key:
+            deepl_input = st.text_input("🔐 DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
+            if deepl_input:
+                st.session_state.deepl_api_key = deepl_input
+                st.success("✅ DeepL key saved!")
+                st.rerun()
+        else:
+            st.success("✅ DeepL API Key: OK")
+    
+    with col2:
+        if not st.session_state.cohere_api_key:
+            cohere_input = st.text_input("🔐 Cohere API Key", type="password", placeholder="e.g., abcd-1234-efgh-5678")
+            if cohere_input:
+                st.session_state.cohere_api_key = cohere_input
+                st.success("✅ Cohere key saved!")
+                st.rerun()
+        else:
+            st.success("✅ Cohere API Key: OK")
+    
+    st.info("💡 Your keys are stored only in your browser session.")
+    st.stop()
 
 # ════════════════════════════════════════════════════════════
 #  TRANSLATION ENGINE (DeepL)
@@ -284,14 +306,16 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe - لجميع اللغات عدا الروسية)
+#  SPEECH-TO-TEXT (Cohere Transcribe - جميع اللغات)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
 
     try:
-        # استخدام MultipartEncoder مع ترتيب صحيح
+        from requests_toolbelt.multipart.encoder import MultipartEncoder
+
+        # ترتيب الأجزاء الصحيح: اللغة → الموديل → الملف
         parts = []
         lang = language_code if language_code != "auto" and language_code is not None else "auto"
         parts.append(("language", lang))
@@ -314,127 +338,20 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
             result = response.json()
             text = result.get("text", "").strip()
             if text:
-                return text, None
+                return text, "Cohere Transcribe"
             else:
                 return None, "لم يتم التعرف على أي كلام"
         else:
-            error_msg = response.text
-            return None, f"Cohere error {response.status_code}: {error_msg}"
+            return None, f"Cohere error {response.status_code}: {response.text}"
 
     except Exception as e:
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Vosk - للروسية فقط)
+#  SPEECH-TO-TEXT (المحرك الرئيسي)
 # ════════════════════════════════════════════════════════════
-def load_vosk_model():
-    """تحميل نموذج Vosk (مرة واحدة فقط)"""
-    if not VOSK_AVAILABLE:
-        return None
-    
-    try:
-        import vosk
-        import urllib.request
-        import zipfile
-        
-        model_name = "vosk-model-ru-0.22"
-        model_path = os.path.join(os.getcwd(), model_name)
-        model_url = "https://alphacephei.com/vosk/models/vosk-model-ru-0.22.zip"
-        
-        if os.path.exists(model_path):
-            st.info(f"✅ تم العثور على النموذج: {model_name}")
-            try:
-                return vosk.Model(model_path)
-            except Exception as e:
-                st.warning(f"⚠️ فشل تحميل النموذج: {e}")
-                return None
-        
-        st.info(f"📥 جاري تحميل نموذج Vosk...")
-        zip_path = os.path.join(os.getcwd(), f"{model_name}.zip")
-        
-        try:
-            with st.spinner("⏳ جاري التحميل..."):
-                urllib.request.urlretrieve(model_url, zip_path)
-            
-            with st.spinner("📂 جاري فك الضغط..."):
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(os.getcwd())
-            
-            os.remove(zip_path)
-            st.success("✅ تم تحميل نموذج Vosk بنجاح!")
-            return vosk.Model(model_path)
-            
-        except Exception as e:
-            st.error(f"❌ فشل تحميل النموذج: {str(e)}")
-            return None
-            
-    except Exception as e:
-        st.error(f"❌ خطأ في تحميل Vosk: {str(e)}")
-        return None
-
-@st.cache_resource
-def get_vosk_model():
-    """الحصول على نموذج Vosk مع التخزين المؤقت"""
-    return load_vosk_model()
-
-def speech_to_text_vosk(audio_bytes):
-    """تحويل الصوت إلى نص باستخدام Vosk"""
-    if not VOSK_AVAILABLE:
-        return None, "مكتبة Vosk غير مثبتة"
-    
-    model = get_vosk_model()
-    if not model:
-        return None, "نموذج Vosk غير متاح"
-    
-    tmp_path = None
-    try:
-        import wave
-        import vosk
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_bytes)
-            tmp_path = tmp_file.name
-        
-        wf = wave.open(tmp_path, "rb")
-        rec = vosk.KaldiRecognizer(model, wf.getframerate())
-        
-        result_text = ""
-        while True:
-            data = wf.readframes(4000)
-            if len(data) == 0:
-                break
-            if rec.AcceptWaveform(data):
-                res = json.loads(rec.Result())
-                result_text += res.get("text", "") + " "
-        
-        final = json.loads(rec.FinalResult())
-        result_text += final.get("text", "")
-        
-        if tmp_path and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        
-        if result_text.strip():
-            return result_text.strip(), "Vosk"
-        else:
-            return None, "لم يتم التعرف على أي كلام"
-            
-    except Exception as e:
-        return None, f"خطأ في Vosk: {str(e)}"
-    finally:
-        try:
-            if tmp_path and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-        except:
-            pass
-
-# ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (المحرك الذكي)
-# ════════════════════════════════════════════════════════════
-def speech_to_text_smart(audio_bytes, language_code="auto"):
-    if language_code == "ru":
-        return speech_to_text_vosk(audio_bytes)
-    else:
-        return speech_to_text_cohere(audio_bytes, language_code)
+def speech_to_text(audio_bytes, language_code="auto"):
+    return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
 #  SESSION STATE
@@ -504,52 +421,9 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  إدارة المفاتيح
-# ════════════════════════════════════════════════════════════
-if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
-    st.markdown("""
-    <div style="background:#1a1a2e;border-radius:14px;padding:2rem;margin-bottom:1.5rem;text-align:center;">
-        <div style="font-size:24px;font-weight:700;color:#ffffff;margin-bottom:10px;">🔑 API Keys Required</div>
-        <div style="font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:20px;">
-            Please enter your API keys below. They will be saved for this session only.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if not st.session_state.deepl_api_key:
-            deepl_input = st.text_input("🔐 DeepL API Key", type="password", placeholder="e.g., abc...xyz:fx")
-            if deepl_input:
-                st.session_state.deepl_api_key = deepl_input
-                st.success("✅ DeepL key saved!")
-                st.rerun()
-        else:
-            st.success("✅ DeepL API Key: OK")
-    
-    with col2:
-        if not st.session_state.cohere_api_key:
-            cohere_input = st.text_input("🔐 Cohere API Key", type="password", placeholder="e.g., abcd-1234-efgh-5678")
-            if cohere_input:
-                st.session_state.cohere_api_key = cohere_input
-                st.success("✅ Cohere key saved!")
-                st.rerun()
-        else:
-            st.success("✅ Cohere API Key: OK")
-    
-    st.info("💡 Your keys are stored only in your browser session.")
-    st.stop()
-
-# ════════════════════════════════════════════════════════════
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
-if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Vosk** (يعمل بدون إنترنت)"
-    engine_note = "📥 سيتم تحميل النموذج تلقائياً"
-else:
-    engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية)"
-    engine_note = ""
+engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية لجميع اللغات، بما فيها الروسية)"
 
 st.markdown(f"""
 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
@@ -557,7 +431,6 @@ st.markdown(f"""
     <div style="font-size:12px;color:#6b7280;">
         Click the microphone button below, speak, and the text will be recognized automatically.
         <br>{engine_info}
-        <br>{engine_note}
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -569,7 +442,7 @@ if audio_value:
     
     with st.spinner("⏳ جاري التعرف على الصوت..."):
         audio_bytes = audio_value.getvalue()
-        recognized_text, engine_used = speech_to_text_smart(audio_bytes, source_lang)
+        recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
         
         if recognized_text:
             st.success(f"✅ تم التعرف ({engine_used}): {recognized_text}")
@@ -643,7 +516,6 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <div style="margin-bottom: 12px;">
                         <span class="api-badge api-deepl">⚡ {source_engine}</span>
                         <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
-                        <span class="api-badge api-vosk">🇷🇺 Vosk</span>
                     </div>
                     <div class="rtext">{final_translation}</div>
                 </div>
