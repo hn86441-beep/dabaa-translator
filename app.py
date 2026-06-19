@@ -320,8 +320,20 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_vosk_model():
-    """تحميل نموذج Vosk (مرة واحدة فقط)"""
-    # تأكد من أن مسار النموذج صحيح
+    """تحميل نموذج Vosk (مرة واحدة فقط) مع رسائل مساعدة"""
+    import os
+    
+    # المسار الحالي للمجلد
+    current_dir = os.getcwd()
+    st.info(f"📂 المسار الحالي: {current_dir}")
+    
+    # قائمة الملفات في المجلد الحالي
+    try:
+        files = os.listdir(current_dir)
+        st.info(f"📁 الملفات الموجودة: {files}")
+    except:
+        pass
+    
     model_paths = [
         "vosk-model-ru-0.22",
         "vosk-model-ru-0.54",
@@ -330,15 +342,18 @@ def load_vosk_model():
     ]
     
     for path in model_paths:
-        if os.path.exists(path):
+        full_path = os.path.join(current_dir, path)
+        if os.path.exists(full_path):
+            st.success(f"✅ تم العثور على النموذج: {path}")
             try:
-                return vosk.Model(path)
+                return vosk.Model(full_path)
             except Exception as e:
                 st.warning(f"فشل تحميل النموذج {path}: {e}")
                 continue
     
-    st.error("⚠️ لم يتم العثور على نموذج Vosk! حمّل نموذجاً من: https://alphacephei.com/vosk/models")
-    st.info("📥 ضع المجلد (مثل vosk-model-ru-0.22) في نفس مجلد app.py")
+    st.error("⚠️ لم يتم العثور على أي نموذج Vosk!")
+    st.info("📥 حمّل نموذجاً من: https://alphacephei.com/vosk/models")
+    st.info("📂 ضع المجلد (مثل vosk-model-ru-0.22) في نفس مجلد app.py")
     return None
 
 def speech_to_text_vosk(audio_bytes):
