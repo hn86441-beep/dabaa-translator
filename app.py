@@ -9,6 +9,8 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 import vosk
 import wave
 import json
+import urllib.request
+import zipfile
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
@@ -315,46 +317,48 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Vosk - للروسية فقط)
-#  يعمل بدون إنترنت، خفيف وسريع
+#  SPEECH-TO-TEXT (Vosk - للروسية فقط) مع تحميل تلقائي
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_vosk_model():
-    """تحميل نموذج Vosk (مرة واحدة فقط) مع رسائل مساعدة"""
+    """تحميل نموذج Vosk (مرة واحدة فقط) - يتم تحميله تلقائياً من الإنترنت"""
     import os
+    import urllib.request
+    import zipfile
     
-    # المسار الحالي للمجلد
-    current_dir = os.getcwd()
-    st.info(f"📂 المسار الحالي: {current_dir}")
+    model_name = "vosk-model-ru-0.22"
+    model_path = os.path.join(os.getcwd(), model_name)
+    model_url = "https://alphacephei.com/vosk/models/vosk-model-ru-0.22.zip"
     
-    # قائمة الملفات في المجلد الحالي
+    # إذا كان النموذج موجوداً بالفعل، استخدمه
+    if os.path.exists(model_path):
+        st.info(f"✅ تم العثور على النموذج: {model_name}")
+        try:
+            return vosk.Model(model_path)
+        except Exception as e:
+            st.warning(f"فشل تحميل النموذج: {e}")
+    
+    # إذا لم يكن النموذج موجوداً، حمّله
+    st.info(f"📥 جاري تحميل نموذج Vosk (~50 ميجابايت)... قد يستغرق هذا دقيقة أو دقيقتين.")
+    
+    zip_path = os.path.join(os.getcwd(), f"{model_name}.zip")
+    
     try:
-        files = os.listdir(current_dir)
-        st.info(f"📁 الملفات الموجودة: {files}")
-    except:
-        pass
-    
-    model_paths = [
-        "vosk-model-ru-0.22",
-        "vosk-model-ru-0.54",
-        "vosk-model-small-ru-0.22",
-        "vosk-model-ru-0.42"
-    ]
-    
-    for path in model_paths:
-        full_path = os.path.join(current_dir, path)
-        if os.path.exists(full_path):
-            st.success(f"✅ تم العثور على النموذج: {path}")
-            try:
-                return vosk.Model(full_path)
-            except Exception as e:
-                st.warning(f"فشل تحميل النموذج {path}: {e}")
-                continue
-    
-    st.error("⚠️ لم يتم العثور على أي نموذج Vosk!")
-    st.info("📥 حمّل نموذجاً من: https://alphacephei.com/vosk/models")
-    st.info("📂 ضع المجلد (مثل vosk-model-ru-0.22) في نفس مجلد app.py")
-    return None
+        with st.spinner("⏳ جاري التحميل... يرجى الانتظار"):
+            urllib.request.urlretrieve(model_url, zip_path)
+        
+        with st.spinner("📂 جاري فك الضغط..."):
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(os.getcwd())
+        
+        os.remove(zip_path)
+        st.success("✅ تم تحميل نموذج Vosk بنجاح!")
+        return vosk.Model(model_path)
+        
+    except Exception as e:
+        st.error(f"❌ فشل تحميل النموذج: {str(e)}")
+        st.info("💡 يمكنك تحميل النموذج يدوياً من: https://alphacephei.com/vosk/models")
+        return None
 
 def speech_to_text_vosk(audio_bytes):
     """
@@ -362,16 +366,14 @@ def speech_to_text_vosk(audio_bytes):
     """
     model = load_vosk_model()
     if not model:
-        return None, "نموذج Vosk غير متاح. تأكد من تحميل النموذج ووضعه في المجلد الصحيح."
+        return None, "نموذج Vosk غير متاح. جارٍ محاولة التحميل..."
     
     tmp_path = None
     try:
-        # حفظ الصوت في ملف مؤقت بصيغة WAV
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
         
-        # فتح الملف والتعرف عليه
         wf = wave.open(tmp_path, "rb")
         rec = vosk.KaldiRecognizer(model, wf.getframerate())
         
@@ -384,11 +386,9 @@ def speech_to_text_vosk(audio_bytes):
                 res = json.loads(rec.Result())
                 result_text += res.get("text", "") + " "
         
-        # الحصول على النتيجة النهائية
         final = json.loads(rec.FinalResult())
         result_text += final.get("text", "")
         
-        # حذف الملف المؤقت
         try:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
@@ -528,7 +528,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
     engine_info = "⚡ يستخدم **Vosk** (يعمل بدون إنترنت، خفيف وسريع)"
-    engine_note = "📥 تأكد من وجود نموذج Vosk في المجلد"
+    engine_note = "📥 سيتم تحميل النموذج تلقائياً في المرة الأولى"
 else:
     engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية لجميع اللغات)"
     engine_note = ""
