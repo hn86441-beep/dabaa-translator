@@ -307,7 +307,7 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe) - المحدثة
+#  SPEECH-TO-TEXT (Cohere Transcribe) - التصحيح النهائي
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
@@ -316,11 +316,12 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
     try:
         fields = OrderedDict()
         
-        # التعديل: إذا لم تكن اللغة auto نرسل الرمز، وإلا نتجاهل الحقل لاكتشافها تلقائيا
-        if language_code != "auto" and language_code is not None:
-            fields['language'] = language_code
-            
+        # 1. الحقول النصية (يجب أن تضاف أولاً قبل الملف لتجنب خطأ الـ multipart 400)
+        # Cohere يعتبر حقل language إجبارياً، لذا سنرسل "auto" أو رمز اللغة
+        fields['language'] = language_code 
         fields['model'] = 'cohere-transcribe-03-2026'
+        
+        # 2. ملف الصوت (يجب أن يضاف في النهاية دائماً)
         fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
 
         encoder = MultipartEncoder(fields=fields)
@@ -332,7 +333,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
                 "Content-Type": encoder.content_type,
             },
             data=encoder,
-            timeout=45 # زيادة الوقت لضمان عمل الـ Auto-detect
+            timeout=45
         )
 
         if response.status_code == 200:
