@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import io
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 import vosk
 import wave
 import json
@@ -191,13 +192,13 @@ STYLE_OPTIONS = {
 }
 
 # ════════════════════════════════════════════════════════════
-#  DOMAIN KEYWORDS
+#  DOMAIN KEYWORDS (مختصر للطول)
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
     "political": ["minister", "government", "council", "ministry", "parliament", "political", "diplomatic", "treaty", "election", "vote", "policy", "embassy", "summit", "legislation", "constitution", "foreign affairs", "national security", "coalition", "sanctions", "bilateral", "president", "state", "capital", "وزير", "حكومة", "مجلس", "وزارة", "برلمان", "سياسة", "دبلوماسي", "سفير", "معاهدة", "اتفاقية دولية", "حزب", "انتخابات", "تصويت", "أمن قومي", "استراتيجية وطنية", "بيان", "تصريح", "قمة", "مؤتمر", "جلسة", "تشريع", "دستور", "حقوق", "مواطن", "رئيس", "دولة", "عاصمة"],
     "legal": ["contract", "agreement", "clause", "appendix", "legal", "stipulation", "liable", "penalty", "compensation", "arbitration", "court", "judgment", "license", "obligation", "terms and conditions", "binding", "jurisdiction", "warranty", "indemnity", "breach", "bill", "law", "code", "عقد", "اتفاقية", "بند", "ملحق", "تعاقد", "قانون", "مرسوم", "لائحة", "نظام", "شرط", "جزاء", "تعويض", "مسؤولية", "ضمان", "FIDIC", "تحكيم", "دعوى", "محكمة", "قاضي", "حكم", "قرار", "تنظيمي", "ترخيص", "التزام", "حق", "ملكية", "إثبات", "مشروع قانون"],
     "economic": ["economic", "financial", "investment", "cost", "budget", "revenue", "profit", "loss", "loan", "bank", "market", "trade", "import", "export", "tax", "fee", "pricing", "tender", "bid", "currency", "inflation", "growth", "GDP", "fiscal", "monetary", "capital", "اقتصاد", "مالية", "استثمار", "تكلفة", "سعر", "ميزانية", "عائد", "ربح", "خسارة", "تمويل", "قرض", "بنك", "سوق", "تجارة", "استيراد", "تصدير", "عمولة", "ضريبة", "رسوم", "تسعير", "عطاء", "مناقصة", "صرف", "عملة", "تضخم", "نمو", "تجاري", "رأس مال"],
-    "medical": ["doctor", "hospital", "treatment", "medication", "dose", "disease", "symptoms", "diagnosis", "laboratory", "clinical", "surgery", "patient", "health", "epidemic", "vaccine", "radiology", "bacteria", "virus", "immunity", "tissue", "cardiac", "renal", "cell", "pupil", "طبيب", "مستشفى", "علاج", "دواء", "جرعة", "مرض", "أعراض", "تشخيص", "فحص", "تحليل", "مختبر", "سريري", "جراحة", "عملية", "مريض", "صحة", "وباء", "تطعيم", "أشعة", "بكتيريا", "فيروس", "مناعة", "أنسجة", "أعضاء", "قلب", "كبد", "কلى", "خلية", "بؤبؤ"],
+    "medical": ["doctor", "hospital", "treatment", "medication", "dose", "disease", "symptoms", "diagnosis", "laboratory", "clinical", "surgery", "patient", "health", "epidemic", "vaccine", "radiology", "bacteria", "virus", "immunity", "tissue", "cardiac", "renal", "cell", "pupil", "طبيب", "مستشفى", "علاج", "دواء", "جرعة", "مرض", "أعراض", "تشخيص", "فحص", "تحليل", "مختبر", "سريري", "جراحة", "عملية", "مريض", "صحة", "وباء", "تطعيم", "أشعة", "بكتيريا", "فيروس", "مناعة", "أنسجة", "أعضاء", "قلب", "كبد", "كلى", "خلية", "بؤبؤ"],
     "scientific": ["research", "study", "experiment", "hypothesis", "theory", "scientific", "discovery", "innovation", "technology", "analysis", "data", "statistical", "model", "simulation", "algorithm", "AI", "machine learning", "physics", "chemistry", "biology", "astronomy", "بحث", "دراسة", "مختبر", "تجربة", "فرضية", "نظرية", "علمي", "اكتشاف", "ابتكار", "تقنية", "تكنولوجيا", "تحليل", "بيانات", "إحصائية", "نموذج", "محاكاة", "خوارزمية", "ذكاء اصطناعي", "تعلم آلي", "طاقة", "فيزياء", "كيمياء", "بيولوجيا", "فلك"],
     "engineering": ["engineering", "structural", "civil", "architectural", "electrical", "mechanical", "concrete", "rebar", "foundation", "excavation", "backfill", "pouring", "drawings", "specifications", "construction", "supervision", "quality", "inspection", "survey", "plane", "spring", "lead", "هندسة", "إنشائي", "مدني", "معماري", "كهرباء", "ميكانيك", "صرف", "مياه", "طرق", "جسور", "أنفاق", "خرسانة", "حديد", "تسليح", "صب", "ردم", "حفر", "أساسات", "تصميم", "مخططات", "مواصفات", "بناء", "تشييد", "إشراف", "جودة", "اختبار", "مساحة", "مستوى", "نابض", "رصاص"],
     "military": ["military", "army", "defense", "war", "battle", "weapon", "air force", "navy", "tank", "missile", "bomb", "base", "recruitment", "officer", "soldier", "rank", "operation", "watch", "جيش", "عسكري", "دفاع", "حرب", "معركة", "سلاح", "سلاح الجو", "بحرية", "دبابة", "صاروخ", "قنبلة", "قاعدة عسكرية", "تجنيد", "ضابط", "جندي", "رتبة", "عملية عسكرية", "حرس"],
@@ -277,38 +278,39 @@ def fetch_ai_translation(text, target_lang):
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (Cohere Transcribe - لجميع اللغات عدا الروسية)
-#  الحل النهائي: استخدام data و files بشكل منفصل
+#  يتم إرسال language = "auto" إذا لم تكن محددة
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
 
     try:
-        # تحضير البيانات النصية (ستأتي قبل الملف في multipart)
-        data = {
-            "model": "cohere-transcribe-03-2026",
-        }
-        
-        # إضافة اللغة إذا كانت محددة
-        if language_code != "auto" and language_code is not None:
-            data["language"] = language_code
-        
-        # تحضير الملف
-        files = {
-            "file": ("audio.wav", audio_bytes, "audio/wav")
-        }
-        
-        # إرسال الطلب
+        from requests_toolbelt.multipart.encoder import MultipartEncoder
+
+        # تحضير الأجزاء بالترتيب الصحيح
+        parts = []
+
+        # الحقول النصية أولاً
+        # إرسال اللغة دائماً، مع "auto" إذا لم تكن محددة
+        lang = language_code if language_code != "auto" and language_code is not None else "auto"
+        parts.append(("language", lang))
+        parts.append(("model", "cohere-transcribe-03-2026"))
+
+        # الملف أخيراً
+        parts.append(("file", ("audio.wav", audio_bytes, "audio/wav")))
+
+        encoder = MultipartEncoder(fields=parts)
+
         response = requests.post(
             "https://api.cohere.com/v2/audio/transcriptions",
             headers={
                 "Authorization": f"Bearer {st.session_state.cohere_api_key}",
+                "Content-Type": encoder.content_type,
             },
-            data=data,
-            files=files,
+            data=encoder,
             timeout=30
         )
-        
+
         if response.status_code == 200:
             result = response.json()
             text = result.get("text", "").strip()
@@ -319,7 +321,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         else:
             error_msg = response.text
             return None, f"Cohere error {response.status_code}: {error_msg}"
-            
+
     except Exception as e:
         return None, f"خطأ في Cohere: {str(e)}"
 
