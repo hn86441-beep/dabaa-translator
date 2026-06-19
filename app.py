@@ -81,7 +81,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .api-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; margin-right: 4px; }
 .api-deepl { background: #0F2B46; color: #8ECAE6; }
 .api-cohere { background: #1a1a2e; color: #8ECAE6; }
-.api-deepgram { background: #1a1a2e; color: #ffffff; }
+.api-yandex { background: #d52b1e; color: #ffffff; }
 
 .domain-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; margin-right: 6px; margin-bottom: 4px; }
 .db-pol { background: #E63946; color: white; }
@@ -119,7 +119,7 @@ st.markdown("""
         <span class="pill pill-active">Auto-Domain Detect</span>
         <span class="pill pill-muted">DeepL Precision</span>
         <span class="pill pill-muted">Cohere Transcribe</span>
-        <span class="pill pill-muted">Deepgram (Русский)</span>
+        <span class="pill pill-muted">Yandex SpeechKit (Русский)</span>
     </div>
     <div class="lang-bar">
         <span class="ldot"></span><span class="ldot"></span><span class="ldot"></span>
@@ -144,6 +144,9 @@ languages_dict = {
     "Portuguese": "pt",
     "Korean": "ko"
 }
+
+# YANDEX FOLDER ID - ضع رقم مجلدك هنا
+YANDEX_FOLDER_ID = "b1gpgicfudvf1upju50h"
 
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political",     "color": "#E63946"},
@@ -231,9 +234,9 @@ except:
     cohere_from_secrets = ""
 
 try:
-    deepgram_from_secrets = st.secrets.get("DEEPGRAM_API_KEY", "")
+    yandex_from_secrets = st.secrets.get("YANDEX_API_KEY", "")
 except:
-    deepgram_from_secrets = ""
+    yandex_from_secrets = ""
 
 if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = deepl_from_secrets
@@ -241,13 +244,13 @@ if "deepl_api_key" not in st.session_state:
 if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
-if "deepgram_api_key" not in st.session_state:
-    st.session_state.deepgram_api_key = deepgram_from_secrets
+if "yandex_api_key" not in st.session_state:
+    st.session_state.yandex_api_key = yandex_from_secrets
 
 # ════════════════════════════════════════════════════════════
 #  إدارة المفاتيح
 # ════════════════════════════════════════════════════════════
-if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key or not st.session_state.deepgram_api_key:
+if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key or not st.session_state.yandex_api_key:
     st.markdown("""
     <div style="background:#1a1a2e;border-radius:14px;padding:2rem;margin-bottom:1.5rem;text-align:center;">
         <div style="font-size:24px;font-weight:700;color:#ffffff;margin-bottom:10px;">🔑 API Keys Required</div>
@@ -280,14 +283,14 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key or 
             st.success("✅ Cohere API Key: OK")
     
     with col3:
-        if not st.session_state.deepgram_api_key:
-            deepgram_input = st.text_input("🔐 Deepgram API Key (للروسية)", type="password", placeholder="e.g., deepgram-api-key")
-            if deepgram_input:
-                st.session_state.deepgram_api_key = deepgram_input
-                st.success("✅ Deepgram key saved!")
+        if not st.session_state.yandex_api_key:
+            yandex_input = st.text_input("🔐 Yandex API Key (للروسية)", type="password", placeholder="e.g., yandex-api-key")
+            if yandex_input:
+                st.session_state.yandex_api_key = yandex_input
+                st.success("✅ Yandex key saved!")
                 st.rerun()
         else:
-            st.success("✅ Deepgram API Key: OK")
+            st.success("✅ Yandex API Key: OK")
     
     st.info("💡 Your keys are stored only in your browser session.")
     st.stop()
@@ -338,7 +341,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         
         # Cohere لا يقبل "auto". إذا كانت auto، نرسل "en" كقيمة افتراضية
         if language_code == "auto" or language_code is None:
-            lang = "en"  # لغة افتراضية، Cohere ستكتشف تلقائياً
+            lang = "en"
         else:
             lang = language_code
         
@@ -372,51 +375,62 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Deepgram - للروسية فقط)
+#  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط)
 # ════════════════════════════════════════════════════════════
-def speech_to_text_deepgram(audio_bytes):
-    if not st.session_state.deepgram_api_key:
-        return None, "مفتاح Deepgram API غير موجود."
+def speech_to_text_yandex(audio_bytes):
+    if not st.session_state.yandex_api_key:
+        return None, "مفتاح Yandex API غير موجود."
 
+    tmp_path = None
     try:
-        url = "https://api.deepgram.com/v1/listen"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+
+        url = "https://stt.api.cloud.yandex.net/speech/v1/stt:recognize"
         headers = {
-            "Authorization": f"Token {st.session_state.deepgram_api_key}",
-            "Content-Type": "audio/wav",
+            "Authorization": f"Api-Key {st.session_state.yandex_api_key}",
         }
         params = {
-            "language": "ru",
-            "model": "nova-2-general",
-            "smart_format": "true",
+            "lang": "ru-RU",
+            "format": "lpcm",
+            "sampleRateHertz": "16000",
+            "folderId": YANDEX_FOLDER_ID,
         }
 
-        response = requests.post(
-            url,
-            headers=headers,
-            params=params,
-            data=audio_bytes,
-            timeout=30
-        )
+        with open(tmp_path, "rb") as f:
+            audio_data = f.read()
+
+        response = requests.post(url, headers=headers, params=params, data=audio_data, timeout=30)
 
         if response.status_code == 200:
             result = response.json()
-            text = result.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])[0].get("transcript", "").strip()
+            text = result.get("result", "").strip()
             if text:
-                return text, "Deepgram (Русский)"
+                return text, "Yandex SpeechKit"
             else:
                 return None, "لم يتم التعرف على أي كلام بالروسية"
         else:
-            return None, f"Deepgram error {response.status_code}: {response.text}"
+            error_msg = response.text
+            if "PermissionDenied" in error_msg:
+                return None, "خطأ في الصلاحيات: تأكد من أن حساب الخدمة لديه صلاحية 'editor' على المجلد."
+            return None, f"Yandex error {response.status_code}: {error_msg}"
 
     except Exception as e:
-        return None, f"خطأ في Deepgram: {str(e)}"
+        return None, f"خطأ في Yandex: {str(e)}"
+    finally:
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except:
+            pass
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (المحرك الذكي)
 # ════════════════════════════════════════════════════════════
 def speech_to_text(audio_bytes, language_code="auto"):
     if language_code == "ru":
-        return speech_to_text_deepgram(audio_bytes)
+        return speech_to_text_yandex(audio_bytes)
     else:
         return speech_to_text_cohere(audio_bytes, language_code)
 
@@ -491,7 +505,7 @@ st.session_state.selected_style = selected_style_label
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Deepgram** (مخصص للغة الروسية)"
+    engine_info = "⚡ يستخدم **Yandex SpeechKit** (مخصص للغة الروسية)"
 elif source_lang == "auto":
     engine_info = "⚡ يستخدم **Cohere Transcribe** (كشف تلقائي للغة)"
 else:
@@ -588,7 +602,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <div style="margin-bottom: 12px;">
                         <span class="api-badge api-deepl">⚡ {source_engine}</span>
                         <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
-                        <span class="api-badge api-deepgram">🇷🇺 Deepgram</span>
+                        <span class="api-badge api-yandex">🇷🇺 Yandex SpeechKit</span>
                     </div>
                     <div class="rtext">{final_translation}</div>
                 </div>
