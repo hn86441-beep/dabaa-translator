@@ -185,7 +185,7 @@ STYLE_OPTIONS = {
 }
 
 # ════════════════════════════════════════════════════════════
-#  DOMAIN KEYWORDS (مختصر للطول)
+#  DOMAIN KEYWORDS
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
     "political": ["minister", "government", "parliament", "political", "diplomatic", "treaty", "election", "policy", "president", "وزير", "حكومة", "برلمان", "سياسة", "دبلوماسي", "معاهدة", "انتخابات", "رئيس"],
@@ -307,9 +307,7 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe)
-#  ✅ إذا كانت اللغة "auto"، لا نرسل حقل language
-#  ✅ إذا كانت لغة محددة، نرسل رمزها
+#  SPEECH-TO-TEXT (Cohere Transcribe) - المحدثة
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
@@ -318,10 +316,10 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
     try:
         fields = OrderedDict()
         
-        # ✅ لا نرسل language إذا كانت "auto" - نترك Cohere يكتشفها بنفسه
+        # التعديل: إذا لم تكن اللغة auto نرسل الرمز، وإلا نتجاهل الحقل لاكتشافها تلقائيا
         if language_code != "auto" and language_code is not None:
             fields['language'] = language_code
-        
+            
         fields['model'] = 'cohere-transcribe-03-2026'
         fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
 
@@ -334,14 +332,19 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
                 "Content-Type": encoder.content_type,
             },
             data=encoder,
-            timeout=30
+            timeout=45 # زيادة الوقت لضمان عمل الـ Auto-detect
         )
 
         if response.status_code == 200:
             result = response.json()
             text = result.get("text", "").strip()
+            
+            # محاولة جلب اللغة المكتشفة لعرضها في الواجهة
+            detected_lang = result.get("language", "Auto")
+            engine_label = f"Cohere Transcribe (Lang: {detected_lang})" if language_code == "auto" else "Cohere Transcribe"
+
             if text:
-                return text, "Cohere Transcribe"
+                return text, engine_label
             else:
                 return None, "لم يتم التعرف على أي كلام"
         else:
