@@ -140,6 +140,9 @@ languages_dict = {
     "Korean": "ko"
 }
 
+# قائمة اللغات المدعومة رسمياً في Cohere Audio
+COHERE_SUPPORTED_AUDIO_LANGS = ['en', 'fr', 'de', 'es', 'pt', 'it', 'nl', 'pl', 'el', 'ar', 'ko', 'ja', 'vi', 'zh']
+
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political",     "color": "#E63946"},
     "legal":      {"emoji": "⚖️", "name_en": "Legal",         "color": "#534AB7"},
@@ -231,9 +234,6 @@ if "deepl_api_key" not in st.session_state:
 if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
-# ════════════════════════════════════════════════════════════
-#  إدارة المفاتيح
-# ════════════════════════════════════════════════════════════
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
     <div style="background:#1a1a2e;border-radius:14px;padding:2rem;margin-bottom:1.5rem;text-align:center;">
@@ -304,20 +304,17 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe) - حل مشكلة Auto
+#  SPEECH-TO-TEXT (Cohere Transcribe)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code):
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
 
-    # حماية من إرسال "auto" الذي يرفضه Cohere
     if language_code == "auto":
-        return None, "الرجاء اختيار لغة التحدث من القائمة العلوية (نظام Cohere لا يدعم التعرف التلقائي على لغة الصوت)."
+        return None, "الرجاء اختيار لغة التحدث من القائمة العلوية."
 
     try:
         fields = OrderedDict()
-        
-        # إرسال رمز اللغة الصحيح (مثل ar, en)
         fields['language'] = language_code 
         fields['model'] = 'cohere-transcribe-03-2026'
         fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
@@ -348,9 +345,6 @@ def speech_to_text_cohere(audio_bytes, language_code):
     except Exception as e:
         return None, f"خطأ في Cohere: {str(e)}"
 
-# ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (المحرك الرئيسي)
-# ════════════════════════════════════════════════════════════
 def speech_to_text(audio_bytes, language_code):
     return speech_to_text_cohere(audio_bytes, language_code)
 
@@ -422,14 +416,22 @@ with style_col2:
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  VOICE INPUT
+#  VOICE INPUT (التكيف الذكي مع حدود الـ API)
 # ════════════════════════════════════════════════════════════
+show_mic = False
+
 if source_lang == "auto":
     engine_info = "⚠️ **تنبيه:** يجب تحديد لغة التحدث من القائمة أعلاه أولاً. التعرف الصوتي لا يدعم Auto-Detect."
     engine_color = "#ef4444"
+    show_mic = True
+elif source_lang not in COHERE_SUPPORTED_AUDIO_LANGS:
+    engine_info = f"🚫 **تنبيه:** محرك Cohere للأسف لا يدعم الإدخال الصوتي للغة ({source_lang_name}). يرجى كتابة النص يدوياً في المربع أدناه."
+    engine_color = "#ef4444"
+    show_mic = False  # إخفاء المايك لأن اللغة غير مدعومة
 else:
     engine_info = f"⚡ يستخدم **Cohere Transcribe** (لغة محددة: {source_lang_name})"
     engine_color = "#6b7280"
+    show_mic = True
 
 st.markdown(f"""
 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
@@ -440,32 +442,33 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
+if show_mic:
+    audio_value = st.audio_input("🎙️ سجل رسالة صوتية")
 
-if audio_value:
-    if source_lang == "auto":
-        st.error("❌ لا يمكن استخدام التعرف التلقائي للصوت. يرجى اختيار لغة محددة (مثل Arabic أو English) من القائمة العلوية ثم التسجيل مرة أخرى.")
-    else:
-        st.audio(audio_value)
-        with st.spinner("⏳ جاري التعرف على الصوت..."):
-            audio_bytes = audio_value.getvalue()
-            recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
-            
-            if recognized_text:
-                st.success(f"✅ تم التعرف ({engine_used}): {recognized_text}")
-                st.session_state.input_text = recognized_text
+    if audio_value:
+        if source_lang == "auto":
+            st.error("❌ لا يمكن استخدام التعرف التلقائي للصوت. يرجى اختيار لغة محددة (مثل Arabic أو English) من القائمة العلوية ثم التسجيل مرة أخرى.")
+        else:
+            st.audio(audio_value)
+            with st.spinner("⏳ جاري التعرف على الصوت..."):
+                audio_bytes = audio_value.getvalue()
+                recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
                 
-                if st.button("ترجم الآن 🚀", type="primary"):
-                    with st.spinner("⏳ جاري الترجمة..."):
-                        translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
-                        if translated_text:
-                            st.session_state.translated_text = translated_text
-                            st.markdown("### الترجمة")
-                            st.markdown(f">>> {translated_text}")
-                        else:
-                            st.error(f"فشلت الترجمة: {engine}")
-            else:
-                st.error(f"فشل التعرف على الصوت: {engine_used}")
+                if recognized_text:
+                    st.success(f"✅ تم التعرف ({engine_used}): {recognized_text}")
+                    st.session_state.input_text = recognized_text
+                    
+                    if st.button("ترجم الآن 🚀", type="primary"):
+                        with st.spinner("⏳ جاري الترجمة..."):
+                            translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
+                            if translated_text:
+                                st.session_state.translated_text = translated_text
+                                st.markdown("### الترجمة")
+                                st.markdown(f">>> {translated_text}")
+                            else:
+                                st.error(f"فشلت الترجمة: {engine}")
+                else:
+                    st.error(f"فشل التعرف على الصوت: {engine_used}")
 
 # ════════════════════════════════════════════════════════════
 #  TEXT INPUT
@@ -522,7 +525,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     </div>
                     <div style="margin-bottom: 12px;">
                         <span class="api-badge api-deepl">⚡ {source_engine}</span>
-                        <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
+                        <span class="api-badge api-cohere">🎤 Text Mode</span>
                     </div>
                     <div class="rtext">{final_translation}</div>
                 </div>
