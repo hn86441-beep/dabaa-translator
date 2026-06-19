@@ -6,6 +6,9 @@ from pathlib import Path
 import tempfile
 import io
 from requests_toolbelt.multipart.encoder import MultipartEncoder
+import vosk
+import wave
+import json
 
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
@@ -81,7 +84,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .api-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; margin-right: 4px; }
 .api-deepl { background: #0F2B46; color: #8ECAE6; }
 .api-cohere { background: #1a1a2e; color: #8ECAE6; }
-.api-gigastt { background: #2d7d46; color: #ffffff; }
+.api-vosk { background: #2d7d46; color: #ffffff; }
 
 .domain-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; margin-right: 6px; margin-bottom: 4px; }
 .db-pol { background: #E63946; color: white; }
@@ -119,7 +122,7 @@ st.markdown("""
         <span class="pill pill-active">Auto-Domain Detect</span>
         <span class="pill pill-muted">DeepL Precision</span>
         <span class="pill pill-muted">Cohere Transcribe</span>
-        <span class="pill pill-muted">GigaSTT (Русский)</span>
+        <span class="pill pill-muted">Vosk (Русский)</span>
     </div>
     <div class="lang-bar">
         <span class="ldot"></span><span class="ldot"></span><span class="ldot"></span>
@@ -312,45 +315,91 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (GigaSTT - للروسية فقط)
-#  يعمل عبر خادم محلي على http://localhost:9876
-#  ⚠️ يجب تشغيل الخادم أولاً: gigastt serve
+#  SPEECH-TO-TEXT (Vosk - للروسية فقط)
+#  يعمل بدون إنترنت، خفيف وسريع
 # ════════════════════════════════════════════════════════════
-def speech_to_text_gigastt(audio_bytes):
+@st.cache_resource
+def load_vosk_model():
+    """تحميل نموذج Vosk (مرة واحدة فقط)"""
+    # تأكد من أن مسار النموذج صحيح
+    model_paths = [
+        "vosk-model-ru-0.22",
+        "vosk-model-ru-0.54",
+        "vosk-model-small-ru-0.22",
+        "vosk-model-ru-0.42"
+    ]
+    
+    for path in model_paths:
+        if os.path.exists(path):
+            try:
+                return vosk.Model(path)
+            except Exception as e:
+                st.warning(f"فشل تحميل النموذج {path}: {e}")
+                continue
+    
+    st.error("⚠️ لم يتم العثور على نموذج Vosk! حمّل نموذجاً من: https://alphacephei.com/vosk/models")
+    st.info("📥 ضع المجلد (مثل vosk-model-ru-0.22) في نفس مجلد app.py")
+    return None
+
+def speech_to_text_vosk(audio_bytes):
     """
-    إرسال الصوت إلى خادم GigaSTT المحلي.
-    يجب تشغيل الخادم أولاً: gigastt serve
+    تحويل الصوت إلى نص باستخدام Vosk (يعمل بدون إنترنت)
     """
+    model = load_vosk_model()
+    if not model:
+        return None, "نموذج Vosk غير متاح. تأكد من تحميل النموذج ووضعه في المجلد الصحيح."
+    
+    tmp_path = None
     try:
-        response = requests.post(
-            "http://127.0.0.1:9876/v1/transcribe",
-            data=audio_bytes,
-            headers={"Content-Type": "application/octet-stream"},
-            timeout=30
-        )
+        # حفظ الصوت في ملف مؤقت بصيغة WAV
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
         
-        if response.status_code == 200:
-            result = response.json()
-            text = result.get("text", "").strip()
-            if text:
-                return text, "GigaSTT"
-            else:
-                return None, "لم يتم التعرف على أي كلام بالروسية"
+        # فتح الملف والتعرف عليه
+        wf = wave.open(tmp_path, "rb")
+        rec = vosk.KaldiRecognizer(model, wf.getframerate())
+        
+        result_text = ""
+        while True:
+            data = wf.readframes(4000)
+            if len(data) == 0:
+                break
+            if rec.AcceptWaveform(data):
+                res = json.loads(rec.Result())
+                result_text += res.get("text", "") + " "
+        
+        # الحصول على النتيجة النهائية
+        final = json.loads(rec.FinalResult())
+        result_text += final.get("text", "")
+        
+        # حذف الملف المؤقت
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except:
+            pass
+        
+        if result_text.strip():
+            return result_text.strip(), "Vosk (بدون إنترنت)"
         else:
-            error_msg = response.text
-            return None, f"GigaSTT error {response.status_code}: {error_msg}"
+            return None, "لم يتم التعرف على أي كلام بالروسية"
             
-    except requests.exceptions.ConnectionError:
-        return None, "⚠️ خادم GigaSTT غير متاح. تأكد من تشغيله: `gigastt serve`"
     except Exception as e:
-        return None, f"خطأ في GigaSTT: {str(e)}"
+        return None, f"خطأ في Vosk: {str(e)}"
+    finally:
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except:
+            pass
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (المحرك الذكي - يختار حسب اللغة)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_smart(audio_bytes, language_code="auto"):
     if language_code == "ru":
-        return speech_to_text_gigastt(audio_bytes)
+        return speech_to_text_vosk(audio_bytes)
     else:
         return speech_to_text_cohere(audio_bytes, language_code)
 
@@ -463,8 +512,8 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **GigaSTT** (مخصص للغة الروسية، يعمل محلياً)"
-    engine_note = "💡 تأكد من تشغيل خادم GigaSTT: `gigastt serve`"
+    engine_info = "⚡ يستخدم **Vosk** (يعمل بدون إنترنت، خفيف وسريع)"
+    engine_note = "📥 تأكد من وجود نموذج Vosk في المجلد"
 else:
     engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية لجميع اللغات)"
     engine_note = ""
@@ -561,7 +610,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <div style="margin-bottom: 12px;">
                         <span class="api-badge api-deepl">⚡ {source_engine}</span>
                         <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
-                        <span class="api-badge api-gigastt">🇷🇺 GigaSTT</span>
+                        <span class="api-badge api-vosk">🇷🇺 Vosk</span>
                     </div>
                     <div class="rtext">{final_translation}</div>
                 </div>
