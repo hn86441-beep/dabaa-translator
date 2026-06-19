@@ -9,7 +9,7 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفسه، اختصار للطول)
+#  CSS
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -307,19 +307,26 @@ def fetch_ai_translation(text, target_lang):
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (Cohere Transcribe - جميع اللغات)
+#  ✅ تم تحسين إرسال اللغة: إذا كانت "auto"، لا نرسل اللغة نهائياً
+#  ✅ إذا كانت لغة محددة، نرسل رمزها
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
         return None, "مفتاح Cohere API غير موجود."
 
     try:
-        from requests_toolbelt.multipart.encoder import MultipartEncoder
-
-        # ترتيب الأجزاء الصحيح: اللغة → الموديل → الملف
+        # بناء الأجزاء بالترتيب الصحيح
         parts = []
-        lang = language_code if language_code != "auto" and language_code is not None else "auto"
-        parts.append(("language", lang))
+        
+        # ⚠️ التغيير الجوهري: إذا كانت اللغة محددة (وليس "auto")، نرسلها
+        # إذا كانت "auto"، لا نرسل حقل language نهائياً (نترك Cohere يكتشف تلقائياً)
+        if language_code != "auto" and language_code is not None:
+            parts.append(("language", language_code))
+        
+        # الموديل دائماً
         parts.append(("model", "cohere-transcribe-03-2026"))
+        
+        # الملف أخيراً
         parts.append(("file", ("audio.wav", audio_bytes, "audio/wav")))
 
         encoder = MultipartEncoder(fields=parts)
@@ -423,7 +430,13 @@ st.session_state.selected_style = selected_style_label
 # ════════════════════════════════════════════════════════════
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
-engine_info = "⚡ يستخدم **Cohere Transcribe** (دقة عالية لجميع اللغات، بما فيها الروسية)"
+# عرض المحرك المستخدم
+if source_lang == "auto":
+    engine_info = "⚡ يستخدم **Cohere Transcribe** (كشف تلقائي للغة)"
+else:
+    # عرض اللغة المحددة
+    lang_name = source_lang_name
+    engine_info = f"⚡ يستخدم **Cohere Transcribe** (لغة محددة: {lang_name})"
 
 st.markdown(f"""
 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:1rem;">
@@ -530,3 +543,4 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <br><span style="font-size:12px;">Please check your DeepL API key and internet connection.</span>
                 </div>
                 """, unsafe_allow_html=True)
+            
