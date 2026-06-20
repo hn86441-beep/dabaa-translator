@@ -10,7 +10,7 @@ from collections import OrderedDict
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفسه، اختصار للطول)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -119,7 +119,7 @@ st.markdown("""
         <span class="pill pill-active">Auto-Domain Detect</span>
         <span class="pill pill-muted">DeepL Precision</span>
         <span class="pill pill-muted">Cohere Transcribe</span>
-        <span class="pill pill-muted">Faster-Whisper (Русский)</span>
+        <span class="pill pill-muted">Whisper Medium (Русский)</span>
     </div>
     <div class="lang-bar">
         <span class="ldot"></span><span class="ldot"></span><span class="ldot"></span>
@@ -353,16 +353,17 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Faster-Whisper - للروسية فقط)
-#  ✅ لا يحتاج إلى تثبيت ffmpeg بشكل منفصل
-#  ✅ أسرع من Whisper الأصلي
+#  SPEECH-TO-TEXT (Faster-Whisper Medium - دقة عالية للروسية)
+#  ✅ يستخدم نموذج MEDIUM لدقة أعلى بكثير
+#  ✅ إعدادات محسّنة: beam_size=5, temperature=0.0
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_whisper_model():
     try:
         from faster_whisper import WhisperModel
-        # يمكنك تغيير حجم النموذج: "tiny", "base", "small", "medium", "large"
-        return WhisperModel("base", device="cpu", compute_type="int8")
+        # استخدام نموذج MEDIUM لدقة عالية جداً
+        # يمكن تغييره إلى "large" للحصول على أفضل دقة (لكن أبطأ)
+        return WhisperModel("medium", device="cpu", compute_type="int8")
     except ImportError:
         st.error("⚠️ Faster-Whisper غير مثبت. قم بتشغيل: pip install faster-whisper")
         return None
@@ -382,12 +383,20 @@ def speech_to_text_whisper(audio_bytes):
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
         
-        # التعرف على الصوت باللغة الروسية
-        segments, info = model.transcribe(tmp_path, language="ru")
+        # إعدادات محسّنة لتحسين الدقة
+        segments, info = model.transcribe(
+            tmp_path,
+            language="ru",
+            beam_size=5,           # تحسين الدقة
+            temperature=0.0,       # جعل النموذج أكثر حزماً
+            vad_filter=True,       # تصفية الصمت
+            condition_on_previous_text=False
+        )
+        
         text = " ".join(segment.text for segment in segments).strip()
         
         if text:
-            return text, "Faster-Whisper (Русский)"
+            return text, "Faster-Whisper Medium (Русский)"
         else:
             return None, "لم يتم التعرف على أي كلام بالروسية"
     except Exception as e:
@@ -479,7 +488,7 @@ st.session_state.selected_style = selected_style_label
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Faster-Whisper** (مخصص للغة الروسية، لا يحتاج ffmpeg)"
+    engine_info = "⚡ يستخدم **Faster-Whisper Medium** (دقة عالية جداً للروسية)"
 elif source_lang == "auto":
     engine_info = "⚡ يستخدم **Cohere Transcribe** (كشف تلقائي للغة)"
 else:
@@ -576,7 +585,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <div style="margin-bottom: 12px;">
                         <span class="api-badge api-deepl">⚡ {source_engine}</span>
                         <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
-                        <span class="api-badge api-whisper">🎙️ Faster-Whisper</span>
+                        <span class="api-badge api-whisper">🎙️ Whisper Medium</span>
                     </div>
                     <div class="rtext">{final_translation}</div>
                 </div>
