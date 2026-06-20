@@ -81,7 +81,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .api-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; margin-right: 4px; }
 .api-deepl { background: #0F2B46; color: #8ECAE6; }
 .api-cohere { background: #1a1a2e; color: #8ECAE6; }
-.api-yandex { background: #d52b1e; color: #ffffff; }
+.api-kairos { background: #2d7d46; color: #ffffff; }
 
 .domain-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; margin-right: 6px; margin-bottom: 4px; }
 .db-pol { background: #E63946; color: white; }
@@ -119,7 +119,7 @@ st.markdown("""
         <span class="pill pill-active">Auto-Domain Detect</span>
         <span class="pill pill-muted">DeepL Precision</span>
         <span class="pill pill-muted">Cohere Transcribe</span>
-        <span class="pill pill-muted">Yandex SpeechKit (Русский)</span>
+        <span class="pill pill-muted">Kairos-ASR (Русский)</span>
     </div>
     <div class="lang-bar">
         <span class="ldot"></span><span class="ldot"></span><span class="ldot"></span>
@@ -230,24 +230,16 @@ try:
 except:
     cohere_from_secrets = ""
 
-try:
-    yandex_from_secrets = st.secrets.get("YANDEX_API_KEY", "")
-except:
-    yandex_from_secrets = ""
-
 if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = deepl_from_secrets
 
 if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
-if "yandex_api_key" not in st.session_state:
-    st.session_state.yandex_api_key = yandex_from_secrets
-
 # ════════════════════════════════════════════════════════════
 #  إدارة المفاتيح
 # ════════════════════════════════════════════════════════════
-if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key or not st.session_state.yandex_api_key:
+if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
     <div style="background:#1a1a2e;border-radius:14px;padding:2rem;margin-bottom:1.5rem;text-align:center;">
         <div style="font-size:24px;font-weight:700;color:#ffffff;margin-bottom:10px;">🔑 API Keys Required</div>
@@ -257,7 +249,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key or 
     </div>
     """, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
         if not st.session_state.deepl_api_key:
@@ -278,16 +270,6 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key or 
                 st.rerun()
         else:
             st.success("✅ Cohere API Key: OK")
-    
-    with col3:
-        if not st.session_state.yandex_api_key:
-            yandex_input = st.text_input("🔐 Yandex API Key (للروسية)", type="password", placeholder="e.g., yandex-api-key")
-            if yandex_input:
-                st.session_state.yandex_api_key = yandex_input
-                st.success("✅ Yandex key saved!")
-                st.rerun()
-        else:
-            st.success("✅ Yandex API Key: OK")
     
     st.info("💡 Your keys are stored only in your browser session.")
     st.stop()
@@ -371,47 +353,49 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط)
-#  ✅ باستخدام API Key (بدون folderId)
+#  SPEECH-TO-TEXT (Kairos-ASR - للروسية فقط)
+#  مجاني، يعمل محلياً، دقة عالية
 # ════════════════════════════════════════════════════════════
-def speech_to_text_yandex(audio_bytes):
-    if not st.session_state.yandex_api_key:
-        return None, "مفتاح Yandex API غير موجود."
+@st.cache_resource
+def load_kairos_model():
+    """تحميل نموذج Kairos-ASR (مرة واحدة فقط)"""
+    try:
+        from kairos_asr import KairosASR
+        # تحميل النموذج (سيتم تحميله تلقائياً من الإنترنت في المرة الأولى)
+        return KairosASR()
+    except ImportError:
+        st.error("⚠️ Kairos-ASR غير مثبت. قم بتشغيل: pip install kairos-asr[cpu]")
+        return None
+    except Exception as e:
+        st.error(f"⚠️ فشل تحميل نموذج Kairos-ASR: {str(e)}")
+        return None
 
+def speech_to_text_kairos(audio_bytes):
+    """
+    تحويل الصوت إلى نص باستخدام Kairos-ASR (للغة الروسية)
+    """
+    model = load_kairos_model()
+    if not model:
+        return None, "نموذج Kairos-ASR غير متاح. تأكد من تثبيت المكتبة."
+    
     tmp_path = None
     try:
+        # حفظ الصوت في ملف مؤقت بصيغة WAV
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
-
-        url = "https://stt.api.cloud.yandex.net/speech/v1/stt:recognize"
-        headers = {
-            "Authorization": f"Api-Key {st.session_state.yandex_api_key}",
-        }
-        params = {
-            "lang": "ru-RU",
-            "format": "lpcm",
-            "sampleRateHertz": "16000",
-            # ✅ تم إزالة folderId نهائياً (غير مطلوب مع API Key)
-        }
-
-        with open(tmp_path, "rb") as f:
-            audio_data = f.read()
-
-        response = requests.post(url, headers=headers, params=params, data=audio_data, timeout=30)
-
-        if response.status_code == 200:
-            result = response.json()
-            text = result.get("result", "").strip()
-            if text:
-                return text, "Yandex SpeechKit"
-            else:
-                return None, "لم يتم التعرف على أي كلام بالروسية"
+        
+        # التعرف على الصوت
+        result = model.transcribe(tmp_path)
+        text = result.full_text.strip()
+        
+        if text:
+            return text, "Kairos-ASR"
         else:
-            return None, f"Yandex error {response.status_code}: {response.text}"
-
+            return None, "لم يتم التعرف على أي كلام بالروسية"
+            
     except Exception as e:
-        return None, f"خطأ في Yandex: {str(e)}"
+        return None, f"خطأ في Kairos-ASR: {str(e)}"
     finally:
         try:
             if tmp_path and os.path.exists(tmp_path):
@@ -424,7 +408,7 @@ def speech_to_text_yandex(audio_bytes):
 # ════════════════════════════════════════════════════════════
 def speech_to_text(audio_bytes, language_code="auto"):
     if language_code == "ru":
-        return speech_to_text_yandex(audio_bytes)
+        return speech_to_text_kairos(audio_bytes)
     else:
         return speech_to_text_cohere(audio_bytes, language_code)
 
@@ -499,7 +483,7 @@ st.session_state.selected_style = selected_style_label
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Yandex SpeechKit** (مخصص للغة الروسية)"
+    engine_info = "⚡ يستخدم **Kairos-ASR** (مجاني، محلي، دقة عالية للروسية)"
 elif source_lang == "auto":
     engine_info = "⚡ يستخدم **Cohere Transcribe** (كشف تلقائي للغة)"
 else:
@@ -596,7 +580,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <div style="margin-bottom: 12px;">
                         <span class="api-badge api-deepl">⚡ {source_engine}</span>
                         <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
-                        <span class="api-badge api-yandex">🇷🇺 Yandex SpeechKit</span>
+                        <span class="api-badge api-kairos">🇷🇺 Kairos-ASR</span>
                     </div>
                     <div class="rtext">{final_translation}</div>
                 </div>
