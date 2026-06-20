@@ -372,7 +372,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط)
-#  ✅ تم إزالة folderId نهائياً - يعتمد على صلاحيات حساب الخدمة
+#  ✅ باستخدام API Key (بدون folderId)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_yandex(audio_bytes):
     if not st.session_state.yandex_api_key:
@@ -392,7 +392,7 @@ def speech_to_text_yandex(audio_bytes):
             "lang": "ru-RU",
             "format": "lpcm",
             "sampleRateHertz": "16000",
-            # ❌ تم حذف folderId لأنه غير مطلوب مع API Key
+            # ✅ تم إزالة folderId نهائياً (غير مطلوب مع API Key)
         }
 
         with open(tmp_path, "rb") as f:
@@ -408,10 +408,7 @@ def speech_to_text_yandex(audio_bytes):
             else:
                 return None, "لم يتم التعرف على أي كلام بالروسية"
         else:
-            error_msg = response.text
-            if "PermissionDenied" in error_msg:
-                return None, "خطأ في الصلاحيات: تأكد من أن المفتاح هو API Key (يبدأ بـ AQVN) وليس Access Key، وأن حساب الخدمة لديه صلاحية 'editor' على المجلد."
-            return None, f"Yandex error {response.status_code}: {error_msg}"
+            return None, f"Yandex error {response.status_code}: {response.text}"
 
     except Exception as e:
         return None, f"خطأ في Yandex: {str(e)}"
