@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS - واجهة محسنة وجذابة
+#  CSS - واجهة محسنة مع ميكروفون أسطوري
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -40,7 +40,7 @@ st.markdown("""
     max-width: 1200px;
 }
 
-/* ====== الهيدر (Hero Section) ====== */
+/* ====== الهيدر ====== */
 .hero {
     background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
     border-radius: 20px;
@@ -320,12 +320,120 @@ textarea:focus {
     box-shadow: 0 8px 25px rgba(48, 43, 99, 0.4) !important;
 }
 
-/* ====== الميكروفون ====== */
-.stAudioInput {
-    border-radius: 16px !important;
-    border: 1px dashed #d1d5db !important;
-    padding: 12px !important;
+/* ============================================================
+   🎙️ ميكروفون أسطوري
+   ============================================================ */
+
+/* إخفاء النص الافتراضي لـ st.audio_input */
+div[data-testid="stAudioInput"] label {
+    display: none !important;
 }
+
+/* إعادة تنسيق الحاوية */
+div[data-testid="stAudioInput"] {
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+/* زر الميكروفون الأساسي */
+div[data-testid="stAudioInput"] > div > div {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 80px;
+}
+
+/* تخصيص زر الميكروفون نفسه */
+div[data-testid="stAudioInput"] button {
+    width: 80px !important;
+    height: 80px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(145deg, #1a1a3e, #2d2b6e) !important;
+    border: 2px solid rgba(93, 202, 165, 0.5) !important;
+    box-shadow: 
+        0 0 20px rgba(93, 202, 165, 0.2),
+        inset 0 0 30px rgba(93, 202, 165, 0.05) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+}
+
+/* تأثير الهالة الخلفية للميكروفون */
+div[data-testid="stAudioInput"] button::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(93, 202, 165, 0.15), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+div[data-testid="stAudioInput"] button:hover::before {
+    opacity: 1;
+}
+
+/* عند التمرير على الميكروفون */
+div[data-testid="stAudioInput"] button:hover {
+    transform: scale(1.08) !important;
+    border-color: #5DCAA5 !important;
+    box-shadow: 
+        0 0 40px rgba(93, 202, 165, 0.4),
+        inset 0 0 40px rgba(93, 202, 165, 0.1) !important;
+}
+
+/* أيقونة الميكروفون (تعديل الأيقونة الافتراضية) */
+div[data-testid="stAudioInput"] button svg {
+    width: 36px !important;
+    height: 36px !important;
+    fill: #5DCAA5 !important;
+    stroke: #5DCAA5 !important;
+    transition: transform 0.3s ease !important;
+}
+
+div[data-testid="stAudioInput"] button:hover svg {
+    transform: scale(1.1) !important;
+}
+
+/* حالة التسجيل (عندما يكون الميكروفون نشطاً) */
+div[data-testid="stAudioInput"] button[aria-pressed="true"] {
+    background: linear-gradient(145deg, #5DCAA5, #2d7d46) !important;
+    border-color: #5DCAA5 !important;
+    animation: mic-pulse 1.5s infinite !important;
+    box-shadow: 0 0 50px rgba(93, 202, 165, 0.6) !important;
+}
+
+div[data-testid="stAudioInput"] button[aria-pressed="true"] svg {
+    fill: #ffffff !important;
+    stroke: #ffffff !important;
+}
+
+@keyframes mic-pulse {
+    0%, 100% {
+        box-shadow: 0 0 30px rgba(93, 202, 165, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 70px rgba(93, 202, 165, 0.8);
+    }
+}
+
+/* إخفاء النص الداخلي لـ st.audio_input */
+div[data-testid="stAudioInput"] button span {
+    font-size: 0 !important;
+}
+
+/* إظهار أيقونة الميكروفون فقط */
+div[data-testid="stAudioInput"] button svg {
+    font-size: 32px !important;
+}
+
+/* ============================================================
+   نهاية تخصيص الميكروفون
+   ============================================================ */
 
 /* ====== صناديق الاختيار ====== */
 .stSelectbox {
@@ -335,6 +443,16 @@ textarea:focus {
 /* ====== التباعد ====== */
 .spacer {
     height: 0.5rem;
+}
+
+/* ====== نص التحميل ====== */
+.stSpinner > div {
+    color: #5DCAA5 !important;
+}
+
+/* ====== شريط التقدم ====== */
+.stProgress > div > div {
+    background: linear-gradient(90deg, #5DCAA5, #302b63) !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -363,7 +481,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION (نفس الكود القديم)
+#  CONFIGURATION
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -419,7 +537,7 @@ STYLE_OPTIONS = {
 }
 
 # ════════════════════════════════════════════════════════════
-#  DOMAIN KEYWORDS (مختصر)
+#  DOMAIN KEYWORDS
 # ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
     "political": ["minister", "government", "parliament", "political", "diplomatic", "treaty", "election", "policy", "president", "وزير", "حكومة", "برلمان", "سياسة", "دبلوماسي", "معاهدة", "انتخابات", "رئيس"],
@@ -469,7 +587,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
 # ════════════════════════════════════════════════════════════
-#  إدارة المفاتيح (نفسها)
+#  إدارة المفاتيح
 # ════════════════════════════════════════════════════════════
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
@@ -507,7 +625,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION ENGINE (DeepL) - نفسها
+#  TRANSLATION ENGINE (DeepL)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -541,7 +659,7 @@ def fetch_ai_translation(text, target_lang):
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Cohere Transcribe) - نفسها
+#  SPEECH-TO-TEXT (Cohere Transcribe)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
@@ -585,7 +703,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Faster-Whisper Medium للروسية) - نفسها
+#  SPEECH-TO-TEXT (Faster-Whisper Medium للروسية)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_whisper_model():
@@ -635,7 +753,7 @@ def speech_to_text_whisper(audio_bytes):
             pass
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (المحرك الذكي) - نفسها
+#  SPEECH-TO-TEXT (المحرك الذكي)
 # ════════════════════════════════════════════════════════════
 def speech_to_text(audio_bytes, language_code="auto"):
     if language_code == "ru":
@@ -664,7 +782,7 @@ def swap_languages():
     st.session_state.target_lang = old_source
 
 # ════════════════════════════════════════════════════════════
-#  UI - تحسينات الواجهة
+#  UI
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -728,7 +846,7 @@ st.session_state.selected_style = selected_style_label
 # ====== تقسيم ======
 st.markdown("---")
 
-# ====== VOICE INPUT ======
+# ====== VOICE INPUT (مع ميكروفون أسطوري) ======
 if source_lang == "ru":
     engine_info = "⚡ يستخدم **Faster-Whisper Medium** (دقة عالية جداً للروسية)"
 elif source_lang == "auto":
@@ -740,12 +858,13 @@ st.markdown(f"""
 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.2rem; margin-bottom: 1.2rem;">
     <div style="font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px;">🎤 Voice Input</div>
     <div style="font-size: 13px; color: #6b7280;">
-        Click the microphone button below, speak, and the text will be recognized automatically.
+        اضغط على زر الميكروفون الأسطوري 🎙️، تحدث، وسيتم التعرف على صوتك تلقائياً.
         <br>{engine_info}
     </div>
 </div>
 """, unsafe_allow_html=True)
 
+# هذا هو الميكروفون الأسطوري
 audio_value = st.audio_input("🎙️ سجل رسالة صوتية", key="audio_input")
 
 if audio_value:
