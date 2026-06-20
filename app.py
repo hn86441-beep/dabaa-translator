@@ -7,6 +7,13 @@ import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
+# محاولة استيراد Whisper
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
@@ -81,7 +88,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .api-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; margin-right: 4px; }
 .api-deepl { background: #0F2B46; color: #8ECAE6; }
 .api-cohere { background: #1a1a2e; color: #8ECAE6; }
-.api-kairos { background: #2d7d46; color: #ffffff; }
+.api-whisper { background: #4a90d9; color: #ffffff; }
 
 .domain-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; margin-right: 6px; margin-bottom: 4px; }
 .db-pol { background: #E63946; color: white; }
@@ -119,7 +126,7 @@ st.markdown("""
         <span class="pill pill-active">Auto-Domain Detect</span>
         <span class="pill pill-muted">DeepL Precision</span>
         <span class="pill pill-muted">Cohere Transcribe</span>
-        <span class="pill pill-muted">Kairos-ASR (Русский)</span>
+        <span class="pill pill-muted">Whisper (Русский)</span>
     </div>
     <div class="lang-bar">
         <span class="ldot"></span><span class="ldot"></span><span class="ldot"></span>
@@ -353,49 +360,43 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Kairos-ASR - للروسية فقط)
-#  مجاني، يعمل محلياً، دقة عالية
+#  SPEECH-TO-TEXT (Whisper - للروسية فقط)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
-def load_kairos_model():
-    """تحميل نموذج Kairos-ASR (مرة واحدة فقط)"""
-    try:
-        from kairos_asr import KairosASR
-        # تحميل النموذج (سيتم تحميله تلقائياً من الإنترنت في المرة الأولى)
-        return KairosASR()
-    except ImportError:
-        st.error("⚠️ Kairos-ASR غير مثبت. قم بتشغيل: pip install kairos-asr[cpu]")
+def load_whisper_model():
+    if not WHISPER_AVAILABLE:
         return None
+    try:
+        # استخدم "base" أو "small" أو "medium" للحصول على دقة أعلى
+        return whisper.load_model("base")
     except Exception as e:
-        st.error(f"⚠️ فشل تحميل نموذج Kairos-ASR: {str(e)}")
+        st.error(f"فشل تحميل نموذج Whisper: {str(e)}")
         return None
 
-def speech_to_text_kairos(audio_bytes):
-    """
-    تحويل الصوت إلى نص باستخدام Kairos-ASR (للغة الروسية)
-    """
-    model = load_kairos_model()
+def speech_to_text_whisper(audio_bytes):
+    if not WHISPER_AVAILABLE:
+        return None, "⚠️ Whisper غير مثبت. قم بتشغيل: pip install openai-whisper"
+    
+    model = load_whisper_model()
     if not model:
-        return None, "نموذج Kairos-ASR غير متاح. تأكد من تثبيت المكتبة."
+        return None, "⚠️ فشل تحميل نموذج Whisper"
     
     tmp_path = None
     try:
-        # حفظ الصوت في ملف مؤقت بصيغة WAV
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
         
-        # التعرف على الصوت
-        result = model.transcribe(tmp_path)
-        text = result.full_text.strip()
+        # تحديد اللغة الروسية
+        result = model.transcribe(tmp_path, language="ru", fp16=False)
+        text = result["text"].strip()
         
         if text:
-            return text, "Kairos-ASR"
+            return text, "Whisper (Русский)"
         else:
             return None, "لم يتم التعرف على أي كلام بالروسية"
-            
     except Exception as e:
-        return None, f"خطأ في Kairos-ASR: {str(e)}"
+        return None, f"خطأ في Whisper: {str(e)}"
     finally:
         try:
             if tmp_path and os.path.exists(tmp_path):
@@ -408,7 +409,7 @@ def speech_to_text_kairos(audio_bytes):
 # ════════════════════════════════════════════════════════════
 def speech_to_text(audio_bytes, language_code="auto"):
     if language_code == "ru":
-        return speech_to_text_kairos(audio_bytes)
+        return speech_to_text_whisper(audio_bytes)
     else:
         return speech_to_text_cohere(audio_bytes, language_code)
 
@@ -483,7 +484,7 @@ st.session_state.selected_style = selected_style_label
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Kairos-ASR** (مجاني، محلي، دقة عالية للروسية)"
+    engine_info = "⚡ يستخدم **Whisper** (مخصص للغة الروسية)"
 elif source_lang == "auto":
     engine_info = "⚡ يستخدم **Cohere Transcribe** (كشف تلقائي للغة)"
 else:
@@ -580,7 +581,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <div style="margin-bottom: 12px;">
                         <span class="api-badge api-deepl">⚡ {source_engine}</span>
                         <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
-                        <span class="api-badge api-kairos">🇷🇺 Kairos-ASR</span>
+                        <span class="api-badge api-whisper">🎙️ Whisper</span>
                     </div>
                     <div class="rtext">{final_translation}</div>
                 </div>
