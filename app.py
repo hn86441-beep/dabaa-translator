@@ -7,13 +7,6 @@ import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
-# محاولة استيراد Whisper
-try:
-    import whisper
-    WHISPER_AVAILABLE = True
-except ImportError:
-    WHISPER_AVAILABLE = False
-
 st.set_page_config(page_title="HASSAN NASSER | Voice Translator", page_icon="🎤", layout="wide")
 
 # ════════════════════════════════════════════════════════════
@@ -126,7 +119,7 @@ st.markdown("""
         <span class="pill pill-active">Auto-Domain Detect</span>
         <span class="pill pill-muted">DeepL Precision</span>
         <span class="pill pill-muted">Cohere Transcribe</span>
-        <span class="pill pill-muted">Whisper (Русский)</span>
+        <span class="pill pill-muted">Faster-Whisper (Русский)</span>
     </div>
     <div class="lang-bar">
         <span class="ldot"></span><span class="ldot"></span><span class="ldot"></span>
@@ -360,43 +353,45 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"خطأ في Cohere: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT (Whisper - للروسية فقط)
+#  SPEECH-TO-TEXT (Faster-Whisper - للروسية فقط)
+#  ✅ لا يحتاج إلى تثبيت ffmpeg بشكل منفصل
+#  ✅ أسرع من Whisper الأصلي
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_whisper_model():
-    if not WHISPER_AVAILABLE:
-        return None
     try:
-        # استخدم "base" أو "small" أو "medium" للحصول على دقة أعلى
-        return whisper.load_model("base")
+        from faster_whisper import WhisperModel
+        # يمكنك تغيير حجم النموذج: "tiny", "base", "small", "medium", "large"
+        return WhisperModel("base", device="cpu", compute_type="int8")
+    except ImportError:
+        st.error("⚠️ Faster-Whisper غير مثبت. قم بتشغيل: pip install faster-whisper")
+        return None
     except Exception as e:
-        st.error(f"فشل تحميل نموذج Whisper: {str(e)}")
+        st.error(f"⚠️ فشل تحميل نموذج Faster-Whisper: {str(e)}")
         return None
 
 def speech_to_text_whisper(audio_bytes):
-    if not WHISPER_AVAILABLE:
-        return None, "⚠️ Whisper غير مثبت. قم بتشغيل: pip install openai-whisper"
-    
     model = load_whisper_model()
     if not model:
-        return None, "⚠️ فشل تحميل نموذج Whisper"
+        return None, "⚠️ فشل تحميل نموذج التعرف على الصوت"
     
     tmp_path = None
     try:
+        # حفظ الصوت في ملف مؤقت
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
         
-        # تحديد اللغة الروسية
-        result = model.transcribe(tmp_path, language="ru", fp16=False)
-        text = result["text"].strip()
+        # التعرف على الصوت باللغة الروسية
+        segments, info = model.transcribe(tmp_path, language="ru")
+        text = " ".join(segment.text for segment in segments).strip()
         
         if text:
-            return text, "Whisper (Русский)"
+            return text, "Faster-Whisper (Русский)"
         else:
             return None, "لم يتم التعرف على أي كلام بالروسية"
     except Exception as e:
-        return None, f"خطأ في Whisper: {str(e)}"
+        return None, f"خطأ في التعرف: {str(e)}"
     finally:
         try:
             if tmp_path and os.path.exists(tmp_path):
@@ -484,7 +479,7 @@ st.session_state.selected_style = selected_style_label
 #  VOICE INPUT
 # ════════════════════════════════════════════════════════════
 if source_lang == "ru":
-    engine_info = "⚡ يستخدم **Whisper** (مخصص للغة الروسية)"
+    engine_info = "⚡ يستخدم **Faster-Whisper** (مخصص للغة الروسية، لا يحتاج ffmpeg)"
 elif source_lang == "auto":
     engine_info = "⚡ يستخدم **Cohere Transcribe** (كشف تلقائي للغة)"
 else:
@@ -581,7 +576,7 @@ if st.button("Translate 🚀", type="primary", use_container_width=True):
                     <div style="margin-bottom: 12px;">
                         <span class="api-badge api-deepl">⚡ {source_engine}</span>
                         <span class="api-badge api-cohere">🎤 Cohere Transcribe</span>
-                        <span class="api-badge api-whisper">🎙️ Whisper</span>
+                        <span class="api-badge api-whisper">🎙️ Faster-Whisper</span>
                     </div>
                     <div class="rtext">{final_translation}</div>
                 </div>
