@@ -145,9 +145,6 @@ languages_dict = {
     "Korean": "ko"
 }
 
-# YANDEX FOLDER ID - ضع رقم مجلدك هنا
-YANDEX_FOLDER_ID = "b1gpgicfudvf1upju50h"
-
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political",     "color": "#E63946"},
     "legal":      {"emoji": "⚖️", "name_en": "Legal",         "color": "#534AB7"},
@@ -339,7 +336,6 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
     try:
         fields = OrderedDict()
         
-        # Cohere لا يقبل "auto". إذا كانت auto، نرسل "en" كقيمة افتراضية
         if language_code == "auto" or language_code is None:
             lang = "en"
         else:
@@ -376,6 +372,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (Yandex SpeechKit - للروسية فقط)
+#  ✅ تم إزالة folderId نهائياً - يعتمد على صلاحيات حساب الخدمة
 # ════════════════════════════════════════════════════════════
 def speech_to_text_yandex(audio_bytes):
     if not st.session_state.yandex_api_key:
@@ -395,7 +392,7 @@ def speech_to_text_yandex(audio_bytes):
             "lang": "ru-RU",
             "format": "lpcm",
             "sampleRateHertz": "16000",
-            "folderId": YANDEX_FOLDER_ID,
+            # ❌ تم حذف folderId لأنه غير مطلوب مع API Key
         }
 
         with open(tmp_path, "rb") as f:
@@ -413,7 +410,7 @@ def speech_to_text_yandex(audio_bytes):
         else:
             error_msg = response.text
             if "PermissionDenied" in error_msg:
-                return None, "خطأ في الصلاحيات: تأكد من أن حساب الخدمة لديه صلاحية 'editor' على المجلد."
+                return None, "خطأ في الصلاحيات: تأكد من أن المفتاح هو API Key (يبدأ بـ AQVN) وليس Access Key، وأن حساب الخدمة لديه صلاحية 'editor' على المجلد."
             return None, f"Yandex error {response.status_code}: {error_msg}"
 
     except Exception as e:
