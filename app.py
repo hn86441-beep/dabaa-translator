@@ -10,16 +10,16 @@ from collections import OrderedDict
 st.set_page_config(
     page_title="HASSAN NASSER | Voice Translator",
     page_icon="🎤",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS - واجهة بسيطة وجذابة مع ميكروفون أسطوري
+#  CSS - واجهة مودرن (بطاقات شفافة + تدرجات)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-/* ====== الأساسيات ====== */
+/* ====== الخطوط ====== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 * {
@@ -30,105 +30,177 @@ st.markdown("""
     visibility: hidden;
 }
 
+/* ====== الخلفية ====== */
+.stApp {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+}
+
 .block-container {
-    padding-top: 0.5rem;
-    padding-bottom: 1rem;
-    max-width: 750px;
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    max-width: 900px;
 }
 
-/* ====== الهيدر البسيط ====== */
-.simple-header {
-    text-align: center;
-    padding: 0.8rem 0 1.2rem 0;
+/* ====== الهيدر ====== */
+.glass-header {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
 }
 
-.simple-header h1 {
-    font-size: 24px;
+.glass-header .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.glass-header .logo-icon {
+    font-size: 32px;
+    background: linear-gradient(135deg, #1a1a2e, #302b63);
+    width: 50px;
+    height: 50px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 22px;
+}
+
+.glass-header .logo-text {
+    font-size: 22px;
     font-weight: 700;
     color: #1a1a2e;
-    margin: 0;
     letter-spacing: -0.5px;
 }
 
-.simple-header h1 span {
+.glass-header .logo-text span {
     color: #5DCAA5;
 }
 
-.simple-header p {
-    font-size: 12px;
+.glass-header .logo-sub {
+    font-size: 11px;
     color: #9ca3af;
-    margin: 4px 0 0 0;
-    letter-spacing: 0.05em;
+    font-weight: 400;
+    letter-spacing: 0.06em;
 }
 
-/* ====== بطاقة الميكروفون الأسطوري ====== */
-.mic-card {
-    background: linear-gradient(135deg, #f8fafc, #eef2f7);
-    border-radius: 24px;
-    padding: 1.8rem 1.5rem 2rem 1.5rem;
-    text-align: center;
-    border: 1px solid rgba(229, 231, 235, 0.5);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
-    margin-bottom: 1.2rem;
+.glass-header .badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.glass-header .badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    background: rgba(93,202,165,0.12);
+    color: #5DCAA5;
+    border: 1px solid rgba(93,202,165,0.15);
+}
+
+/* ====== بطاقات شفافة ====== */
+.glass-card {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px;
+    padding: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.04);
     transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+    box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+}
+
+/* ====== ميكروفون أسطوري ====== */
+.mic-section {
+    text-align: center;
+    padding: 0.5rem 0;
+}
+
+.mic-icon-wrapper {
+    display: inline-block;
     position: relative;
-    overflow: hidden;
-}
-
-.mic-card::before {
-    content: '';
-    position: absolute;
-    top: -60%;
-    right: -40%;
-    width: 300px;
-    height: 300px;
-    background: radial-gradient(circle, rgba(93,202,165,0.06) 0%, transparent 70%);
-    border-radius: 50%;
-}
-
-.mic-card::after {
-    content: '';
-    position: absolute;
-    bottom: -40%;
-    left: -30%;
-    width: 250px;
-    height: 250px;
-    background: radial-gradient(circle, rgba(93,202,165,0.04) 0%, transparent 70%);
-    border-radius: 50%;
-}
-
-.mic-icon {
-    font-size: 48px;
-    display: block;
     margin-bottom: 8px;
+}
+
+.mic-icon-wrapper .pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: rgba(93, 202, 165, 0.08);
+    animation: pulse-ring 2.5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes pulse-ring {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; }
+    50% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+}
+
+.mic-icon-wrapper .mic-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1a1a2e, #302b63);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     position: relative;
     z-index: 1;
+    box-shadow: 0 8px 32px rgba(48, 43, 99, 0.25);
+    transition: all 0.3s ease;
+}
+
+.mic-icon-wrapper .mic-circle:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 48px rgba(48, 43, 99, 0.35);
+}
+
+.mic-icon-wrapper .mic-circle .mic-emoji {
+    font-size: 36px;
 }
 
 .mic-title {
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
     color: #1a1a2e;
-    margin-bottom: 4px;
-    position: relative;
-    z-index: 1;
+    margin-top: 4px;
 }
 
 .mic-sub {
-    font-size: 12px;
+    font-size: 13px;
     color: #9ca3af;
-    position: relative;
-    z-index: 1;
 }
 
-/* ====== الميكروفون المدمج من Streamlit ====== */
+/* ====== حقل الميكروفون ====== */
 .stAudioInput {
     border-radius: 60px !important;
-    border: 2px dashed #d1d5db !important;
-    padding: 8px 16px !important;
-    background: white !important;
+    border: 2px dashed rgba(209, 213, 219, 0.6) !important;
+    padding: 6px 16px !important;
+    background: rgba(255,255,255,0.5) !important;
+    backdrop-filter: blur(8px) !important;
     transition: all 0.3s ease !important;
-    max-width: 320px !important;
+    max-width: 340px !important;
     margin: 0 auto !important;
 }
 
@@ -152,36 +224,38 @@ st.markdown("""
     color: white !important;
     border: none !important;
     width: auto !important;
-    min-width: 160px !important;
+    min-width: 140px !important;
+    box-shadow: 0 4px 16px rgba(48, 43, 99, 0.2) !important;
 }
 
 .stButton > button:hover {
     transform: translateY(-2px) !important;
-    box-shadow: 0 8px 25px rgba(48, 43, 99, 0.3) !important;
+    box-shadow: 0 8px 32px rgba(48, 43, 99, 0.3) !important;
 }
 
-.stButton > button:active {
-    transform: translateY(0px) !important;
-}
-
-/* ====== الحقول ====== */
+/* ====== حقول الإدخال ====== */
 textarea {
     border-radius: 16px !important;
-    border: 1px solid #e5e7eb !important;
+    border: 1px solid rgba(229, 231, 235, 0.6) !important;
     font-size: 14px !important;
     transition: all 0.3s ease !important;
     padding: 12px 16px !important;
+    background: rgba(255,255,255,0.4) !important;
+    backdrop-filter: blur(8px) !important;
 }
 
 textarea:focus {
     border-color: #5DCAA5 !important;
     box-shadow: 0 0 0 4px rgba(93,202,165,0.1) !important;
+    background: rgba(255,255,255,0.7) !important;
 }
 
 /* ====== صناديق الاختيار ====== */
 .stSelectbox > div > div {
     border-radius: 12px !important;
-    border-color: #e5e7eb !important;
+    border-color: rgba(229, 231, 235, 0.6) !important;
+    background: rgba(255,255,255,0.4) !important;
+    backdrop-filter: blur(8px) !important;
 }
 
 .stSelectbox label {
@@ -190,56 +264,59 @@ textarea:focus {
     color: #6b7280 !important;
 }
 
-/* ====== النتيجة ====== */
-.result-box {
-    background: #f8fafc;
+/* ====== نتيجة الترجمة ====== */
+.result-glass {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-radius: 16px;
-    padding: 1rem 1.2rem;
+    padding: 1rem 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-left: 4px solid #5DCAA5;
-    margin-top: 0.8rem;
+    margin-top: 0.5rem;
 }
 
-.result-box .label {
+.result-glass .rlabel {
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     color: #9ca3af;
     margin-bottom: 4px;
 }
 
-.result-box .text {
+.result-glass .rtext {
     font-size: 15px;
     color: #1f2937;
     line-height: 1.7;
 }
 
-/* ====== السياق المكتشف ====== */
-.context-box {
-    background: #f0fdf4;
+/* ====== سياق ====== */
+.context-glass {
+    background: rgba(240, 253, 244, 0.5);
+    backdrop-filter: blur(8px);
     border-radius: 12px;
-    padding: 10px 14px;
+    padding: 8px 14px;
     font-size: 12px;
     color: #065f46;
     margin-bottom: 0.8rem;
     border-left: 3px solid #5DCAA5;
 }
 
-/* ====== الشارات الصغيرة ====== */
+/* ====== شارات ====== */
 .badge-sm {
     display: inline-block;
     padding: 2px 10px;
     border-radius: 12px;
     font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.04em;
     margin-right: 4px;
 }
 .badge-deepl { background: #0F2B46; color: #8ECAE6; }
 .badge-cohere { background: #1a1a2e; color: #8ECAE6; }
 .badge-whisper { background: #4a90d9; color: #fff; }
 
-/* ====== أوسمة المجالات ====== */
+/* ====== أوسمة ====== */
 .tag {
     display: inline-block;
     padding: 2px 10px;
@@ -266,15 +343,10 @@ textarea:focus {
 .tag-tour { background: #00838F; color: white; }
 .tag-gen { background: #6B7280; color: white; }
 
-/* ====== تقسيم ====== */
-hr {
-    margin: 1.2rem 0 !important;
-    opacity: 0.3 !important;
-}
-
-/* ====== أخطاء ====== */
-.error-box {
-    background: #fee2e2;
+/* ====== خطأ ====== */
+.error-glass {
+    background: rgba(254, 226, 226, 0.5);
+    backdrop-filter: blur(8px);
     border-radius: 12px;
     padding: 10px 14px;
     font-size: 13px;
@@ -282,22 +354,40 @@ hr {
     border-left: 3px solid #ef4444;
 }
 
-/* ====== حالة التسجيل ====== */
-.recording-status {
-    font-size: 12px;
-    color: #6b7280;
-    margin-top: 6px;
+/* ====== فواصل ====== */
+hr {
+    margin: 1.2rem 0 !important;
+    opacity: 0.2 !important;
+    border-color: #d1d5db !important;
+}
+
+/* ====== رسائل النجاح ====== */
+.stSuccess {
+    background: rgba(240, 253, 244, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    border-radius: 12px !important;
+    border-left: 3px solid #5DCAA5 !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  الهيدر البسيط
+#  الهيدر
 # ════════════════════════════════════════════════════════════
 st.markdown("""
-<div class="simple-header">
-    <h1>🎤 HASSAN <span>NASSER</span></h1>
-    <p>VOICE &amp; MULTI-DOMAIN TRANSLATOR</p>
+<div class="glass-header">
+    <div class="logo">
+        <div class="logo-icon">🎤</div>
+        <div>
+            <div class="logo-text">HASSAN <span>NASSER</span></div>
+            <div class="logo-sub">VOICE &amp; MULTI-DOMAIN TRANSLATOR</div>
+        </div>
+    </div>
+    <div class="badges">
+        <span class="badge">🎤 Voice</span>
+        <span class="badge">🤖 AI</span>
+        <span class="badge">🌍 8 Languages</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -413,7 +503,7 @@ if "cohere_api_key" not in st.session_state:
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
     <div style="text-align:center;padding:2rem 0;">
-        <h3 style="font-weight:600;">🔑 API Keys Required</h3>
+        <h3 style="font-weight:600;color:#1a1a2e;">🔑 API Keys Required</h3>
         <p style="color:#6b7280;font-size:13px;">Enter your keys below. They will be saved for this session.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -595,7 +685,7 @@ def swap_languages():
     st.session_state.target_lang = old_source
 
 # ════════════════════════════════════════════════════════════
-#  UI
+#  UI - مودرن
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -611,7 +701,7 @@ tgt_options = [k for k in lang_list if k != st.session_state.source_lang and k !
 tgt_idx = tgt_options.index(st.session_state.target_lang) if st.session_state.target_lang in tgt_options else 0
 style_idx = style_list.index(st.session_state.selected_style) if st.session_state.selected_style in style_list else 0
 
-# ====== اختيار اللغات ======
+# ====== اللغات ======
 st.markdown("### 🌐 Languages")
 
 col_left, col_mid, col_right = st.columns([1, 0.15, 1])
@@ -638,7 +728,9 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx)
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== بطاقة الميكروفون الأسطوري ======
+# ====== بطاقة الميكروفون ======
+st.markdown("---")
+
 if source_lang == "ru":
     engine_info = "⚡ Faster-Whisper (دقة عالية للروسية)"
 elif source_lang == "auto":
@@ -647,10 +739,17 @@ else:
     engine_info = f"⚡ Cohere ({source_lang_name})"
 
 st.markdown(f"""
-<div class="mic-card">
-    <span class="mic-icon">🎤</span>
-    <div class="mic-title">سجل رسالتك الصوتية</div>
-    <div class="mic-sub">{engine_info}</div>
+<div class="glass-card">
+    <div class="mic-section">
+        <div class="mic-icon-wrapper">
+            <div class="pulse-ring"></div>
+            <div class="mic-circle">
+                <span class="mic-emoji">🎤</span>
+            </div>
+        </div>
+        <div class="mic-title">سجل رسالتك الصوتية</div>
+        <div class="mic-sub">{engine_info}</div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -671,9 +770,15 @@ if audio_value:
                     if translated_text:
                         st.session_state.translated_text = translated_text
                         st.markdown("### 📝 الترجمة")
-                        st.markdown(f">>> {translated_text}")
+                        st.markdown(f"""
+                        <div class="result-glass">
+                            <div class="rlabel">🎯 نتيجة الترجمة</div>
+                            <div class="rtext">{translated_text}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.code(translated_text, language=None)
                     else:
-                        st.error(f"فشلت الترجمة: {engine}")
+                        st.error(f"❌ {engine}")
         else:
             st.error(f"❌ {engine_used}")
 
@@ -702,7 +807,7 @@ if input_text.strip():
             emoji = DOMAINS[d]["emoji"]
             css_class = f"tag-{d}" if d in DOMAINS else "tag-gen"
             badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
-        st.markdown(f'<div class="context-box">🔍 {badges}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="context-glass">🔍 {badges}</div>', unsafe_allow_html=True)
 
 # ====== زر الترجمة ======
 if st.button("ترجم 🚀", use_container_width=True, key="translate_btn"):
@@ -725,11 +830,11 @@ if st.button("ترجم 🚀", use_container_width=True, key="translate_btn"):
 
                 st.markdown("### 📝 النتيجة")
                 st.markdown(f"""
-<div class="result-box">
-    <div class="label">🎯 الترجمة</div>
-    <div class="text">{final_translation}</div>
-</div>
-""", unsafe_allow_html=True)
+                <div class="result-glass">
+                    <div class="rlabel">🎯 نتيجة الترجمة</div>
+                    <div class="rtext">{final_translation}</div>
+                </div>
+                """, unsafe_allow_html=True)
                 st.code(final_translation, language=None)
             else:
                 st.error(f"❌ {translation_result}")
