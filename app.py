@@ -34,6 +34,7 @@ if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = ""
 if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = ""
+# ═══ متغيرات جديدة للتحكم بمصدر الترجمة ═══
 if "translation_source" not in st.session_state:
     st.session_state.translation_source = None  # "voice" or "text"
 if "skip_auto_translate" not in st.session_state:
@@ -813,22 +814,18 @@ if audio_value:
         recognized_text, error = speech_to_text(audio_bytes, source_lang)
         if recognized_text:
             st.success(f"✅ {recognized_text}")
-            # تعيين النص في مربع الإدخال
+            # ═══ تعيين النص وتحديث المصدر ═══
             st.session_state.input_text = recognized_text
-            st.session_state.last_input = recognized_text  # لمنع إعادة الترجمة التلقائية
-            # تعليم أن هذا من الصوت
+            st.session_state.last_input = recognized_text
             st.session_state.skip_auto_translate = True
-            # ترجمة الصوت
             with st.spinner("⏳ Translating..."):
                 translated_text, err = fetch_ai_translation(recognized_text, target_lang)
                 if translated_text:
                     st.session_state.translated_text = translated_text
-                    st.session_state.translation_source = "voice"
+                    st.session_state.translation_source = "voice"  # ← مصدر الترجمة: صوت
                 else:
                     st.error(f"❌ {err}")
-            # إعادة تعيين العلم بعد الانتهاء
             st.session_state.skip_auto_translate = False
-            # إعادة تشغيل الواجهة لتحديث مربع النص والترجمة
             st.rerun()
         else:
             st.error(f"❌ {error}")
@@ -842,16 +839,14 @@ def handle_text_input():
     if current_text != st.session_state.last_input:
         st.session_state.last_input = current_text
         st.session_state.input_text = current_text
-        # إذا كان التعديل من الصوت (تم تعيين العلم) فتجاوز
         if st.session_state.skip_auto_translate:
             st.session_state.skip_auto_translate = False
             return
-        # الترجمة التلقائية للنص
         if st.session_state.auto_translate and len(current_text.strip()) >= 3:
             translated, err = fetch_ai_translation(current_text, target_lang)
             if translated:
                 st.session_state.translated_text = translated
-                st.session_state.translation_source = "text"
+                st.session_state.translation_source = "text"  # ← مصدر الترجمة: نص
             else:
                 st.session_state.translated_text = f"❌ {err}"
 
@@ -864,7 +859,6 @@ input_text = st.text_area(
     on_change=handle_text_input
 )
 
-# في حال تغير النص مباشرة (عند التحديث من الصوت)
 if input_text != st.session_state.input_text and not st.session_state.skip_auto_translate:
     st.session_state.input_text = input_text
     if st.session_state.auto_translate and len(input_text.strip()) >= 3:
@@ -890,7 +884,7 @@ if st.session_state.input_text.strip():
 # ====== عرض نتيجة الترجمة (مرة واحدة فقط) ======
 if st.session_state.translated_text and st.session_state.input_text.strip():
     if not st.session_state.translated_text.startswith("❌"):
-        # تحديد مصدر الترجمة
+        # ═══ تحديد مصدر الترجمة ═══
         if st.session_state.translation_source == "voice":
             src_label = "🎤 Voice Translation"
         elif st.session_state.translation_source == "text":
@@ -909,7 +903,7 @@ if st.session_state.translated_text and st.session_state.input_text.strip():
     else:
         st.error(st.session_state.translated_text)
 
-# ====== زر ترجمة يدوي (في حال إلغاء الترجمة التلقائية) ======
+# ====== زر ترجمة يدوي ======
 if not st.session_state.auto_translate:
     if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
         if not st.session_state.input_text.strip():
