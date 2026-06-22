@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
+from streamlit_mic_recorder import mic_recorder  # <-- المكتبة الجديدة
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -14,7 +15,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — Premium Dark-Glass مع دعم أفضل للهواتف وإصلاح الميكروفون
+#  CSS — نفس التصميم مع إزالة أجزاء الـ audio_input القديمة
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -51,7 +52,7 @@ st.markdown("""
     z-index: 1;
 }
 
-/* ====== العنوان الرئيسي ====== */
+/* ====== العنوان ====== */
 .app-header {
     text-align: center;
     padding: 0.5rem 0.5rem 0.4rem;
@@ -115,99 +116,36 @@ st.markdown("""
     background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
 }
 
-/* ====== حاوية الميكروفون (مضغوطة وقابلة للنقر) ====== */
-.mic-container {
-    position: relative;
+/* ====== زر الميكروفون من المكتبة ====== */
+div[data-testid="stVerticalBlock"] > div:has(> .mic-recorder-container) {
     display: flex;
     justify-content: center;
-    align-items: center;
-    margin: 0 auto;
-    width: 76px;
-    height: 76px;
-    cursor: pointer;
-    touch-action: manipulation;  /* تحسين اللمس */
 }
 
-.mic-container .glass-card {
-    width: 100%;
-    height: 100%;
-    padding: 0.2rem;
+.mic-recorder-container {
     display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
-    border-radius: 16px;
-    margin: 0;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    margin: 0.5rem 0;
 }
 
-.mic-container .glass-card:hover {
-    border-color: rgba(78,203,160,0.5);
-    box-shadow: 0 0 30px rgba(78,203,160,0.1);
+/* تخصيص زر التسجيل */
+.mic-recorder-container button {
+    background: rgba(78,203,160,0.15) !important;
+    border: 1.5px solid rgba(78,203,160,0.4) !important;
+    border-radius: 50px !important;
+    padding: 0.6rem 1.8rem !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #e8f0ff !important;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 0 20px rgba(78,203,160,0.1);
+    transition: all 0.3s;
 }
 
-.mic-container .mic-icon-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%);
-    border: 1.5px solid rgba(78,203,160,0.25);
-    font-size: 18px;
-    margin-bottom: 0.1rem;
-    box-shadow: 0 0 12px rgba(78,203,160,0.05);
-}
-
-.mic-container .mic-label {
-    font-size: 10px;
-    font-weight: 600;
-    color: #e8f0ff;
-    line-height: 1.2;
-}
-
-.mic-container .mic-hint {
-    font-size: 8px;
-    color: rgba(180,200,230,0.35);
-    line-height: 1.2;
-}
-
-/* ====== عنصر st.audio_input (يغطي المستطيل بالكامل ويكون قابل للنقر) ====== */
-div[data-testid="stAudioInput"] {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    opacity: 0.01 !important;        /* شفاف لكن ليس مخفي تماماً */
-    z-index: 10 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-    background: transparent !important;
-    pointer-events: auto !important;  /* النقر يعمل */
-    touch-action: manipulation !important;
-}
-
-div[data-testid="stAudioInput"] label {
-    display: none !important;
-}
-
-div[data-testid="stAudioInput"] button {
-    width: 100% !important;
-    height: 100% !important;
-    opacity: 0.01 !important;
-    cursor: pointer !important;
-    border: none !important;
-    background: transparent !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    min-height: unset !important;
-    min-width: unset !important;
-    pointer-events: auto !important;
-    touch-action: manipulation !important;
+.mic-recorder-container button:hover {
+    background: rgba(78,203,160,0.25) !important;
+    border-color: #4ECBA0 !important;
+    box-shadow: 0 0 30px rgba(78,203,160,0.2);
 }
 
 /* ====== Selectbox ====== */
@@ -470,7 +408,7 @@ hr {
     flex-shrink: 0;
 }
 
-/* ====== تحسينات خاصة للهواتف ====== */
+/* ====== تحسينات للهواتف ====== */
 @media (max-width: 600px) {
     .block-container {
         padding-left: 0.4rem !important;
@@ -479,22 +417,6 @@ hr {
     .app-header h1 {
         font-size: 20px !important;
     }
-    /* تكبير حجم الميكروفون لسهولة اللمس */
-    .mic-container {
-        width: 86px !important;
-        height: 86px !important;
-    }
-    .mic-container .mic-icon-wrap {
-        width: 36px !important;
-        height: 36px !important;
-        font-size: 20px !important;
-    }
-    .mic-container .mic-label {
-        font-size: 10px !important;
-    }
-    .mic-container .mic-hint {
-        font-size: 8px !important;
-    }
     .stSelectbox > div > div {
         font-size: 12px !important;
         min-height: 28px !important;
@@ -502,7 +424,7 @@ hr {
     .stButton > button {
         font-size: 11px !important;
         padding: 0.3rem 0.6rem !important;
-        min-height: 34px !important;  /* أسهل للنقر */
+        min-height: 34px !important;
     }
     textarea {
         font-size: 13px !important;
@@ -798,7 +720,7 @@ def swap_languages():
     st.session_state.target_lang = old_source
 
 # ════════════════════════════════════════════════════════════
-#  UI - ميكروفون مضغوط (يعمل على الهواتف)
+#  UI
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -842,46 +764,41 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== الميكروفون ======
+# ====== الميكروفون الجديد (يعمل على الهواتف) ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
-# المستطيل الذي يحتوي على أيقونة الميكروفون
-st.markdown("""
-<div class="mic-container">
-    <div class="glass-card" style="cursor:pointer;">
-        <div class="mic-icon-wrap">🎤</div>
-        <div class="mic-label">Record</div>
-        <div class="mic-hint">Tap to speak</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# استخدام mic_recorder مباشرة
+audio = mic_recorder(
+    start_prompt="🎤 اضغط للتسجيل",
+    stop_prompt="⏹️ أوقف التسجيل",
+    just_once=True,
+    use_container_width=True,
+    key="mic_recorder"
+)
 
-# عنصر التسجيل المخفي (يغطي المستطيل بالكامل ويعمل على اللمس)
-audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
-
-if audio_value:
+if audio:
     with st.spinner("⏳ جاري التعرف..."):
-        audio_bytes = audio_value.getvalue()
+        audio_bytes = audio['bytes']
         recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
         if recognized_text:
             st.success(f"✅ {recognized_text}")
             st.session_state.input_text = recognized_text
-            if st.button("Translate ✦", use_container_width=True):
-                with st.spinner("⏳ جاري الترجمة..."):
-                    translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
-                    if translated_text:
-                        st.session_state.translated_text = translated_text
-                        st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                        st.markdown(f"""
-                        <div class="result-box">
-                            <span class="label">✦ Translation</span>
-                            <div class="text">{translated_text}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.code(translated_text, language=None)
-                    else:
-                        st.error(f"❌ {engine}")
+            # نعرض الترجمة فوراً
+            with st.spinner("⏳ جاري الترجمة..."):
+                translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
+                if translated_text:
+                    st.session_state.translated_text = translated_text
+                    st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class="result-box">
+                        <span class="label">✦ Translation</span>
+                        <div class="text">{translated_text}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.code(translated_text, language=None)
+                else:
+                    st.error(f"❌ {engine}")
         else:
             st.error(f"❌ {engine_used}")
 
