@@ -36,7 +36,7 @@ st.markdown("""
     z-index: 1;
 }
 
-/* ====== العنوان (تم إزالة النص الفرعي) ====== */
+/* ====== العنوان ====== */
 .app-header {
     text-align: center;
     padding: 0.3rem 0.5rem 0.2rem;
@@ -149,7 +149,30 @@ div[data-testid="stAudioInput"] button::before {
     min-height: 28px !important;
 }
 
-/* ====== خلفية صلبة لمربع النص ====== */
+/* ====== زر إزالة التسجيل ====== */
+.clear-audio-btn {
+    margin-top: 0.3rem;
+    text-align: center;
+}
+.clear-audio-btn button {
+    background: rgba(239,68,68,0.15) !important;
+    border: 1px solid rgba(239,68,68,0.3) !important;
+    color: #ff6b78 !important;
+    font-size: 11px !important;
+    padding: 0.2rem 0.6rem !important;
+    border-radius: 20px !important;
+    width: auto !important;
+    min-height: 28px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s !important;
+}
+.clear-audio-btn button:hover {
+    background: rgba(239,68,68,0.25) !important;
+    border-color: #ff6b78 !important;
+    box-shadow: 0 0 20px rgba(239,68,68,0.15) !important;
+}
+
+/* ====== Textarea ====== */
 textarea {
     background: #1a1a2e !important;
     border: 1px solid rgba(255,255,255,0.15) !important;
@@ -267,12 +290,13 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
     div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
     .stButton > button { font-size: 11px !important; min-height: 34px !important; }
     textarea { font-size: 13px !important; min-height: 50px !important; }
+    .clear-audio-btn button { font-size: 10px !important; padding: 0.15rem 0.5rem !important; min-height: 24px !important; }
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  العنوان (تم إزالة النص الفرعي)
+#  العنوان
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
@@ -498,31 +522,34 @@ if "selected_style" not in st.session_state:
     st.session_state.selected_style = "Auto-Detect"
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
+if "audio_uploaded" not in st.session_state:
+    st.session_state.audio_uploaded = False  # لتتبع وجود تسجيل
 
 def swap_languages():
-    """تبديل اللغات المصدر والهدف مع التحقق من عدم وجود تعارض."""
     old_source = st.session_state.source_lang
     old_target = st.session_state.target_lang
     
-    # التبديل
     st.session_state.source_lang = old_target
     st.session_state.target_lang = old_source
     
-    # إذا أصبحت المصدر "Auto-Detect" نجعلها لغة أخرى (مثلاً الإنجليزية)
     if st.session_state.source_lang == "Auto-Detect":
         st.session_state.source_lang = "English"
         if st.session_state.target_lang == "English":
             st.session_state.target_lang = "Arabic"
     
-    # إذا أصبحت المصدر مساوية للهدف، نغير الهدف
     if st.session_state.source_lang == st.session_state.target_lang:
-        # نغير الهدف إلى لغة مختلفة عن المصدر
         for lang in languages_dict.keys():
             if lang != st.session_state.source_lang and lang != "Auto-Detect":
                 st.session_state.target_lang = lang
                 break
     
-    # إعادة تشغيل التطبيق لتحديث الواجهة
+    st.rerun()
+
+def clear_audio():
+    """مسح التسجيل الصوتي وإعادة تعيين النصوص."""
+    st.session_state.input_text = ""
+    st.session_state.translated_text = ""
+    st.session_state.audio_uploaded = False
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
@@ -531,17 +558,14 @@ def swap_languages():
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
 
-# التأكد من أن اللغة الهدف مختلفة عن المصدر (في حالة وجود Auto-Detect)
 if st.session_state.target_lang == st.session_state.source_lang:
     for lang in lang_list:
         if lang != st.session_state.source_lang:
             st.session_state.target_lang = lang
             break
 
-# تحديد المؤشرات الحالية
 src_idx = lang_list.index(st.session_state.source_lang) if st.session_state.source_lang in lang_list else 0
 tgt_options = [k for k in lang_list if k != st.session_state.source_lang and k != "Auto-Detect"]
-# إذا كانت اللغة الهدف غير موجودة في القائمة المخصصة (مثل Auto-Detect) نضعها افتراضياً
 if st.session_state.target_lang not in tgt_options:
     st.session_state.target_lang = tgt_options[0] if tgt_options else "English"
 tgt_idx = tgt_options.index(st.session_state.target_lang) if st.session_state.target_lang in tgt_options else 0
@@ -559,7 +583,6 @@ with col_mid:
 with col_right:
     target_lang_name = st.selectbox("To", tgt_options, index=tgt_idx)
 
-# تحديث session_state بالقيم المختارة (إذا لم يتم التبديل)
 if source_lang_name != st.session_state.source_lang:
     st.session_state.source_lang = source_lang_name
 if target_lang_name != st.session_state.target_lang:
@@ -579,6 +602,13 @@ st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
 audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
+
+# تحديث حالة الرفع
+if audio_value:
+    st.session_state.audio_uploaded = True
+else:
+    # إذا لم يكن هناك ملف مرفق، نضع الحالة إلى False
+    st.session_state.audio_uploaded = False
 
 if audio_value:
     with st.spinner("⏳ جاري التعرف..."):
@@ -603,6 +633,12 @@ if audio_value:
                     st.error(f"❌ {engine}")
         else:
             st.error(f"❌ {engine_used}")
+
+    # زر إزالة التسجيل (يظهر فقط بعد رفع صوت)
+    st.markdown('<div class="clear-audio-btn">', unsafe_allow_html=True)
+    if st.button("🗑️ إزالة التسجيل", key="clear_audio_btn"):
+        clear_audio()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ====== النص المكتوب ======
 st.markdown("---")
