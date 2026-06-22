@@ -10,8 +10,7 @@ from collections import OrderedDict
 st.set_page_config(
     page_title="HN TRANSLATOR",
     page_icon="🌐",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    layout="centered"
 )
 
 # ════════════════════════════════════════════════════════════
@@ -37,7 +36,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = ""
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم متجاوب مثل Google Translate
+#  CSS — تصميم مضغوط ليظهر في صفحة واحدة
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -66,114 +65,37 @@ st.markdown("""
 }
 
 .block-container {
-    padding-top: 1rem !important;
-    padding-bottom: 1.5rem !important;
+    padding-top: 0.8rem !important;
+    padding-bottom: 0.8rem !important;
     max-width: 680px !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
     position: relative;
     z-index: 1;
 }
 
-/* ====== للهواتف ====== */
-@media (max-width: 600px) {
-    .block-container {
-        padding-top: 0.5rem !important;
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
-        max-width: 100% !important;
-    }
-    .app-header h1 {
-        font-size: 24px !important;
-    }
-    .app-header .brand {
-        font-size: 9px !important;
-    }
-    .app-header .subtitle {
-        font-size: 10px !important;
-    }
-    .glass-card {
-        padding: 0.8rem !important;
-        border-radius: 12px !important;
-    }
-    .mic-icon-wrap {
-        width: 56px !important;
-        height: 56px !important;
-        font-size: 26px !important;
-    }
-    .stSelectbox > div > div {
-        font-size: 13px !important;
-        padding: 2px 8px !important;
-    }
-    textarea {
-        font-size: 14px !important;
-        min-height: 70px !important;
-        padding: 10px 12px !important;
-    }
-    .result-box .text {
-        font-size: 14px !important;
-    }
-    .stButton > button {
-        font-size: 12px !important;
-        padding: 0.5rem 0.8rem !important;
-    }
-    [data-testid="column"] {
-        padding: 0 2px !important;
-    }
-    .section-heading {
-        font-size: 9px !important;
-        margin: 0.8rem 0 0.4rem !important;
-    }
-    .context {
-        font-size: 10px !important;
-        padding: 4px 8px !important;
-        flex-wrap: wrap !important;
-    }
-    .tag {
-        font-size: 8px !important;
-        padding: 1px 6px !important;
-    }
-    .result-box {
-        padding: 0.6rem 0.8rem !important;
-    }
-    .result-box .label {
-        font-size: 8px !important;
-    }
-    .mic-hint {
-        font-size: 11px !important;
-    }
-    .stCheckbox label {
-        font-size: 12px !important;
-    }
-    .stRadio label {
-        font-size: 12px !important;
-    }
-}
-
-/* ====== العنوان الرئيسي ====== */
+/* ====== العنوان ====== */
 .app-header {
     text-align: center;
-    padding: 1.2rem 0.5rem 1rem;
+    padding: 0.8rem 0.5rem 0.5rem;
     position: relative;
 }
 
 .app-header .brand {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     letter-spacing: 0.35em;
     color: #4ECBA0;
     text-transform: uppercase;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.2rem;
     display: block;
 }
 
 .app-header h1 {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 700;
     color: #f0f4ff;
-    margin: 0 0 0.2rem 0;
+    margin: 0 0 0.1rem 0;
     line-height: 1.1;
     letter-spacing: -0.02em;
 }
@@ -184,7 +106,7 @@ st.markdown("""
 }
 
 .app-header .subtitle {
-    font-size: 11px;
+    font-size: 10px;
     color: rgba(180,200,230,0.55);
     margin: 0;
     letter-spacing: 0.08em;
@@ -196,9 +118,9 @@ st.markdown("""
 .glass-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 16px;
-    padding: 1rem;
-    margin-bottom: 0.8rem;
+    border-radius: 14px;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.6rem;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
@@ -219,18 +141,18 @@ st.markdown("""
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%);
     border: 1.5px solid rgba(78,203,160,0.25);
-    font-size: 30px;
-    margin-bottom: 0.5rem;
+    font-size: 26px;
+    margin-bottom: 0.2rem;
     box-shadow: 0 0 30px rgba(78,203,160,0.12), inset 0 1px 0 rgba(78,203,160,0.15);
 }
 
 .mic-hint {
-    font-size: 12px;
+    font-size: 11px;
     color: rgba(180,200,230,0.6);
     margin: 0;
     font-weight: 400;
@@ -240,12 +162,13 @@ st.markdown("""
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     color: #e8f0ff !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 14px !important;
+    font-size: 13px !important;
     transition: border-color 0.2s;
-    padding: 2px 10px !important;
+    padding: 0px 8px !important;
+    min-height: 32px !important;
 }
 
 .stSelectbox > div > div:hover {
@@ -258,20 +181,20 @@ st.markdown("""
 }
 
 .stSelectbox label {
-    font-size: 10px !important;
+    font-size: 9px !important;
     font-weight: 600 !important;
     color: rgba(78,203,160,0.75) !important;
     letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
-    margin-bottom: 2px !important;
+    margin-bottom: 1px !important;
 }
 
 /* ====== الأزرار ====== */
 .stButton > button {
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     font-weight: 600 !important;
-    font-size: 13px !important;
-    padding: 0.5rem 1rem !important;
+    font-size: 12px !important;
+    padding: 0.35rem 0.8rem !important;
     background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
     color: #0a1520 !important;
     border: none !important;
@@ -280,8 +203,7 @@ st.markdown("""
     letter-spacing: 0.03em !important;
     transition: all 0.25s ease !important;
     box-shadow: 0 4px 20px rgba(78,203,160,0.3) !important;
-    position: relative !important;
-    overflow: hidden !important;
+    min-height: 32px !important;
 }
 
 .stButton > button:hover {
@@ -290,14 +212,18 @@ st.markdown("""
     transform: translateY(-1px) !important;
 }
 
+.stButton > button:active {
+    transform: translateY(0) !important;
+}
+
 .stButton:has(button[title="Swap"]) > button {
     background: rgba(255,255,255,0.07) !important;
     color: rgba(200,220,255,0.8) !important;
     box-shadow: none !important;
     border: 1px solid rgba(255,255,255,0.1) !important;
-    font-size: 16px !important;
-    padding: 0.3rem !important;
-    min-height: 36px !important;
+    font-size: 14px !important;
+    padding: 0.1rem !important;
+    min-height: 32px !important;
 }
 
 .stButton:has(button[title="Swap"]) > button:hover {
@@ -312,14 +238,14 @@ st.markdown("""
 textarea {
     background: rgba(255,255,255,0.04) !important;
     border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 14px !important;
+    border-radius: 12px !important;
     color: #e8f0ff !important;
-    font-size: 15px !important;
+    font-size: 14px !important;
     font-family: 'Inter', sans-serif !important;
-    padding: 10px 14px !important;
+    padding: 8px 12px !important;
     transition: border-color 0.2s, box-shadow 0.2s !important;
-    line-height: 1.6 !important;
-    min-height: 80px !important;
+    line-height: 1.5 !important;
+    min-height: 60px !important;
 }
 
 textarea:focus {
@@ -335,10 +261,10 @@ textarea::placeholder {
 /* ====== صندوق النتيجة ====== */
 .result-box {
     background: rgba(78,203,160,0.06);
-    border-radius: 14px;
-    padding: 0.8rem 1rem;
+    border-radius: 12px;
+    padding: 0.6rem 0.8rem;
     border: 1px solid rgba(78,203,160,0.2);
-    margin-top: 0.5rem;
+    margin-top: 0.4rem;
     position: relative;
     overflow: hidden;
 }
@@ -353,45 +279,45 @@ textarea::placeholder {
 }
 
 .result-box .label {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 700;
     text-transform: uppercase;
     color: rgba(78,203,160,0.7);
     letter-spacing: 0.15em;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     display: block;
 }
 
 .result-box .text {
-    font-size: 15px;
+    font-size: 14px;
     color: #e8f0ff;
-    line-height: 1.6;
+    line-height: 1.5;
     font-weight: 400;
 }
 
 /* ====== سياق المجال ====== */
 .context {
     background: rgba(78,203,160,0.07);
-    border-radius: 10px;
-    padding: 5px 10px;
-    font-size: 11px;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 10px;
     color: rgba(78,203,160,0.9);
     border: 1px solid rgba(78,203,160,0.15);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
     display: flex;
     align-items: center;
     gap: 5px;
     flex-wrap: wrap;
 }
 
-/* ====== شارات المجالات ====== */
+/* ====== شارات ====== */
 .tag {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    padding: 2px 8px;
-    border-radius: 14px;
-    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 12px;
+    font-size: 8px;
     font-weight: 600;
     margin-right: 3px;
     letter-spacing: 0.03em;
@@ -417,33 +343,44 @@ textarea::placeholder {
 .stSuccess {
     background: rgba(78,203,160,0.08) !important;
     border: 1px solid rgba(78,203,160,0.25) !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     color: #a8f0d8 !important;
-    padding: 6px 12px !important;
-    font-size: 13px !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
 }
+
+.stSuccess > div { color: #a8f0d8 !important; }
+
 .stError, [data-baseweb="notification"][kind="negative"] {
     background: rgba(239,68,68,0.08) !important;
     border: 1px solid rgba(239,68,68,0.25) !important;
-    border-radius: 12px !important;
-    padding: 6px 12px !important;
-    font-size: 13px !important;
+    border-radius: 10px !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
 }
+
 .stWarning {
     background: rgba(245,158,11,0.08) !important;
     border: 1px solid rgba(245,158,11,0.2) !important;
-    border-radius: 12px !important;
-    padding: 6px 12px !important;
-    font-size: 13px !important;
+    border-radius: 10px !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
 }
 
 .stCode, code, pre {
     background: rgba(0,0,0,0.35) !important;
     border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 10px !important;
+    border-radius: 8px !important;
     color: #a8f0d8 !important;
-    font-size: 12px !important;
-    padding: 6px 10px !important;
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+}
+
+hr {
+    margin: 0.4rem 0 !important;
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent) !important;
 }
 
 .stSpinner > div {
@@ -453,11 +390,11 @@ textarea::placeholder {
 .stTextInput input {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     color: #e8f0ff !important;
     font-family: 'Inter', sans-serif !important;
-    padding: 6px 12px !important;
-    font-size: 14px !important;
+    padding: 6px 10px !important;
+    font-size: 13px !important;
 }
 
 .stTextInput input:focus {
@@ -467,7 +404,7 @@ textarea::placeholder {
 
 .stTextInput label {
     color: rgba(78,203,160,0.75) !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
     font-weight: 600 !important;
     letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
@@ -475,11 +412,11 @@ textarea::placeholder {
 
 .stCheckbox label {
     color: rgba(180,200,230,0.8) !important;
-    font-size: 13px !important;
+    font-size: 12px !important;
 }
 
 .stAudioInput {
-    border-radius: 40px !important;
+    border-radius: 30px !important;
 }
 
 .stCaption {
@@ -491,30 +428,23 @@ textarea::placeholder {
     padding: 0 4px !important;
 }
 
-hr {
-    margin: 0.8rem 0 !important;
-    border: none !important;
-    height: 1px !important;
-    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent) !important;
-}
-
 .section-heading {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     color: rgba(150,185,230,0.5);
-    margin: 1rem 0 0.5rem;
+    margin: 0.5rem 0 0.2rem;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .section-heading::before {
     content: '';
-    width: 3px;
-    height: 12px;
+    width: 2px;
+    height: 10px;
     background: #4ECBA0;
     border-radius: 2px;
     flex-shrink: 0;
@@ -533,9 +463,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ════════════════════════════════════════════════════════════
-#  زر الترجمة التلقائية
-# ════════════════════════════════════════════════════════════
+# ====== زر الترجمة التلقائية ======
 auto_translate = st.checkbox(
     "⚡ Auto-Translate",
     value=st.session_state.auto_translate,
@@ -655,10 +583,10 @@ if st.session_state.cohere_api_key == "":
 # ════════════════════════════════════════════════════════════
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
-    <div class="glass-card" style="text-align:center; padding: 1.5rem 1rem;">
-        <div style="font-size:28px; margin-bottom:0.5rem;">🔐</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:700;
-                    color:#e8f0ff; margin-bottom:0.2rem;">Connect API Keys</div>
+    <div class="glass-card" style="text-align:center; padding: 1rem 0.8rem;">
+        <div style="font-size:24px; margin-bottom:0.3rem;">🔐</div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:700;
+                    color:#e8f0ff; margin-bottom:0.1rem;">Connect API Keys</div>
         <div style="font-size:10px; color:rgba(150,185,230,0.5); letter-spacing:0.04em;">
             Stored in your browser session only
         </div>
@@ -810,7 +738,7 @@ with col_left:
     source_lang_name = st.selectbox("From", lang_list, index=src_idx)
 
 with col_mid:
-    st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:22px;'></div>", unsafe_allow_html=True)
     if st.button("⇄", help="Swap", use_container_width=True):
         old_source = st.session_state.source_lang
         old_target = st.session_state.target_lang
@@ -838,15 +766,16 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 
 # ====== الميكروفون ======
 st.markdown("---")
+
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
 st.markdown("""
-<div class="glass-card" style="text-align:center; padding: 1.2rem 0.8rem 1rem;">
+<div class="glass-card" style="text-align:center; padding: 0.8rem 0.5rem 0.6rem;">
     <div class="mic-icon-wrap">🎤</div>
-    <div style="font-size:14px; font-weight:600; color:#e8f0ff; margin-bottom:2px;">
+    <div style="font-size:13px; font-weight:600; color:#e8f0ff; margin-bottom:1px;">
         Record Your Message
     </div>
-    <div style="font-size:11px; color:rgba(180,200,230,0.45);">
+    <div style="font-size:10px; color:rgba(180,200,230,0.45);">
         Speak clearly for best results
     </div>
 </div>
@@ -898,7 +827,7 @@ def handle_text_input():
 
 input_text = st.text_area(
     "",
-    height=80,
+    height=60,
     placeholder="اكتب أو الصق النص هنا...",
     value=st.session_state.input_text,
     key="input_text_area",
@@ -940,7 +869,7 @@ if st.session_state.translated_text and st.session_state.input_text.strip():
     else:
         st.error(st.session_state.translated_text)
 
-# ====== زر ترجمة يدوي ======
+# ====== زر ترجمة يدوي (في حال إلغاء الترجمة التلقائية) ======
 if not st.session_state.auto_translate:
     if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
         if not st.session_state.input_text.strip():
@@ -956,7 +885,7 @@ if not st.session_state.auto_translate:
 
 # ====== Footer ======
 st.markdown("""
-<div style="text-align:center; padding: 2rem 0 0.5rem; color:rgba(100,130,170,0.3); font-size:10px;
+<div style="text-align:center; padding: 0.8rem 0 0.2rem; color:rgba(100,130,170,0.3); font-size:9px;
             letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
     HN TRANSLATOR &nbsp;·&nbsp; Voice Translation Suite
 </div>
