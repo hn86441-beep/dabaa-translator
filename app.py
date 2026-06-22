@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم أنيق (النسخة الأصلية) مع تعديلات طفيفة للهواتف
+#  CSS — تم إصلاح خلفية textarea لتظهر بوضوح في Light Mode
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -28,24 +28,10 @@ st.markdown("""
     min-height: 100vh;
 }
 
-.stApp::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-        linear-gradient(rgba(100,220,180,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(100,220,180,0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-}
-
 .block-container {
-    padding-top: 0.6rem !important;
-    padding-bottom: 0.6rem !important;
-    padding-left: 0.6rem !important;
-    padding-right: 0.6rem !important;
-    max-width: 720px !important;   /* أوسع قليلاً للهواتف */
+    padding-top: 0.8rem !important;
+    padding-bottom: 1rem !important;
+    max-width: 680px !important;
     position: relative;
     z-index: 1;
 }
@@ -53,8 +39,7 @@ st.markdown("""
 /* ====== العنوان ====== */
 .app-header {
     text-align: center;
-    padding: 0.4rem 0.5rem 0.3rem;
-    position: relative;
+    padding: 0.5rem 0.5rem 0.4rem;
 }
 .app-header .brand {
     font-family: 'Space Grotesk', sans-serif;
@@ -67,49 +52,34 @@ st.markdown("""
 }
 .app-header h1 {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 22px;   /* قلّصت قليلاً */
+    font-size: 24px;
     font-weight: 700;
     color: #f0f4ff;
-    margin: 0 0 0.1rem 0;
-    line-height: 1.2;
+    margin: 0;
 }
 .app-header h1 .accent { color: #4ECBA0; }
 .app-header .subtitle {
     font-size: 10px;
     color: rgba(180,200,230,0.55);
-    margin: 0;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    font-weight: 500;
 }
 
-/* ====== بطاقات ====== */
+/* ====== بطاقات زجاجية ====== */
 .glass-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.09);
     border-radius: 14px;
-    padding: 0.5rem;    /* قلّصت قليلاً */
-    margin-bottom: 0.5rem;
+    padding: 0.6rem;
     backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
-    position: relative;
-    overflow: hidden;
-}
-.glass-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
-/* ====== زر الميكروفون (بنفس التصميم السابق) ====== */
+/* ====== زر الميكروفون ====== */
 div[data-testid="stAudioInput"] {
     display: flex !important;
     justify-content: center !important;
     width: 100% !important;
-    margin: 0.2rem 0 !important;
 }
 
 div[data-testid="stAudioInput"] > div {
@@ -122,106 +92,80 @@ div[data-testid="stAudioInput"] > div {
     transition: all 0.3s !important;
     backdrop-filter: blur(8px);
 }
+
 div[data-testid="stAudioInput"] > div:hover {
     border-color: #4ECBA0 !important;
     box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
 }
+
 div[data-testid="stAudioInput"] button {
     background: transparent !important;
     border: none !important;
     color: #e8f0ff !important;
-    font-size: 15px !important;
+    font-size: 16px !important;
     font-weight: 600 !important;
-    padding: 0.4rem 1.5rem !important;
+    padding: 0.5rem 1.8rem !important;
     width: 100% !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 6px !important;
-}
-div[data-testid="stAudioInput"] button::before {
-    content: "🎤";
-    font-size: 18px;
+    gap: 8px !important;
 }
 
-/* ====== Selectbox ====== */
+div[data-testid="stAudioInput"] button::before {
+    content: "🎤";
+    font-size: 20px;
+}
+
+/* ====== باقي العناصر ====== */
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
     border-radius: 10px !important;
     color: #e8f0ff !important;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 12px !important;  /* قلّصت قليلاً */
-    transition: border-color 0.2s;
+    font-size: 13px !important;
     padding: 0px 8px !important;
-    min-height: 28px !important;  /* قلّصت قليلاً */
-}
-.stSelectbox > div > div:hover {
-    border-color: rgba(78,203,160,0.5) !important;
-}
-.stSelectbox > div > div:focus-within {
-    border-color: #4ECBA0 !important;
-    box-shadow: 0 0 0 3px rgba(78,203,160,0.12) !important;
+    min-height: 30px !important;
 }
 .stSelectbox label {
-    font-size: 8px !important;   /* قلّصت قليلاً */
+    font-size: 9px !important;
     font-weight: 600 !important;
     color: rgba(78,203,160,0.75) !important;
     letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
-    margin-bottom: 1px !important;
 }
-
-/* ====== الأزرار ====== */
 .stButton > button {
     border-radius: 10px !important;
     font-weight: 600 !important;
-    font-size: 11px !important;  /* قلّصت قليلاً */
-    padding: 0.3rem 0.6rem !important;
+    font-size: 12px !important;
+    padding: 0.35rem 0.8rem !important;
     background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
     color: #0a1520 !important;
     border: none !important;
     width: 100% !important;
     font-family: 'Space Grotesk', sans-serif !important;
-    letter-spacing: 0.03em !important;
-    transition: all 0.25s ease !important;
-    box-shadow: 0 4px 16px rgba(78,203,160,0.15) !important;
-    min-height: 30px !important;  /* قلّصت قليلاً */
-}
-.stButton > button:hover {
-    background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important;
-    box-shadow: 0 6px 24px rgba(78,203,160,0.3) !important;
-    transform: translateY(-1px) !important;
+    min-height: 32px !important;
 }
 .stButton:has(button[title="Swap"]) > button {
     background: rgba(255,255,255,0.07) !important;
     color: rgba(200,220,255,0.8) !important;
-    box-shadow: none !important;
     border: 1px solid rgba(255,255,255,0.1) !important;
-    font-size: 13px !important;
-    padding: 0.1rem !important;
-    min-height: 26px !important;
-}
-.stButton:has(button[title="Swap"]) > button:hover {
-    background: rgba(78,203,160,0.12) !important;
-    border-color: rgba(78,203,160,0.3) !important;
-    box-shadow: none !important;
-    transform: none !important;
-    color: #4ECBA0 !important;
+    font-size: 14px !important;
+    min-height: 28px !important;
 }
 
-/* ====== Textarea ====== */
+/* ====== الإصلاح الجوهري: خلفية صلبة داكنة لمربع النص ====== */
 textarea {
-    background: #1a1a2e !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
+    background: #1a1a2e !important;       /* خلفية داكنة صلبة */
+    border: 1px solid rgba(255,255,255,0.15) !important;
     border-radius: 12px !important;
-    color: #f0f4ff !important;
-    font-size: 13px !important;   /* قلّصت قليلاً */
+    color: #f0f4ff !important;            /* نص أبيض فاتح */
+    font-size: 14px !important;
     font-family: 'Inter', sans-serif !important;
     padding: 8px 12px !important;
     transition: border-color 0.2s, box-shadow 0.2s !important;
     line-height: 1.5 !important;
-    min-height: 60px !important;  /* قلّصت قليلاً */
+    min-height: 60px !important;
 }
 textarea:focus {
     border-color: rgba(78,203,160,0.5) !important;
@@ -229,16 +173,16 @@ textarea:focus {
     outline: none !important;
 }
 textarea::placeholder {
-    color: rgba(150,175,220,0.3) !important;
+    color: rgba(150,175,220,0.4) !important;
 }
 
 /* ====== صندوق النتيجة ====== */
 .result-box {
     background: rgba(78,203,160,0.06);
     border-radius: 12px;
-    padding: 0.4rem 0.6rem;
+    padding: 0.5rem 0.8rem;
     border: 1px solid rgba(78,203,160,0.2);
-    margin-top: 0.3rem;
+    margin-top: 0.4rem;
     position: relative;
 }
 .result-box::before {
@@ -247,7 +191,6 @@ textarea::placeholder {
     top: 0; left: 0;
     width: 3px; height: 100%;
     background: linear-gradient(180deg, #4ECBA0, #2fa87a);
-    border-radius: 3px 0 0 3px;
 }
 .result-box .label {
     font-size: 8px;
@@ -261,22 +204,17 @@ textarea::placeholder {
     font-size: 14px;
     color: #e8f0ff;
     line-height: 1.5;
-    font-weight: 400;
 }
-
-/* ====== سياق المجال ====== */
 .context {
     background: rgba(78,203,160,0.07);
     border-radius: 8px;
-    padding: 3px 10px;
+    padding: 4px 10px;
     font-size: 10px;
     color: rgba(78,203,160,0.9);
     border: 1px solid rgba(78,203,160,0.15);
-    margin-bottom: 0.3rem;
     display: flex;
-    align-items: center;
-    gap: 4px;
     flex-wrap: wrap;
+    gap: 4px;
 }
 .tag {
     display: inline-flex;
@@ -304,46 +242,17 @@ textarea::placeholder {
 .tag-tour { background: rgba(0,131,143,0.2);   color: #30c8d8; border: 1px solid rgba(0,131,143,0.3); }
 .tag-gen  { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
 
-/* ====== رسائل ====== */
-.stSuccess { background: rgba(78,203,160,0.08) !important; border: 1px solid rgba(78,203,160,0.25) !important; color: #a8f0d8 !important; padding: 4px 10px !important; font-size: 11px !important; border-radius: 10px !important; }
-.stError { background: rgba(239,68,68,0.08) !important; border: 1px solid rgba(239,68,68,0.25) !important; padding: 4px 10px !important; font-size: 11px !important; border-radius: 10px !important; }
-.stWarning { background: rgba(245,158,11,0.08) !important; border: 1px solid rgba(245,158,11,0.2) !important; padding: 4px 10px !important; font-size: 11px !important; border-radius: 10px !important; }
-.stCode, code, pre {
-    background: rgba(0,0,0,0.35) !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 8px !important;
-    color: #a8f0d8 !important;
-    font-size: 11px !important;
-    padding: 4px 8px !important;
-}
-hr {
-    margin: 0.5rem 0 !important;
-    border: none !important;
-    height: 1px !important;
-    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent) !important;
-}
-.stSpinner > div {
-    border-color: #4ECBA0 !important;
-}
-.stCheckbox label {
-    color: rgba(180,200,230,0.8) !important;
-    font-size: 11px !important;
-}
-.stCaption {
-    color: rgba(150,175,220,0.45) !important;
-    font-size: 9px !important;
-}
-[data-testid="column"] {
-    padding: 0 4px !important;
-}
+.stSuccess { background: rgba(78,203,160,0.08) !important; border: 1px solid rgba(78,203,160,0.25) !important; color: #a8f0d8 !important; }
+.stError { background: rgba(239,68,68,0.08) !important; border: 1px solid rgba(239,68,68,0.25) !important; }
+hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent); }
 .section-heading {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 8px;
+    font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     color: rgba(150,185,230,0.5);
-    margin: 0.5rem 0 0.25rem;
+    margin: 0.6rem 0 0.3rem;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -353,31 +262,15 @@ hr {
     width: 2px;
     height: 10px;
     background: #4ECBA0;
-    border-radius: 2px;
-    flex-shrink: 0;
 }
 
-/* ====== تحسينات للهواتف (معتدلة) ====== */
 @media (max-width: 600px) {
-    .block-container {
-        padding-left: 0.4rem !important;
-        padding-right: 0.4rem !important;
-        padding-top: 0.4rem !important;
-        padding-bottom: 0.4rem !important;
-    }
-    .app-header h1 {
-        font-size: 20px !important;
-    }
-    .app-header .brand { font-size: 8px !important; }
-    .app-header .subtitle { font-size: 9px !important; }
+    .block-container { padding: 0.4rem !important; }
+    .app-header h1 { font-size: 20px !important; }
     div[data-testid="stAudioInput"] > div { min-width: 140px !important; }
-    div[data-testid="stAudioInput"] button { font-size: 13px !important; padding: 0.3rem 1rem !important; }
-    .stSelectbox > div > div { font-size: 11px !important; min-height: 26px !important; }
-    .stButton > button { font-size: 10px !important; min-height: 28px !important; }
-    textarea { font-size: 12px !important; min-height: 55px !important; padding: 6px 10px !important; }
-    .result-box .text { font-size: 13px !important; }
-    .section-heading { font-size: 7px !important; }
-    .glass-card { padding: 0.4rem !important; }
+    div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
+    .stButton > button { font-size: 11px !important; min-height: 34px !important; }
+    textarea { font-size: 13px !important; min-height: 50px !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -495,7 +388,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
-    st.markdown('<div class="glass-card" style="text-align:center; padding:0.8rem;">🔐 Connect API Keys</div>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card" style="text-align:center;">🔐 Connect API Keys</div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         if not st.session_state.deepl_api_key:
@@ -513,7 +406,6 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
                 st.rerun()
         else:
             st.success("✅ Cohere Active")
-    st.caption("💡 Keys are never stored on any server — session only.")
     st.stop()
 
 # ════════════════════════════════════════════════════════════
@@ -641,7 +533,7 @@ col_left, col_mid, col_right = st.columns([1, 0.18, 1])
 with col_left:
     source_lang_name = st.selectbox("From", lang_list, index=src_idx)
 with col_mid:
-    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:22px;'></div>", unsafe_allow_html=True)
     if st.button("⇄", help="Swap", use_container_width=True):
         swap_languages()
 with col_right:
@@ -691,7 +583,7 @@ if audio_value:
 # ====== النص المكتوب ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Text Input</div>', unsafe_allow_html=True)
-input_text = st.text_area("", height=60, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
+input_text = st.text_area("", height=70, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
@@ -729,8 +621,7 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
                 st.error(f"❌ {translation_result}")
 
 st.markdown("""
-<div style="text-align:center; padding: 0.6rem 0 0.2rem; color:rgba(100,130,170,0.3); font-size:9px;
-            letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
-    HN TRANSLATOR &nbsp;·&nbsp; Voice Translation Suite
+<div style="text-align:center; padding: 1rem 0; color:rgba(100,130,170,0.3); font-size:9px; letter-spacing:0.12em; text-transform:uppercase;">
+    HN TRANSLATOR · Voice Translation Suite
 </div>
 """, unsafe_allow_html=True)
