@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم الميكروفون بشكل جميل ويعمل على الهواتف
+#  CSS — تم إصلاح خلفية textarea لتظهر بوضوح في Light Mode
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -75,7 +75,7 @@ st.markdown("""
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
-/* ====== زر الميكروفون الجديد ====== */
+/* ====== زر الميكروفون ====== */
 div[data-testid="stAudioInput"] {
     display: flex !important;
     justify-content: center !important;
@@ -153,15 +153,30 @@ div[data-testid="stAudioInput"] button::before {
     font-size: 14px !important;
     min-height: 28px !important;
 }
+
+/* ====== الإصلاح الجوهري: خلفية صلبة داكنة لمربع النص ====== */
 textarea {
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
+    background: #1a1a2e !important;       /* خلفية داكنة صلبة */
+    border: 1px solid rgba(255,255,255,0.15) !important;
     border-radius: 12px !important;
-    color: #e8f0ff !important;
+    color: #f0f4ff !important;            /* نص أبيض فاتح */
     font-size: 14px !important;
+    font-family: 'Inter', sans-serif !important;
     padding: 8px 12px !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+    line-height: 1.5 !important;
     min-height: 60px !important;
 }
+textarea:focus {
+    border-color: rgba(78,203,160,0.5) !important;
+    box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
+    outline: none !important;
+}
+textarea::placeholder {
+    color: rgba(150,175,220,0.4) !important;
+}
+
+/* ====== صندوق النتيجة ====== */
 .result-box {
     background: rgba(78,203,160,0.06);
     border-radius: 12px;
@@ -412,7 +427,6 @@ def translate_deepl(text, target_lang):
 def fetch_ai_translation(text, target_lang):
     return translate_deepl(text, target_lang)
 
-# ====== الدوال المعدلة لتعيد دائماً tuple ======
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
         return None, "API key missing"
@@ -432,7 +446,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         if response.status_code == 200:
             text = response.json().get("text", "").strip()
             if text:
-                return text, "Speech Recognition"   # ← دائماً tuple
+                return text, "Speech Recognition"
             else:
                 return None, "No speech detected"
         return None, f"Cohere error {response.status_code}"
