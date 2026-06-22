@@ -34,11 +34,6 @@ if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = ""
 if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = ""
-# ═══ متغيرات جديدة للتحكم بمصدر الترجمة ═══
-if "translation_source" not in st.session_state:
-    st.session_state.translation_source = None  # "voice" or "text"
-if "skip_auto_translate" not in st.session_state:
-    st.session_state.skip_auto_translate = False
 
 # ════════════════════════════════════════════════════════════
 #  CSS — تصميم محسّن مع زر ميكروفون احترافي
@@ -204,6 +199,7 @@ div[data-testid="stAudioInput"] button:active {
     box-shadow: 0 2px 12px rgba(78,203,160,0.1) !important;
 }
 
+/* أيقونة الميكروفون الداخلية */
 div[data-testid="stAudioInput"] button .mic-icon {
     font-size: 26px !important;
     line-height: 1 !important;
@@ -219,6 +215,22 @@ div[data-testid="stAudioInput"] button:hover .mic-icon {
     text-shadow: 0 0 40px rgba(78,203,160,0.5) !important;
 }
 
+/* حلقة نبض عند التسجيل (في حال كان التسجيل نشطاً) */
+div[data-testid="stAudioInput"] button.recording::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid rgba(78,203,160,0.4);
+    animation: pulse-ring 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.2); opacity: 0; }
+}
+
+/* تلميح صغير أسفل الزر */
 .mic-hint {
     text-align: center;
     font-size: 10px;
@@ -805,7 +817,10 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 st.markdown("---")
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
+# زر الميكروفون مع أيقونة محسّنة
 audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
+
+# تلميح صغير تحت الزر
 st.markdown('<div class="mic-hint">🎙️ Click to record</div>', unsafe_allow_html=True)
 
 if audio_value:
@@ -814,19 +829,21 @@ if audio_value:
         recognized_text, error = speech_to_text(audio_bytes, source_lang)
         if recognized_text:
             st.success(f"✅ {recognized_text}")
-            # ═══ تعيين النص وتحديث المصدر ═══
             st.session_state.input_text = recognized_text
-            st.session_state.last_input = recognized_text
-            st.session_state.skip_auto_translate = True
             with st.spinner("⏳ Translating..."):
                 translated_text, err = fetch_ai_translation(recognized_text, target_lang)
                 if translated_text:
                     st.session_state.translated_text = translated_text
-                    st.session_state.translation_source = "voice"  # ← مصدر الترجمة: صوت
+                    st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class="result-box">
+                        <span class="label">✦ Translation</span>
+                        <div class="text">{translated_text}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.code(translated_text, language=None)
                 else:
                     st.error(f"❌ {err}")
-            st.session_state.skip_auto_translate = False
-            st.rerun()
         else:
             st.error(f"❌ {error}")
 
@@ -839,14 +856,10 @@ def handle_text_input():
     if current_text != st.session_state.last_input:
         st.session_state.last_input = current_text
         st.session_state.input_text = current_text
-        if st.session_state.skip_auto_translate:
-            st.session_state.skip_auto_translate = False
-            return
         if st.session_state.auto_translate and len(current_text.strip()) >= 3:
             translated, err = fetch_ai_translation(current_text, target_lang)
             if translated:
                 st.session_state.translated_text = translated
-                st.session_state.translation_source = "text"  # ← مصدر الترجمة: نص
             else:
                 st.session_state.translated_text = f"❌ {err}"
 
@@ -859,13 +872,12 @@ input_text = st.text_area(
     on_change=handle_text_input
 )
 
-if input_text != st.session_state.input_text and not st.session_state.skip_auto_translate:
+if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
     if st.session_state.auto_translate and len(input_text.strip()) >= 3:
         translated, err = fetch_ai_translation(input_text, target_lang)
         if translated:
             st.session_state.translated_text = translated
-            st.session_state.translation_source = "text"
         else:
             st.session_state.translated_text = f"❌ {err}"
 
@@ -881,21 +893,13 @@ if st.session_state.input_text.strip():
             badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
         st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
 
-# ====== عرض نتيجة الترجمة (مرة واحدة فقط) ======
+# ====== عرض نتيجة الترجمة ======
 if st.session_state.translated_text and st.session_state.input_text.strip():
     if not st.session_state.translated_text.startswith("❌"):
-        # ═══ تحديد مصدر الترجمة ═══
-        if st.session_state.translation_source == "voice":
-            src_label = "🎤 Voice Translation"
-        elif st.session_state.translation_source == "text":
-            src_label = "✍️ Text Translation"
-        else:
-            src_label = "✦ Translation"
-        
         st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="result-box">
-            <span class="label">{src_label}</span>
+            <span class="label">✦ Translation</span>
             <div class="text">{st.session_state.translated_text}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -913,7 +917,6 @@ if not st.session_state.auto_translate:
                 translated, err = fetch_ai_translation(st.session_state.input_text, target_lang)
                 if translated:
                     st.session_state.translated_text = translated
-                    st.session_state.translation_source = "text"
                     st.rerun()
                 else:
                     st.error(f"❌ {err}")
@@ -924,4 +927,4 @@ st.markdown("""
             letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
     HN TRANSLATOR &nbsp;·&nbsp; Voice Translation Suite
 </div>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True)                                                                                                                    اريدك ان تعدل على هذا الكود لتجعل اما زر تسجيل الصوت او نص الترجمة ان تكتب نص وتسجيل صوت واترجم والاثنين في نفس الوقت لا اريده
