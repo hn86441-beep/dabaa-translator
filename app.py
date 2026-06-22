@@ -36,7 +36,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = ""
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم مضغوط مع ميكروفون مدمج
+#  CSS — تصميم مضغوط مع ميكروفون مدمج قابل للضغط
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -136,12 +136,71 @@ st.markdown("""
     background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
 }
 
-/* ====== منطقة الميكروفون ====== */
+/* ====== تخصيص عنصر st.audio_input ليكون بطاقة قابلة للضغط ====== */
+div[data-testid="stAudioInput"] {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.09) !important;
+    border-radius: 14px !important;
+    padding: 0.8rem 0.5rem 0.6rem !important;
+    margin-bottom: 0.6rem !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    text-align: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+div[data-testid="stAudioInput"]:hover {
+    border-color: rgba(78,203,160,0.4) !important;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 30px rgba(78,203,160,0.05) !important;
+}
+
+div[data-testid="stAudioInput"]::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
+}
+
+div[data-testid="stAudioInput"] label {
+    display: none !important;
+}
+
+div[data-testid="stAudioInput"] > div {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 70px !important;
+}
+
+div[data-testid="stAudioInput"] > div > div:first-child {
+    display: none !important;
+}
+
+/* تخصيص زر التسجيل الداخلي */
+div[data-testid="stAudioInput"] button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    width: 100% !important;
+    font-size: 0 !important;
+}
+
+/* المحتوى المخصص داخل العنصر */
 .mic-wrapper {
     text-align: center;
     padding: 0.2rem 0 0.3rem;
     cursor: pointer;
-    position: relative;
+    width: 100%;
+    pointer-events: none;
 }
 
 .mic-wrapper .mic-icon {
@@ -159,12 +218,6 @@ st.markdown("""
     transition: all 0.3s ease;
 }
 
-.mic-wrapper .mic-icon:hover {
-    transform: scale(1.05);
-    border-color: rgba(78,203,160,0.5);
-    box-shadow: 0 0 40px rgba(78,203,160,0.2);
-}
-
 .mic-wrapper .mic-label {
     font-size: 13px;
     font-weight: 600;
@@ -175,23 +228,6 @@ st.markdown("""
 .mic-wrapper .mic-hint {
     font-size: 10px;
     color: rgba(180,200,230,0.45);
-}
-
-/* ====== إخفاء عنصر audio_input الافتراضي مع جعله قابل للضغط ====== */
-.stAudioInput {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    opacity: 0 !important;
-    cursor: pointer !important;
-    z-index: 10 !important;
-}
-
-.stAudioInput > div {
-    width: 100% !important;
-    height: 100% !important;
 }
 
 /* ====== Selectbox ====== */
@@ -447,10 +483,6 @@ hr {
     font-size: 12px !important;
 }
 
-.stAudioInput {
-    border-radius: 30px !important;
-}
-
 .stCaption {
     color: rgba(150,175,220,0.45) !important;
     font-size: 10px !important;
@@ -480,23 +512,6 @@ hr {
     background: #4ECBA0;
     border-radius: 2px;
     flex-shrink: 0;
-}
-
-/* ====== جعل الميكروفون يغطي البطاقة بالكامل ====== */
-.mic-click-area {
-    position: relative;
-    cursor: pointer;
-}
-
-.mic-click-area .stAudioInput {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    opacity: 0 !important;
-    cursor: pointer !important;
-    z-index: 10 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -813,13 +828,16 @@ if selected_style_label != st.session_state.selected_style:
     st.session_state.selected_style = selected_style_label
 selected_domain = STYLE_OPTIONS[selected_style_label]
 
-# ====== الميكروفون (يتم الضغط على البطاقة لفتح التسجيل) ======
+# ====== الميكروفون (يعمل عند الضغط على النص) ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
-# بطاقة الميكروفون مع st.audio_input مخفي
+# استخدام st.audio_input مباشرة مع تنسيق CSS لجعله يبدو كبطاقة
+audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
+
+# وضع المحتوى المخصص (نظراً لأننا أخفينا label، سنضيف النص يدوياً عبر markdown قبل العنصر)
 st.markdown("""
-<div class="glass-card mic-click-area" style="text-align:center; padding: 0.8rem 0.5rem 0.6rem; cursor: pointer;">
+<div style="text-align:center; margin-top: -1.8rem; margin-bottom: 0.5rem; pointer-events: none;">
     <div class="mic-wrapper">
         <div class="mic-icon">🎤</div>
         <div class="mic-label">Record Your Message</div>
@@ -828,8 +846,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# وضع st.audio_input مخفي فوق البطاقة
-audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
+# ملاحظة: st.audio_input يكون فوق هذا العنصر، والضغط على النص يفعله
 
 if audio_value:
     with st.spinner("⏳ Processing..."):
