@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تم إصلاح خلفية textarea لتظهر بوضوح في Light Mode
+#  CSS — تم إصلاح خلفية textarea وتصميم زر الإزالة
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -112,6 +112,35 @@ div[data-testid="stAudioInput"] button::before {
     font-size: 20px;
 }
 
+/* ====== زر الإزالة (علامة X) ====== */
+.clear-audio-btn {
+    display: inline-block;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+.clear-audio-btn button {
+    background: rgba(239,68,68,0.15) !important;
+    border: 1.5px solid rgba(239,68,68,0.4) !important;
+    color: #ff6b78 !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    padding: 0 10px !important;
+    border-radius: 50% !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-height: unset !important;
+    line-height: 1 !important;
+    transition: all 0.3s !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.clear-audio-btn button:hover {
+    background: rgba(239,68,68,0.3) !important;
+    border-color: #ff6b78 !important;
+    box-shadow: 0 0 20px rgba(239,68,68,0.2) !important;
+}
+
 /* ====== باقي العناصر ====== */
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
@@ -147,33 +176,6 @@ div[data-testid="stAudioInput"] button::before {
     border: 1px solid rgba(255,255,255,0.1) !important;
     font-size: 14px !important;
     min-height: 28px !important;
-}
-
-/* ====== زر إزالة التسجيل (يظهر دائماً) ====== */
-.clear-audio-btn {
-    margin-top: 0.3rem;
-    text-align: center;
-}
-.clear-audio-btn button {
-    background: rgba(239,68,68,0.15) !important;
-    border: 1px solid rgba(239,68,68,0.3) !important;
-    color: #ff6b78 !important;
-    font-size: 11px !important;
-    padding: 0.2rem 0.6rem !important;
-    border-radius: 20px !important;
-    width: auto !important;
-    min-height: 28px !important;
-    font-weight: 600 !important;
-    transition: all 0.3s !important;
-}
-.clear-audio-btn button:hover:not(:disabled) {
-    background: rgba(239,68,68,0.25) !important;
-    border-color: #ff6b78 !important;
-    box-shadow: 0 0 20px rgba(239,68,68,0.15) !important;
-}
-.clear-audio-btn button:disabled {
-    opacity: 0.4 !important;
-    cursor: not-allowed !important;
 }
 
 /* ====== Textarea ====== */
@@ -294,7 +296,7 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
     div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
     .stButton > button { font-size: 11px !important; min-height: 34px !important; }
     textarea { font-size: 13px !important; min-height: 50px !important; }
-    .clear-audio-btn button { font-size: 10px !important; padding: 0.15rem 0.5rem !important; min-height: 24px !important; }
+    .clear-audio-btn button { width: 28px !important; height: 28px !important; font-size: 14px !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -527,7 +529,7 @@ if "selected_style" not in st.session_state:
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
 if "audio_uploaded" not in st.session_state:
-    st.session_state.audio_uploaded = False  # لتتبع وجود تسجيل
+    st.session_state.audio_uploaded = False
 
 def swap_languages():
     old_source = st.session_state.source_lang
@@ -601,7 +603,7 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== الميكروفون وزر الإزالة ======
+# ====== الميكروفون مع زر الإزالة (✖) ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
@@ -615,7 +617,22 @@ else:
     # إذا لم يكن هناك ملف مرفق، نضع الحالة إلى False
     st.session_state.audio_uploaded = False
 
-# معالجة الصوت إذا كان موجوداً
+# عرض زر الإزالة فقط إذا كان هناك تسجيل
+if st.session_state.audio_uploaded:
+    # نضع الزر في نفس السطر مع الميكروفون باستخدام عمود أو عنصر inline
+    # سنستخدم عمودين: الأول للميكروفون، الثاني للزر (إذا أردنا)
+    # لكن الأسهل: نضع الزر أسفل الميكروفون مباشرة، مع مسافة صغيرة
+    col_mic, col_clear = st.columns([6, 1])
+    with col_mic:
+        # إعادة عرض الميكروفون؟ لا، الميكروفون موجود بالفعل أعلاه.
+        # بدلاً من ذلك، نضع زر الإزالة في عمود منفصل، ولكننا سنضعه أسفل الميكروفون.
+        pass
+    with col_clear:
+        # زر الإزالة
+        if st.button("✖", key="clear_audio_btn", help="حذف التسجيل"):
+            clear_audio()
+
+# معالجة الصوت إذا كان موجوداً (هذا يحدث مرة واحدة بعد الرفع)
 if audio_value:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
@@ -639,12 +656,6 @@ if audio_value:
                     st.error(f"❌ {engine}")
         else:
             st.error(f"❌ {engine_used}")
-
-# زر إزالة التسجيل (يظهر دائماً، لكنه مفعل فقط عند وجود تسجيل)
-st.markdown('<div class="clear-audio-btn">', unsafe_allow_html=True)
-if st.button("🗑️ إزالة التسجيل", key="clear_audio_btn", disabled=not st.session_state.audio_uploaded):
-    clear_audio()
-st.markdown('</div>', unsafe_allow_html=True)
 
 # ====== النص المكتوب ======
 st.markdown("---")
