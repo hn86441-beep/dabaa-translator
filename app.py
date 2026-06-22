@@ -36,7 +36,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = ""
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم مضغوط مع زر ميكروفون صغير
+#  CSS — تصميم محسّن مع زر ميكروفون احترافي
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -136,16 +136,17 @@ st.markdown("""
     background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
 }
 
-/* ====== زر الميكروفون الصغير ====== */
+/* ====== زر الميكروفون الاحترافي ====== */
 div[data-testid="stAudioInput"] {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     backdrop-filter: none !important;
     box-shadow: none !important;
     width: auto !important;
-    display: inline-block !important;
+    display: flex !important;
+    justify-content: center !important;
 }
 
 div[data-testid="stAudioInput"] label {
@@ -153,33 +154,89 @@ div[data-testid="stAudioInput"] label {
 }
 
 div[data-testid="stAudioInput"] button {
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.09) !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)) !important;
+    border: 1px solid rgba(78,203,160,0.3) !important;
     border-radius: 50% !important;
-    padding: 0.3rem !important;
+    padding: 0 !important;
     margin: 0 !important;
-    min-height: 44px !important;
-    min-width: 44px !important;
-    width: 44px !important;
-    height: 44px !important;
+    min-height: 56px !important;
+    min-width: 56px !important;
+    width: 56px !important;
+    height: 56px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
-    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 24px rgba(78,203,160,0.15), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+}
+
+div[data-testid="stAudioInput"] button::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    padding: 2px;
+    background: linear-gradient(135deg, rgba(78,203,160,0.3), rgba(78,203,160,0.05));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
 }
 
 div[data-testid="stAudioInput"] button:hover {
-    transform: scale(1.05);
-    border-color: rgba(78,203,160,0.5) !important;
-    box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
+    transform: scale(1.08);
+    border-color: rgba(78,203,160,0.6) !important;
+    box-shadow: 0 8px 40px rgba(78,203,160,0.25), inset 0 1px 0 rgba(255,255,255,0.15) !important;
 }
 
-div[data-testid="stAudioInput"] button > div {
-    font-size: 20px !important;
+div[data-testid="stAudioInput"] button:active {
+    transform: scale(0.92);
+    box-shadow: 0 2px 12px rgba(78,203,160,0.1) !important;
+}
+
+/* أيقونة الميكروفون الداخلية */
+div[data-testid="stAudioInput"] button .mic-icon {
+    font-size: 26px !important;
     line-height: 1 !important;
     color: #e8f0ff !important;
+    text-shadow: 0 0 20px rgba(78,203,160,0.3) !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+div[data-testid="stAudioInput"] button:hover .mic-icon {
+    text-shadow: 0 0 40px rgba(78,203,160,0.5) !important;
+}
+
+/* حلقة نبض عند التسجيل (في حال كان التسجيل نشطاً) */
+div[data-testid="stAudioInput"] button.recording::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid rgba(78,203,160,0.4);
+    animation: pulse-ring 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.2); opacity: 0; }
+}
+
+/* تلميح صغير أسفل الزر */
+.mic-hint {
+    text-align: center;
+    font-size: 10px;
+    color: rgba(180,200,230,0.35);
+    margin-top: 0.3rem;
+    letter-spacing: 0.06em;
 }
 
 /* ====== Selectbox ====== */
@@ -756,14 +813,16 @@ if selected_style_label != st.session_state.selected_style:
     st.session_state.selected_style = selected_style_label
 selected_domain = STYLE_OPTIONS[selected_style_label]
 
-# ====== زر الميكروفون الصغير (بدون أي مربع أبيض) ======
+# ====== زر الميكروفون الاحترافي ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
-# العنصر الوحيد هو st.audio_input المصمم كزر
+# زر الميكروفون مع أيقونة محسّنة
 audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
 
-# ستظهر أيقونة الميكروفون داخل الزر تلقائياً بسبب CSS
+# تلميح صغير تحت الزر
+st.markdown('<div class="mic-hint">🎙️ Click to record</div>', unsafe_allow_html=True)
+
 if audio_value:
     with st.spinner("⏳ Processing..."):
         audio_bytes = audio_value.getvalue()
