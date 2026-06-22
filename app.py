@@ -36,10 +36,10 @@ st.markdown("""
     z-index: 1;
 }
 
-/* ====== العنوان ====== */
+/* ====== العنوان (تم إزالة النص الفرعي) ====== */
 .app-header {
     text-align: center;
-    padding: 0.5rem 0.5rem 0.4rem;
+    padding: 0.3rem 0.5rem 0.2rem;
 }
 .app-header .brand {
     font-family: 'Space Grotesk', sans-serif;
@@ -49,6 +49,7 @@ st.markdown("""
     color: #4ECBA0;
     text-transform: uppercase;
     display: block;
+    margin-bottom: 0.1rem;
 }
 .app-header h1 {
     font-family: 'Space Grotesk', sans-serif;
@@ -58,12 +59,6 @@ st.markdown("""
     margin: 0;
 }
 .app-header h1 .accent { color: #4ECBA0; }
-.app-header .subtitle {
-    font-size: 10px;
-    color: rgba(180,200,230,0.55);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
 
 /* ====== بطاقات زجاجية ====== */
 .glass-card {
@@ -154,12 +149,12 @@ div[data-testid="stAudioInput"] button::before {
     min-height: 28px !important;
 }
 
-/* ====== الإصلاح الجوهري: خلفية صلبة داكنة لمربع النص ====== */
+/* ====== خلفية صلبة لمربع النص ====== */
 textarea {
-    background: #1a1a2e !important;       /* خلفية داكنة صلبة */
+    background: #1a1a2e !important;
     border: 1px solid rgba(255,255,255,0.15) !important;
     border-radius: 12px !important;
-    color: #f0f4ff !important;            /* نص أبيض فاتح */
+    color: #f0f4ff !important;
     font-size: 14px !important;
     font-family: 'Inter', sans-serif !important;
     padding: 8px 12px !important;
@@ -267,6 +262,7 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 @media (max-width: 600px) {
     .block-container { padding: 0.4rem !important; }
     .app-header h1 { font-size: 20px !important; }
+    .app-header { padding: 0.2rem 0.3rem 0.1rem !important; }
     div[data-testid="stAudioInput"] > div { min-width: 140px !important; }
     div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
     .stButton > button { font-size: 11px !important; min-height: 34px !important; }
@@ -276,13 +272,12 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  العنوان
+#  العنوان (تم إزالة النص الفرعي)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
     <span class="brand">✦ Smart Voice Translator ✦</span>
     <h1>HN <span class="accent">TRANSLATOR</span></h1>
-    <p class="subtitle">Voice &amp; Text Translation · 8 Languages</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -505,10 +500,30 @@ if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
 
 def swap_languages():
+    """تبديل اللغات المصدر والهدف مع التحقق من عدم وجود تعارض."""
     old_source = st.session_state.source_lang
     old_target = st.session_state.target_lang
+    
+    # التبديل
     st.session_state.source_lang = old_target
     st.session_state.target_lang = old_source
+    
+    # إذا أصبحت المصدر "Auto-Detect" نجعلها لغة أخرى (مثلاً الإنجليزية)
+    if st.session_state.source_lang == "Auto-Detect":
+        st.session_state.source_lang = "English"
+        if st.session_state.target_lang == "English":
+            st.session_state.target_lang = "Arabic"
+    
+    # إذا أصبحت المصدر مساوية للهدف، نغير الهدف
+    if st.session_state.source_lang == st.session_state.target_lang:
+        # نغير الهدف إلى لغة مختلفة عن المصدر
+        for lang in languages_dict.keys():
+            if lang != st.session_state.source_lang and lang != "Auto-Detect":
+                st.session_state.target_lang = lang
+                break
+    
+    # إعادة تشغيل التطبيق لتحديث الواجهة
+    st.rerun()
 
 # ════════════════════════════════════════════════════════════
 #  UI
@@ -516,18 +531,23 @@ def swap_languages():
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
 
+# التأكد من أن اللغة الهدف مختلفة عن المصدر (في حالة وجود Auto-Detect)
 if st.session_state.target_lang == st.session_state.source_lang:
     for lang in lang_list:
         if lang != st.session_state.source_lang:
             st.session_state.target_lang = lang
             break
 
+# تحديد المؤشرات الحالية
 src_idx = lang_list.index(st.session_state.source_lang) if st.session_state.source_lang in lang_list else 0
 tgt_options = [k for k in lang_list if k != st.session_state.source_lang and k != "Auto-Detect"]
+# إذا كانت اللغة الهدف غير موجودة في القائمة المخصصة (مثل Auto-Detect) نضعها افتراضياً
+if st.session_state.target_lang not in tgt_options:
+    st.session_state.target_lang = tgt_options[0] if tgt_options else "English"
 tgt_idx = tgt_options.index(st.session_state.target_lang) if st.session_state.target_lang in tgt_options else 0
 style_idx = style_list.index(st.session_state.selected_style) if st.session_state.selected_style in style_list else 0
 
-# اللغات
+# ====== اللغات ======
 st.markdown('<div class="section-heading">Translation Direction</div>', unsafe_allow_html=True)
 col_left, col_mid, col_right = st.columns([1, 0.18, 1])
 with col_left:
@@ -539,12 +559,16 @@ with col_mid:
 with col_right:
     target_lang_name = st.selectbox("To", tgt_options, index=tgt_idx)
 
-st.session_state.source_lang = source_lang_name
-st.session_state.target_lang = target_lang_name
-source_lang = languages_dict[source_lang_name]
-target_lang = languages_dict[target_lang_name]
+# تحديث session_state بالقيم المختارة (إذا لم يتم التبديل)
+if source_lang_name != st.session_state.source_lang:
+    st.session_state.source_lang = source_lang_name
+if target_lang_name != st.session_state.target_lang:
+    st.session_state.target_lang = target_lang_name
 
-# النمط
+source_lang = languages_dict[st.session_state.source_lang]
+target_lang = languages_dict[st.session_state.target_lang]
+
+# ====== النمط ======
 st.markdown('<div class="section-heading">Domain Style</div>', unsafe_allow_html=True)
 selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_visibility="collapsed")
 selected_domain = STYLE_OPTIONS[selected_style_label]
