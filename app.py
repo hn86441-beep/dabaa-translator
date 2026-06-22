@@ -36,7 +36,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = ""
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم مضغوط مع ميكروفون مدمج قابل للضغط
+#  CSS — تصميم مضغوط مع ميكروفون صغير
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -136,20 +136,18 @@ st.markdown("""
     background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
 }
 
-/* ====== تخصيص عنصر st.audio_input ليكون بطاقة قابلة للضغط ====== */
+/* ====== ميكروفون صغير ====== */
 div[data-testid="stAudioInput"] {
     background: rgba(255,255,255,0.04) !important;
     border: 1px solid rgba(255,255,255,0.09) !important;
-    border-radius: 14px !important;
-    padding: 0.8rem 0.5rem 0.6rem !important;
-    margin-bottom: 0.6rem !important;
+    border-radius: 12px !important;
+    padding: 0 !important;
+    margin-bottom: 0.4rem !important;
     backdrop-filter: blur(12px) !important;
     -webkit-backdrop-filter: blur(12px) !important;
     box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06) !important;
     position: relative !important;
     overflow: hidden !important;
-    text-align: center !important;
-    cursor: pointer !important;
     transition: all 0.3s ease !important;
 }
 
@@ -170,63 +168,54 @@ div[data-testid="stAudioInput"] label {
     display: none !important;
 }
 
-div[data-testid="stAudioInput"] > div {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: 70px !important;
-}
-
-div[data-testid="stAudioInput"] > div > div:first-child {
-    display: none !important;
-}
-
-/* تخصيص زر التسجيل الداخلي */
 div[data-testid="stAudioInput"] button {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 0.6rem 0.5rem !important;
     margin: 0 !important;
-    min-height: auto !important;
+    min-height: 50px !important;
     width: 100% !important;
-    font-size: 0 !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
 }
 
-/* المحتوى المخصص داخل العنصر */
-.mic-wrapper {
-    text-align: center;
-    padding: 0.2rem 0 0.3rem;
-    cursor: pointer;
-    width: 100%;
-    pointer-events: none;
+div[data-testid="stAudioInput"] button > div {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
 }
 
-.mic-wrapper .mic-icon {
+div[data-testid="stAudioInput"] button .mic-icon-custom {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 60px;
-    height: 60px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%);
     border: 1.5px solid rgba(78,203,160,0.25);
-    font-size: 28px;
-    margin-bottom: 0.2rem;
-    box-shadow: 0 0 30px rgba(78,203,160,0.12), inset 0 1px 0 rgba(78,203,160,0.15);
+    font-size: 20px;
+    margin-bottom: 0.1rem;
+    box-shadow: 0 0 20px rgba(78,203,160,0.1), inset 0 1px 0 rgba(78,203,160,0.15);
     transition: all 0.3s ease;
 }
 
-.mic-wrapper .mic-label {
-    font-size: 13px;
+div[data-testid="stAudioInput"] button .mic-label-custom {
+    font-size: 11px;
     font-weight: 600;
     color: #e8f0ff;
-    margin-bottom: 1px;
+    margin-bottom: 0px;
 }
 
-.mic-wrapper .mic-hint {
-    font-size: 10px;
+div[data-testid="stAudioInput"] button .mic-hint-custom {
+    font-size: 9px;
     color: rgba(180,200,230,0.45);
 }
 
@@ -378,7 +367,6 @@ textarea::placeholder {
     flex-wrap: wrap;
 }
 
-/* ====== شارات ====== */
 .tag {
     display: inline-flex;
     align-items: center;
@@ -453,29 +441,6 @@ hr {
 
 .stSpinner > div {
     border-color: #4ECBA0 !important;
-}
-
-.stTextInput input {
-    background: rgba(255,255,255,0.05) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 10px !important;
-    color: #e8f0ff !important;
-    font-family: 'Inter', sans-serif !important;
-    padding: 6px 10px !important;
-    font-size: 13px !important;
-}
-
-.stTextInput input:focus {
-    border-color: rgba(78,203,160,0.5) !important;
-    box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
-}
-
-.stTextInput label {
-    color: rgba(78,203,160,0.75) !important;
-    font-size: 9px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.1em !important;
-    text-transform: uppercase !important;
 }
 
 .stCheckbox label {
@@ -828,25 +793,25 @@ if selected_style_label != st.session_state.selected_style:
     st.session_state.selected_style = selected_style_label
 selected_domain = STYLE_OPTIONS[selected_style_label]
 
-# ====== الميكروفون (يعمل عند الضغط على النص) ======
+# ====== الميكروفون الصغير ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
-# استخدام st.audio_input مباشرة مع تنسيق CSS لجعله يبدو كبطاقة
+# استخدام st.audio_input مع تنسيق صغير
 audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
 
-# وضع المحتوى المخصص (نظراً لأننا أخفينا label، سنضيف النص يدوياً عبر markdown قبل العنصر)
+# وضع المحتوى المخصص فوق العنصر
 st.markdown("""
-<div style="text-align:center; margin-top: -1.8rem; margin-bottom: 0.5rem; pointer-events: none;">
-    <div class="mic-wrapper">
-        <div class="mic-icon">🎤</div>
-        <div class="mic-label">Record Your Message</div>
-        <div class="mic-hint">Click anywhere to start recording</div>
+<div style="text-align:center; margin-top: -1.8rem; margin-bottom: 0.2rem; pointer-events: none;">
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0.2rem 0;">
+        <div style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%); border:1.5px solid rgba(78,203,160,0.25); font-size:18px; margin-bottom:0.1rem;">
+            🎤
+        </div>
+        <div style="font-size:11px; font-weight:600; color:#e8f0ff;">Record</div>
+        <div style="font-size:8px; color:rgba(180,200,230,0.4);">Click to speak</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-# ملاحظة: st.audio_input يكون فوق هذا العنصر، والضغط على النص يفعله
 
 if audio_value:
     with st.spinner("⏳ Processing..."):
@@ -855,6 +820,7 @@ if audio_value:
         if recognized_text:
             st.success(f"✅ {recognized_text}")
             st.session_state.input_text = recognized_text
+            # الترجمة التلقائية مباشرة
             with st.spinner("⏳ Translating..."):
                 translated_text, err = fetch_ai_translation(recognized_text, target_lang)
                 if translated_text:
