@@ -36,11 +36,10 @@ st.markdown("""
     z-index: 1;
 }
 
-/* ====== العنوان (تم إزالة النص الفرعي) ====== */
+/* ====== العنوان ====== */
 .app-header {
     text-align: center;
-    padding: 0.3rem 0.5rem 0.2rem;  /* تقليل padding */
-    position: relative;
+    padding: 0.5rem 0.5rem 0.4rem;
 }
 .app-header .brand {
     font-family: 'Space Grotesk', sans-serif;
@@ -50,7 +49,6 @@ st.markdown("""
     color: #4ECBA0;
     text-transform: uppercase;
     display: block;
-    margin-bottom: 0.1rem;
 }
 .app-header h1 {
     font-family: 'Space Grotesk', sans-serif;
@@ -60,8 +58,14 @@ st.markdown("""
     margin: 0;
 }
 .app-header h1 .accent { color: #4ECBA0; }
+.app-header .subtitle {
+    font-size: 10px;
+    color: rgba(180,200,230,0.55);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
 
-/* ====== باقي العناصر كما هي ====== */
+/* ====== بطاقات زجاجية ====== */
 .glass-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.09);
@@ -71,6 +75,7 @@ st.markdown("""
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
+/* ====== زر الميكروفون ====== */
 div[data-testid="stAudioInput"] {
     display: flex !important;
     justify-content: center !important;
@@ -112,6 +117,7 @@ div[data-testid="stAudioInput"] button::before {
     font-size: 20px;
 }
 
+/* ====== باقي العناصر ====== */
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
@@ -148,11 +154,12 @@ div[data-testid="stAudioInput"] button::before {
     min-height: 28px !important;
 }
 
+/* ====== الإصلاح الجوهري: خلفية صلبة داكنة لمربع النص ====== */
 textarea {
-    background: #1a1a2e !important;
+    background: #1a1a2e !important;       /* خلفية داكنة صلبة */
     border: 1px solid rgba(255,255,255,0.15) !important;
     border-radius: 12px !important;
-    color: #f0f4ff !important;
+    color: #f0f4ff !important;            /* نص أبيض فاتح */
     font-size: 14px !important;
     font-family: 'Inter', sans-serif !important;
     padding: 8px 12px !important;
@@ -169,6 +176,7 @@ textarea::placeholder {
     color: rgba(150,175,220,0.4) !important;
 }
 
+/* ====== صندوق النتيجة ====== */
 .result-box {
     background: rgba(78,203,160,0.06);
     border-radius: 12px;
@@ -259,7 +267,6 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 @media (max-width: 600px) {
     .block-container { padding: 0.4rem !important; }
     .app-header h1 { font-size: 20px !important; }
-    .app-header { padding: 0.2rem 0.3rem 0.1rem !important; }
     div[data-testid="stAudioInput"] > div { min-width: 140px !important; }
     div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
     .stButton > button { font-size: 11px !important; min-height: 34px !important; }
@@ -269,12 +276,13 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  العنوان (تم إزالة النص الفرعي)
+#  العنوان
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
     <span class="brand">✦ Smart Voice Translator ✦</span>
     <h1>HN <span class="accent">TRANSLATOR</span></h1>
+    <p class="subtitle">Voice &amp; Text Translation · 8 Languages</p>
 </div>
 """, unsafe_allow_html=True)
 
