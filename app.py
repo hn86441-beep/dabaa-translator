@@ -112,33 +112,39 @@ div[data-testid="stAudioInput"] button::before {
     font-size: 20px;
 }
 
-/* ====== زر الإزالة (علامة X) ====== */
-.clear-audio-btn {
-    display: inline-block;
-    margin-left: 10px;
-    vertical-align: middle;
+/* ====== زر الإزالة (✖) بجانب الميكروفون ====== */
+div[data-testid="column"]:has(button[key="clear_audio_btn"]) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding-left: 0 !important;
 }
-.clear-audio-btn button {
-    background: rgba(239,68,68,0.15) !important;
-    border: 1.5px solid rgba(239,68,68,0.4) !important;
+
+button[key="clear_audio_btn"] {
+    background: rgba(239,68,68,0.12) !important;
+    border: 1.5px solid rgba(239,68,68,0.3) !important;
     color: #ff6b78 !important;
-    font-size: 16px !important;
+    font-size: 18px !important;
     font-weight: 700 !important;
-    padding: 0 10px !important;
+    padding: 0 !important;
     border-radius: 50% !important;
-    width: 32px !important;
-    height: 32px !important;
+    width: 36px !important;
+    height: 36px !important;
     min-height: unset !important;
     line-height: 1 !important;
-    transition: all 0.3s !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 0 10px rgba(239,68,68,0.05) !important;
+    margin-top: 0.3rem !important;
 }
-.clear-audio-btn button:hover {
-    background: rgba(239,68,68,0.3) !important;
+
+button[key="clear_audio_btn"]:hover {
+    background: rgba(239,68,68,0.25) !important;
     border-color: #ff6b78 !important;
-    box-shadow: 0 0 20px rgba(239,68,68,0.2) !important;
+    box-shadow: 0 0 25px rgba(239,68,68,0.2) !important;
+    transform: scale(1.05) !important;
 }
 
 /* ====== باقي العناصر ====== */
@@ -296,7 +302,7 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
     div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
     .stButton > button { font-size: 11px !important; min-height: 34px !important; }
     textarea { font-size: 13px !important; min-height: 50px !important; }
-    .clear-audio-btn button { width: 28px !important; height: 28px !important; font-size: 14px !important; }
+    button[key="clear_audio_btn"] { width: 32px !important; height: 32px !important; font-size: 16px !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -528,8 +534,6 @@ if "selected_style" not in st.session_state:
     st.session_state.selected_style = "Auto-Detect"
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
-if "audio_uploaded" not in st.session_state:
-    st.session_state.audio_uploaded = False
 
 def swap_languages():
     old_source = st.session_state.source_lang
@@ -549,13 +553,6 @@ def swap_languages():
                 st.session_state.target_lang = lang
                 break
     
-    st.rerun()
-
-def clear_audio():
-    """مسح التسجيل الصوتي وإعادة تعيين النصوص."""
-    st.session_state.input_text = ""
-    st.session_state.translated_text = ""
-    st.session_state.audio_uploaded = False
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
@@ -607,32 +604,23 @@ st.session_state.selected_style = selected_style_label
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
-# عنصر رفع الصوت
-audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
+# صف يحتوي على الميكروفون وزر الإزالة (بجانب بعض)
+col_mic, col_clear = st.columns([5, 1])
 
-# تحديث حالة الرفع
-if audio_value:
-    st.session_state.audio_uploaded = True
-else:
-    # إذا لم يكن هناك ملف مرفق، نضع الحالة إلى False
-    st.session_state.audio_uploaded = False
+with col_mic:
+    # عنصر رفع الصوت
+    audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
 
-# عرض زر الإزالة فقط إذا كان هناك تسجيل
-if st.session_state.audio_uploaded:
-    # نضع الزر في نفس السطر مع الميكروفون باستخدام عمود أو عنصر inline
-    # سنستخدم عمودين: الأول للميكروفون، الثاني للزر (إذا أردنا)
-    # لكن الأسهل: نضع الزر أسفل الميكروفون مباشرة، مع مسافة صغيرة
-    col_mic, col_clear = st.columns([6, 1])
-    with col_mic:
-        # إعادة عرض الميكروفون؟ لا، الميكروفون موجود بالفعل أعلاه.
-        # بدلاً من ذلك، نضع زر الإزالة في عمود منفصل، ولكننا سنضعه أسفل الميكروفون.
-        pass
-    with col_clear:
-        # زر الإزالة
+with col_clear:
+    # زر الإزالة يظهر فقط إذا كان هناك ملف صوتي مرفوع
+    if audio_value:
         if st.button("✖", key="clear_audio_btn", help="حذف التسجيل"):
-            clear_audio()
+            # مسح النصوص وإعادة تعيين الحالة
+            st.session_state.input_text = ""
+            st.session_state.translated_text = ""
+            st.rerun()
 
-# معالجة الصوت إذا كان موجوداً (هذا يحدث مرة واحدة بعد الرفع)
+# معالجة الصوت إذا كان موجوداً
 if audio_value:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
