@@ -607,6 +607,17 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
+# ====== عرض الترجمة المخزنة (في حالة إعادة التشغيل) ======
+if st.session_state.translated_text:
+    st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="result-box">
+        <span class="label">✦ Translation</span>
+        <div class="text">{st.session_state.translated_text}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.code(st.session_state.translated_text, language=None)
+
 # ====== الميكروفون مع زر إزالة أنيق ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
@@ -637,7 +648,9 @@ if audio_value is not None:
             with st.spinner("⏳ جاري الترجمة..."):
                 translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
                 if translated_text:
+                    # تخزين الترجمة في session_state
                     st.session_state.translated_text = translated_text
+                    # عرض الترجمة فوراً
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                     st.markdown(f"""
                     <div class="result-box">
@@ -647,9 +660,11 @@ if audio_value is not None:
                     """, unsafe_allow_html=True)
                     st.code(translated_text, language=None)
                     
-                    # ✅ حذف التسجيل الصوتي تلقائياً بعد الترجمة
+                    # ✅ حذف التسجيل الصوتي نهائياً وإعادة التشغيل
                     if "mic_audio_main" in st.session_state:
                         del st.session_state.mic_audio_main
+                    # نستمر في التنفيذ لإعادة التشغيل بعد عرض الترجمة
+                    # سنقوم بإعادة التشغيل بعد فترة قصيرة للسماح بعرض الترجمة
                     st.rerun()
                 else:
                     st.error(f"❌ {engine}")
@@ -685,6 +700,7 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
         with st.spinner("جاري الترجمة..."):
             translation_result, source_engine = fetch_ai_translation(input_text, target_lang)
             if translation_result:
+                st.session_state.translated_text = translation_result
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                 st.markdown(f"""
                 <div class="result-box">
