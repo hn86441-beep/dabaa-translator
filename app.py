@@ -646,6 +646,11 @@ if audio_value is not None:
                     </div>
                     """, unsafe_allow_html=True)
                     st.code(translated_text, language=None)
+                    
+                    # ✅ حذف التسجيل الصوتي تلقائياً بعد الترجمة
+                    if "mic_audio_main" in st.session_state:
+                        del st.session_state.mic_audio_main
+                    st.rerun()
                 else:
                     st.error(f"❌ {engine}")
         else:
