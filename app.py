@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — Premium Dark-Glass Design مع ميكروفون مضغوط
+#  CSS — Premium Dark-Glass مع دعم أفضل للهواتف وإصلاح الميكروفون
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -51,7 +51,7 @@ st.markdown("""
     z-index: 1;
 }
 
-/* ====== العنوان الرئيسي (مصغر) ====== */
+/* ====== العنوان الرئيسي ====== */
 .app-header {
     text-align: center;
     padding: 0.5rem 0.5rem 0.4rem;
@@ -115,16 +115,17 @@ st.markdown("""
     background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
 }
 
-/* ====== حاوية الميكروفون المضغوطة ====== */
+/* ====== حاوية الميكروفون (مضغوطة وقابلة للنقر) ====== */
 .mic-container {
     position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
     margin: 0 auto;
-    width: 72px;
-    height: 72px;
+    width: 76px;
+    height: 76px;
     cursor: pointer;
+    touch-action: manipulation;  /* تحسين اللمس */
 }
 
 .mic-container .glass-card {
@@ -173,19 +174,21 @@ st.markdown("""
     line-height: 1.2;
 }
 
-/* ====== إخفاء عنصر st.audio_input وجعله يغطي المستطيل ====== */
+/* ====== عنصر st.audio_input (يغطي المستطيل بالكامل ويكون قابل للنقر) ====== */
 div[data-testid="stAudioInput"] {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    opacity: 0 !important;
+    opacity: 0.01 !important;        /* شفاف لكن ليس مخفي تماماً */
     z-index: 10 !important;
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
     background: transparent !important;
+    pointer-events: auto !important;  /* النقر يعمل */
+    touch-action: manipulation !important;
 }
 
 div[data-testid="stAudioInput"] label {
@@ -195,7 +198,7 @@ div[data-testid="stAudioInput"] label {
 div[data-testid="stAudioInput"] button {
     width: 100% !important;
     height: 100% !important;
-    opacity: 0 !important;
+    opacity: 0.01 !important;
     cursor: pointer !important;
     border: none !important;
     background: transparent !important;
@@ -203,6 +206,8 @@ div[data-testid="stAudioInput"] button {
     margin: 0 !important;
     min-height: unset !important;
     min-width: unset !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
 }
 
 /* ====== Selectbox ====== */
@@ -465,7 +470,7 @@ hr {
     flex-shrink: 0;
 }
 
-/* ====== تحسينات للهواتف ====== */
+/* ====== تحسينات خاصة للهواتف ====== */
 @media (max-width: 600px) {
     .block-container {
         padding-left: 0.4rem !important;
@@ -474,29 +479,30 @@ hr {
     .app-header h1 {
         font-size: 20px !important;
     }
+    /* تكبير حجم الميكروفون لسهولة اللمس */
     .mic-container {
-        width: 64px !important;
-        height: 64px !important;
+        width: 86px !important;
+        height: 86px !important;
     }
     .mic-container .mic-icon-wrap {
-        width: 28px !important;
-        height: 28px !important;
-        font-size: 16px !important;
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 20px !important;
     }
     .mic-container .mic-label {
-        font-size: 9px !important;
+        font-size: 10px !important;
     }
     .mic-container .mic-hint {
-        font-size: 7px !important;
+        font-size: 8px !important;
     }
     .stSelectbox > div > div {
         font-size: 12px !important;
-        min-height: 26px !important;
+        min-height: 28px !important;
     }
     .stButton > button {
         font-size: 11px !important;
         padding: 0.3rem 0.6rem !important;
-        min-height: 30px !important;
+        min-height: 34px !important;  /* أسهل للنقر */
     }
     textarea {
         font-size: 13px !important;
@@ -792,7 +798,7 @@ def swap_languages():
     st.session_state.target_lang = old_source
 
 # ════════════════════════════════════════════════════════════
-#  UI - ميكروفون مضغوط جداً
+#  UI - ميكروفون مضغوط (يعمل على الهواتف)
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -836,22 +842,22 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== الميكروفون المضغوط (المستطيل نفسه هو زر التسجيل) ======
+# ====== الميكروفون ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
-# المستطيل الصغير مع زر تسجيل مخفي فوقه
+# المستطيل الذي يحتوي على أيقونة الميكروفون
 st.markdown("""
 <div class="mic-container">
-    <div class="glass-card">
+    <div class="glass-card" style="cursor:pointer;">
         <div class="mic-icon-wrap">🎤</div>
         <div class="mic-label">Record</div>
-        <div class="mic-hint">Tap</div>
+        <div class="mic-hint">Tap to speak</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# هذا العنصر مخفي ولكنه يغطي المستطيل بالكامل بفضل CSS
+# عنصر التسجيل المخفي (يغطي المستطيل بالكامل ويعمل على اللمس)
 audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
 
 if audio_value:
@@ -906,7 +912,7 @@ if input_text.strip():
             badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
         st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
 
-# ====== زر الترجمة ======
+# ====== زر الترجمة الرئيسي ======
 if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
     if not st.session_state.deepl_api_key:
         st.error("❌ API key missing.")
