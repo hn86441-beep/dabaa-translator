@@ -8,40 +8,19 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
 st.set_page_config(
-    page_title="HN TRANSLATOR",
-    page_icon="🌐",
+    page_title="HASSAN NASSER | Voice Translator",
+    page_icon="🎤",
     layout="centered"
 )
 
 # ════════════════════════════════════════════════════════════
-#  تهيئة Session State
-# ════════════════════════════════════════════════════════════
-if "source_lang" not in st.session_state:
-    st.session_state.source_lang = "Auto-Detect"
-if "target_lang" not in st.session_state:
-    st.session_state.target_lang = "Arabic"
-if "input_text" not in st.session_state:
-    st.session_state.input_text = ""
-if "translated_text" not in st.session_state:
-    st.session_state.translated_text = ""
-if "selected_style" not in st.session_state:
-    st.session_state.selected_style = "Auto-Detect"
-if "auto_translate" not in st.session_state:
-    st.session_state.auto_translate = True
-if "last_input" not in st.session_state:
-    st.session_state.last_input = ""
-if "deepl_api_key" not in st.session_state:
-    st.session_state.deepl_api_key = ""
-if "cohere_api_key" not in st.session_state:
-    st.session_state.cohere_api_key = ""
-
-# ════════════════════════════════════════════════════════════
-#  CSS — تصميم محسّن مع زر ميكروفون احترافي
+#  CSS — Premium Dark-Glass Design
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
+/* ====== Reset & Base ====== */
 #MainMenu, footer, header { visibility: hidden; }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -52,6 +31,7 @@ st.markdown("""
     min-height: 100vh;
 }
 
+/* شبكة خلفية ناعمة */
 .stApp::before {
     content: '';
     position: fixed;
@@ -65,37 +45,37 @@ st.markdown("""
 }
 
 .block-container {
-    padding-top: 0.8rem !important;
-    padding-bottom: 0.8rem !important;
+    padding-top: 2rem !important;
+    padding-bottom: 3rem !important;
     max-width: 680px !important;
     position: relative;
     z-index: 1;
 }
 
-/* ====== العنوان ====== */
+/* ====== العنوان الرئيسي ====== */
 .app-header {
     text-align: center;
-    padding: 0.8rem 0.5rem 0.5rem;
+    padding: 2.5rem 1rem 2rem;
     position: relative;
 }
 
 .app-header .brand {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.35em;
     color: #4ECBA0;
     text-transform: uppercase;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.75rem;
     display: block;
 }
 
 .app-header h1 {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 28px;
+    font-size: 42px;
     font-weight: 700;
     color: #f0f4ff;
-    margin: 0 0 0.1rem 0;
+    margin: 0 0 0.5rem 0;
     line-height: 1.1;
     letter-spacing: -0.02em;
 }
@@ -106,7 +86,7 @@ st.markdown("""
 }
 
 .app-header .subtitle {
-    font-size: 10px;
+    font-size: 13px;
     color: rgba(180,200,230,0.55);
     margin: 0;
     letter-spacing: 0.08em;
@@ -118,9 +98,9 @@ st.markdown("""
 .glass-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 14px;
-    padding: 0.7rem 0.8rem;
-    margin-bottom: 0.6rem;
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
@@ -136,120 +116,74 @@ st.markdown("""
     background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
 }
 
-/* ====== زر الميكروفون الاحترافي ====== */
-div[data-testid="stAudioInput"] {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 auto !important;
-    backdrop-filter: none !important;
-    box-shadow: none !important;
-    width: auto !important;
-    display: flex !important;
-    justify-content: center !important;
-}
-
-div[data-testid="stAudioInput"] label {
-    display: none !important;
-}
-
-div[data-testid="stAudioInput"] button {
-    background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)) !important;
-    border: 1px solid rgba(78,203,160,0.3) !important;
-    border-radius: 50% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    min-height: 56px !important;
-    min-width: 56px !important;
-    width: 56px !important;
-    height: 56px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    cursor: pointer !important;
-    box-shadow: 0 4px 24px rgba(78,203,160,0.15), inset 0 1px 0 rgba(255,255,255,0.1) !important;
-    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    position: relative !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-}
-
-div[data-testid="stAudioInput"] button::before {
-    content: '';
-    position: absolute;
-    inset: -2px;
-    border-radius: 50%;
-    padding: 2px;
-    background: linear-gradient(135deg, rgba(78,203,160,0.3), rgba(78,203,160,0.05));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-}
-
-div[data-testid="stAudioInput"] button:hover {
-    transform: scale(1.08);
-    border-color: rgba(78,203,160,0.6) !important;
-    box-shadow: 0 8px 40px rgba(78,203,160,0.25), inset 0 1px 0 rgba(255,255,255,0.15) !important;
-}
-
-div[data-testid="stAudioInput"] button:active {
-    transform: scale(0.92);
-    box-shadow: 0 2px 12px rgba(78,203,160,0.1) !important;
-}
-
-/* أيقونة الميكروفون الداخلية */
-div[data-testid="stAudioInput"] button .mic-icon {
-    font-size: 26px !important;
-    line-height: 1 !important;
-    color: #e8f0ff !important;
-    text-shadow: 0 0 20px rgba(78,203,160,0.3) !important;
-    transition: all 0.3s ease !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-
-div[data-testid="stAudioInput"] button:hover .mic-icon {
-    text-shadow: 0 0 40px rgba(78,203,160,0.5) !important;
-}
-
-/* حلقة نبض عند التسجيل (في حال كان التسجيل نشطاً) */
-div[data-testid="stAudioInput"] button.recording::after {
-    content: '';
-    position: absolute;
-    inset: -4px;
-    border-radius: 50%;
-    border: 2px solid rgba(78,203,160,0.4);
-    animation: pulse-ring 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse-ring {
-    0%, 100% { transform: scale(1); opacity: 0.4; }
-    50% { transform: scale(1.2); opacity: 0; }
-}
-
-/* تلميح صغير أسفل الزر */
-.mic-hint {
-    text-align: center;
+.card-label {
     font-size: 10px;
-    color: rgba(180,200,230,0.35);
-    margin-top: 0.3rem;
-    letter-spacing: 0.06em;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(78,203,160,0.7);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.card-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.07);
+}
+
+/* ====== منطقة الميكروفون ====== */
+.mic-zone {
+    text-align: center;
+    padding: 1.5rem 0 1rem;
+}
+
+.mic-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%);
+    border: 1.5px solid rgba(78,203,160,0.25);
+    font-size: 36px;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 0 30px rgba(78,203,160,0.12), inset 0 1px 0 rgba(78,203,160,0.15);
+}
+
+.mic-hint {
+    font-size: 13px;
+    color: rgba(180,200,230,0.6);
+    margin: 0;
+    font-weight: 400;
+}
+
+.engine-badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    background: rgba(78,203,160,0.12);
+    color: #4ECBA0;
+    border: 1px solid rgba(78,203,160,0.2);
 }
 
 /* ====== Selectbox ====== */
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 10px !important;
+    border-radius: 14px !important;
     color: #e8f0ff !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 13px !important;
+    font-size: 14px !important;
     transition: border-color 0.2s;
-    padding: 0px 8px !important;
-    min-height: 32px !important;
 }
 
 .stSelectbox > div > div:hover {
@@ -262,20 +196,20 @@ div[data-testid="stAudioInput"] button.recording::after {
 }
 
 .stSelectbox label {
-    font-size: 9px !important;
+    font-size: 11px !important;
     font-weight: 600 !important;
     color: rgba(78,203,160,0.75) !important;
     letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
-    margin-bottom: 1px !important;
+    margin-bottom: 4px !important;
 }
 
 /* ====== الأزرار ====== */
 .stButton > button {
-    border-radius: 10px !important;
+    border-radius: 14px !important;
     font-weight: 600 !important;
-    font-size: 12px !important;
-    padding: 0.35rem 0.8rem !important;
+    font-size: 14px !important;
+    padding: 0.7rem 1.5rem !important;
     background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
     color: #0a1520 !important;
     border: none !important;
@@ -284,7 +218,8 @@ div[data-testid="stAudioInput"] button.recording::after {
     letter-spacing: 0.03em !important;
     transition: all 0.25s ease !important;
     box-shadow: 0 4px 20px rgba(78,203,160,0.3) !important;
-    min-height: 32px !important;
+    position: relative !important;
+    overflow: hidden !important;
 }
 
 .stButton > button:hover {
@@ -293,14 +228,19 @@ div[data-testid="stAudioInput"] button.recording::after {
     transform: translateY(-1px) !important;
 }
 
-.stButton:has(button[title="Swap"]) > button {
+.stButton > button:active {
+    transform: translateY(0) !important;
+}
+
+/* زر المبادلة ⇄ */
+.stButton:has(button[title="Swap"]) > button,
+.stButton > button[kind="secondary"] {
     background: rgba(255,255,255,0.07) !important;
     color: rgba(200,220,255,0.8) !important;
     box-shadow: none !important;
     border: 1px solid rgba(255,255,255,0.1) !important;
-    font-size: 14px !important;
-    padding: 0.1rem !important;
-    min-height: 32px !important;
+    font-size: 18px !important;
+    padding: 0.5rem !important;
 }
 
 .stButton:has(button[title="Swap"]) > button:hover {
@@ -315,14 +255,13 @@ div[data-testid="stAudioInput"] button.recording::after {
 textarea {
     background: rgba(255,255,255,0.04) !important;
     border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 12px !important;
+    border-radius: 16px !important;
     color: #e8f0ff !important;
-    font-size: 14px !important;
+    font-size: 15px !important;
     font-family: 'Inter', sans-serif !important;
-    padding: 8px 12px !important;
+    padding: 14px 16px !important;
     transition: border-color 0.2s, box-shadow 0.2s !important;
-    line-height: 1.5 !important;
-    min-height: 60px !important;
+    line-height: 1.6 !important;
 }
 
 textarea:focus {
@@ -338,10 +277,10 @@ textarea::placeholder {
 /* ====== صندوق النتيجة ====== */
 .result-box {
     background: rgba(78,203,160,0.06);
-    border-radius: 12px;
-    padding: 0.6rem 0.8rem;
+    border-radius: 16px;
+    padding: 1.2rem 1.4rem;
     border: 1px solid rgba(78,203,160,0.2);
-    margin-top: 0.4rem;
+    margin-top: 0.75rem;
     position: relative;
     overflow: hidden;
 }
@@ -356,46 +295,46 @@ textarea::placeholder {
 }
 
 .result-box .label {
-    font-size: 8px;
+    font-size: 9px;
     font-weight: 700;
     text-transform: uppercase;
     color: rgba(78,203,160,0.7);
     letter-spacing: 0.15em;
-    margin-bottom: 2px;
+    margin-bottom: 6px;
     display: block;
 }
 
 .result-box .text {
-    font-size: 14px;
+    font-size: 16px;
     color: #e8f0ff;
-    line-height: 1.5;
+    line-height: 1.65;
     font-weight: 400;
 }
 
 /* ====== سياق المجال ====== */
 .context {
     background: rgba(78,203,160,0.07);
-    border-radius: 8px;
-    padding: 4px 10px;
-    font-size: 10px;
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 12px;
     color: rgba(78,203,160,0.9);
     border: 1px solid rgba(78,203,160,0.15);
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.75rem;
     display: flex;
     align-items: center;
-    gap: 5px;
-    flex-wrap: wrap;
+    gap: 8px;
 }
 
+/* ====== شارات المجالات ====== */
 .tag {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 1px 6px;
-    border-radius: 12px;
-    font-size: 8px;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
     font-weight: 600;
-    margin-right: 3px;
+    margin-right: 5px;
     letter-spacing: 0.03em;
 }
 .tag-pol  { background: rgba(230,57,70,0.2);   color: #ff6b78; border: 1px solid rgba(230,57,70,0.3); }
@@ -415,14 +354,12 @@ textarea::placeholder {
 .tag-tour { background: rgba(0,131,143,0.2);   color: #30c8d8; border: 1px solid rgba(0,131,143,0.3); }
 .tag-gen  { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
 
-/* ====== رسائل ====== */
+/* ====== رسائل النجاح والخطأ ====== */
 .stSuccess {
     background: rgba(78,203,160,0.08) !important;
     border: 1px solid rgba(78,203,160,0.25) !important;
-    border-radius: 10px !important;
+    border-radius: 14px !important;
     color: #a8f0d8 !important;
-    padding: 4px 10px !important;
-    font-size: 12px !important;
 }
 
 .stSuccess > div { color: #a8f0d8 !important; }
@@ -430,73 +367,105 @@ textarea::placeholder {
 .stError, [data-baseweb="notification"][kind="negative"] {
     background: rgba(239,68,68,0.08) !important;
     border: 1px solid rgba(239,68,68,0.25) !important;
-    border-radius: 10px !important;
-    padding: 4px 10px !important;
-    font-size: 12px !important;
+    border-radius: 14px !important;
 }
 
 .stWarning {
     background: rgba(245,158,11,0.08) !important;
     border: 1px solid rgba(245,158,11,0.2) !important;
-    border-radius: 10px !important;
-    padding: 4px 10px !important;
-    font-size: 12px !important;
+    border-radius: 14px !important;
 }
 
+/* ====== كود ====== */
 .stCode, code, pre {
     background: rgba(0,0,0,0.35) !important;
     border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 8px !important;
+    border-radius: 12px !important;
     color: #a8f0d8 !important;
-    font-size: 11px !important;
-    padding: 4px 8px !important;
+    font-size: 13px !important;
 }
 
+/* ====== فاصل ====== */
 hr {
-    margin: 0.4rem 0 !important;
+    margin: 1.5rem 0 !important;
     border: none !important;
     height: 1px !important;
     background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent) !important;
 }
 
+/* ====== Spinner ====== */
 .stSpinner > div {
     border-color: #4ECBA0 !important;
 }
 
-.stCheckbox label {
-    color: rgba(180,200,230,0.8) !important;
-    font-size: 12px !important;
+/* ====== Input text (password fields) ====== */
+.stTextInput input {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 12px !important;
+    color: #e8f0ff !important;
+    font-family: 'Inter', sans-serif !important;
 }
 
+.stTextInput input:focus {
+    border-color: rgba(78,203,160,0.5) !important;
+    box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
+}
+
+.stTextInput label {
+    color: rgba(78,203,160,0.75) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+}
+
+/* ====== Caption ====== */
 .stCaption {
     color: rgba(150,175,220,0.45) !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
 }
 
+/* ====== Audio Input ====== */
+.stAudioInput {
+    border-radius: 40px !important;
+}
+
+/* ====== Columns gap ====== */
 [data-testid="column"] {
-    padding: 0 4px !important;
+    padding: 0 6px !important;
 }
 
+/* ====== Section headings ====== */
 .section-heading {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     color: rgba(150,185,230,0.5);
-    margin: 0.5rem 0 0.2rem;
+    margin: 1.5rem 0 0.75rem;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
 }
 
 .section-heading::before {
     content: '';
-    width: 2px;
-    height: 10px;
+    width: 3px;
+    height: 14px;
     background: #4ECBA0;
     border-radius: 2px;
     flex-shrink: 0;
+}
+
+/* ====== Dots decoration ====== */
+.dots {
+    text-align: center;
+    color: rgba(78,203,160,0.25);
+    font-size: 18px;
+    letter-spacing: 6px;
+    margin: 0.5rem 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -506,21 +475,11 @@ hr {
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
-    <span class="brand">✦ Smart Voice Translator ✦</span>
-    <h1>HN <span class="accent">TRANSLATOR</span></h1>
-    <p class="subtitle">Voice &amp; Text Translation · 8 Languages</p>
+    <span class="brand">✦ Professional Translation Suite ✦</span>
+    <h1>HASSAN <span class="accent">NASSER</span></h1>
+    <p class="subtitle">Voice Translator &nbsp;·&nbsp; 8 Languages</p>
 </div>
 """, unsafe_allow_html=True)
-
-# ====== زر الترجمة التلقائية ======
-auto_translate = st.checkbox(
-    "⚡ Auto-Translate",
-    value=st.session_state.auto_translate,
-    key="auto_translate_check"
-)
-if auto_translate != st.session_state.auto_translate:
-    st.session_state.auto_translate = auto_translate
-    st.rerun()
 
 # ════════════════════════════════════════════════════════════
 #  CONFIGURATION
@@ -622,9 +581,10 @@ try:
 except:
     cohere_from_secrets = ""
 
-if st.session_state.deepl_api_key == "":
+if "deepl_api_key" not in st.session_state:
     st.session_state.deepl_api_key = deepl_from_secrets
-if st.session_state.cohere_api_key == "":
+
+if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
 # ════════════════════════════════════════════════════════════
@@ -632,12 +592,12 @@ if st.session_state.cohere_api_key == "":
 # ════════════════════════════════════════════════════════════
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
-    <div class="glass-card" style="text-align:center; padding: 1rem 0.8rem;">
-        <div style="font-size:24px; margin-bottom:0.3rem;">🔐</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:700;
-                    color:#e8f0ff; margin-bottom:0.1rem;">Connect API Keys</div>
-        <div style="font-size:10px; color:rgba(150,185,230,0.5); letter-spacing:0.04em;">
-            Stored in your browser session only
+    <div class="glass-card" style="text-align:center; padding: 2.5rem 2rem;">
+        <div style="font-size:36px; margin-bottom:1rem;">🔐</div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:700;
+                    color:#e8f0ff; margin-bottom:0.4rem;">Connect Your API Keys</div>
+        <div style="font-size:12px; color:rgba(150,185,230,0.5); letter-spacing:0.04em;">
+            Securely stored in your browser session only
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -646,25 +606,25 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     
     with col1:
         if not st.session_state.deepl_api_key:
-            deepl_input = st.text_input("DeepL Key", type="password", placeholder="abc...xyz:fx")
+            deepl_input = st.text_input("DeepL API Key", type="password", placeholder="abc...xyz:fx")
             if deepl_input:
                 st.session_state.deepl_api_key = deepl_input
-                st.success("✅ Connected")
+                st.success("✅ DeepL connected")
                 st.rerun()
         else:
             st.success("✅ DeepL Active")
     
     with col2:
         if not st.session_state.cohere_api_key:
-            cohere_input = st.text_input("Cohere Key", type="password", placeholder="abcd-1234-efgh-5678")
+            cohere_input = st.text_input("Cohere API Key", type="password", placeholder="abcd-1234-efgh-5678")
             if cohere_input:
                 st.session_state.cohere_api_key = cohere_input
-                st.success("✅ Connected")
+                st.success("✅ Cohere connected")
                 st.rerun()
         else:
             st.success("✅ Cohere Active")
     
-    st.caption("💡 Keys are never stored on any server.")
+    st.caption("💡 Keys are never stored on any server — session only.")
     st.stop()
 
 # ════════════════════════════════════════════════════════════
@@ -672,9 +632,15 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
-        return None, "No API key"
+        return None, "No DeepL API key configured"
+        
     tl = target_lang.upper()
-    endpoint = "https://api-free.deepl.com/v2/translate" if st.session_state.deepl_api_key.endswith(":fx") else "https://api.deepl.com/v2/translate"
+    
+    if st.session_state.deepl_api_key.endswith(":fx"):
+        endpoint = "https://api-free.deepl.com/v2/translate"
+    else:
+        endpoint = "https://api.deepl.com/v2/translate"
+        
     try:
         resp = requests.post(
             endpoint,
@@ -685,29 +651,37 @@ def translate_deepl(text, target_lang):
         if resp.status_code == 200:
             return resp.json()["translations"][0]["text"], None
         else:
-            return None, f"DeepL error {resp.status_code}"
+            return None, f"DeepL error {resp.status_code}: {resp.text}"
     except Exception as e:
-        return None, f"Error: {str(e)}"
+        return None, f"Request error: {str(e)}"
 
 def fetch_ai_translation(text, target_lang):
     result, error = translate_deepl(text, target_lang)
     if result:
-        return result, "Translator"
+        return result, "DeepL"
     return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT
+#  SPEECH-TO-TEXT (Cohere)
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
-        return None, "API key missing"
+        return None, "مفتاح Cohere API غير موجود."
+
     try:
         fields = OrderedDict()
-        lang = "en" if language_code == "auto" or language_code is None else language_code
+        
+        if language_code == "auto" or language_code is None:
+            lang = "en"
+        else:
+            lang = language_code
+        
         fields['language'] = lang
         fields['model'] = 'cohere-transcribe-03-2026'
         fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
+
         encoder = MultipartEncoder(fields=fields)
+
         response = requests.post(
             "https://api.cohere.com/v2/audio/transcriptions",
             headers={
@@ -717,37 +691,60 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
             data=encoder,
             timeout=30
         )
+
         if response.status_code == 200:
             result = response.json()
             text = result.get("text", "").strip()
-            return (text, None) if text else (None, "No speech detected")
+            if text:
+                return text, "Cohere Transcribe"
+            else:
+                return None, "لم يتم التعرف على أي كلام"
         else:
-            return None, f"Cohere error {response.status_code}"
-    except Exception as e:
-        return None, f"Error: {str(e)}"
+            return None, f"Cohere error {response.status_code}: {response.text}"
 
+    except Exception as e:
+        return None, f"خطأ في Cohere: {str(e)}"
+
+# ════════════════════════════════════════════════════════════
+#  SPEECH-TO-TEXT (Faster-Whisper للروسية)
+# ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_whisper_model():
     try:
         from faster_whisper import WhisperModel
         return WhisperModel("small", device="cpu", compute_type="int8")
-    except:
+    except ImportError:
+        return None
+    except Exception:
         return None
 
 def speech_to_text_whisper(audio_bytes):
     model = load_whisper_model()
     if not model:
-        return None, "Model not available"
+        return None, "⚠️ نموذج التعرف غير متاح"
+    
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
-        segments, info = model.transcribe(tmp_path, language="ru", beam_size=5, temperature=0.0, vad_filter=True)
-        text = " ".join(seg.text for seg in segments).strip()
-        return (text, None) if text else (None, "No speech detected")
+        
+        segments, info = model.transcribe(
+            tmp_path,
+            language="ru",
+            beam_size=5,
+            temperature=0.0,
+            vad_filter=True
+        )
+        
+        text = " ".join(segment.text for segment in segments).strip()
+        
+        if text:
+            return text, "Faster-Whisper"
+        else:
+            return None, "لم يتم التعرف على أي كلام بالروسية"
     except Exception as e:
-        return None, f"Error: {str(e)}"
+        return None, f"خطأ: {str(e)}"
     finally:
         try:
             if tmp_path and os.path.exists(tmp_path):
@@ -762,7 +759,27 @@ def speech_to_text(audio_bytes, language_code="auto"):
         return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  UI
+#  SESSION STATE
+# ════════════════════════════════════════════════════════════
+if "source_lang" not in st.session_state:
+    st.session_state.source_lang = "Auto-Detect"
+if "target_lang" not in st.session_state:
+    st.session_state.target_lang = "Arabic"
+if "input_text" not in st.session_state:
+    st.session_state.input_text = ""
+if "selected_style" not in st.session_state:
+    st.session_state.selected_style = "Auto-Detect"
+if "translated_text" not in st.session_state:
+    st.session_state.translated_text = ""
+
+def swap_languages():
+    old_source = st.session_state.source_lang
+    old_target = st.session_state.target_lang
+    st.session_state.source_lang = old_target
+    st.session_state.target_lang = old_source
+
+# ════════════════════════════════════════════════════════════
+#  UI - بسيط وجذاب
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -787,103 +804,94 @@ with col_left:
     source_lang_name = st.selectbox("From", lang_list, index=src_idx)
 
 with col_mid:
-    st.markdown("<div style='height:22px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
     if st.button("⇄", help="Swap", use_container_width=True):
-        old_source = st.session_state.source_lang
-        old_target = st.session_state.target_lang
-        st.session_state.source_lang = old_target
-        st.session_state.target_lang = old_source
-        st.rerun()
+        swap_languages()
 
 with col_right:
     target_lang_name = st.selectbox("To", tgt_options, index=tgt_idx)
 
-if source_lang_name != st.session_state.source_lang:
-    st.session_state.source_lang = source_lang_name
-if target_lang_name != st.session_state.target_lang:
-    st.session_state.target_lang = target_lang_name
+st.session_state.source_lang = source_lang_name
+st.session_state.target_lang = target_lang_name
 
-source_lang = languages_dict[st.session_state.source_lang]
-target_lang = languages_dict[st.session_state.target_lang]
+source_lang = languages_dict[source_lang_name]
+target_lang = languages_dict[target_lang_name]
 
 # ====== النمط ======
 st.markdown('<div class="section-heading">Domain Style</div>', unsafe_allow_html=True)
 selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_visibility="collapsed")
-if selected_style_label != st.session_state.selected_style:
-    st.session_state.selected_style = selected_style_label
 selected_domain = STYLE_OPTIONS[selected_style_label]
+st.session_state.selected_style = selected_style_label
 
-# ====== زر الميكروفون الاحترافي ======
+# ====== الميكروفون ======
 st.markdown("---")
+
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
-# زر الميكروفون مع أيقونة محسّنة
-audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
+if source_lang == "ru":
+    engine_info = "Faster-Whisper · High-accuracy Russian"
+elif source_lang == "auto":
+    engine_info = "Cohere · Auto Language Detection"
+else:
+    engine_info = f"Cohere · {source_lang_name}"
 
-# تلميح صغير تحت الزر
-st.markdown('<div class="mic-hint">🎙️ Click to record</div>', unsafe_allow_html=True)
+st.markdown(f"""
+<div class="glass-card" style="text-align:center; padding: 2rem 1rem 1.5rem;">
+    <div class="mic-icon-wrap">🎤</div>
+    <div style="font-size:15px; font-weight:600; color:#e8f0ff; margin-bottom:4px;">
+        Record Your Message
+    </div>
+    <span class="engine-badge">{engine_info}</span>
+</div>
+""", unsafe_allow_html=True)
+
+audio_value = st.audio_input("")
 
 if audio_value:
-    with st.spinner("⏳ Processing..."):
+    with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
-        recognized_text, error = speech_to_text(audio_bytes, source_lang)
+        recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
+        
         if recognized_text:
             st.success(f"✅ {recognized_text}")
             st.session_state.input_text = recognized_text
-            with st.spinner("⏳ Translating..."):
-                translated_text, err = fetch_ai_translation(recognized_text, target_lang)
-                if translated_text:
-                    st.session_state.translated_text = translated_text
-                    st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                    st.markdown(f"""
-                    <div class="result-box">
-                        <span class="label">✦ Translation</span>
-                        <div class="text">{translated_text}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    st.code(translated_text, language=None)
-                else:
-                    st.error(f"❌ {err}")
+            
+            if st.button("Translate ✦", use_container_width=True):
+                with st.spinner("⏳ جاري الترجمة..."):
+                    translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
+                    if translated_text:
+                        st.session_state.translated_text = translated_text
+                        st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="result-box">
+                            <span class="label">✦ DeepL Translation</span>
+                            <div class="text">{translated_text}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.code(translated_text, language=None)
+                    else:
+                        st.error(f"❌ {engine}")
         else:
-            st.error(f"❌ {error}")
+            st.error(f"❌ {engine_used}")
 
-# ====== نص مكتوب مع ترجمة تلقائية ======
+# ====== نص مكتوب ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Text Input</div>', unsafe_allow_html=True)
 
-def handle_text_input():
-    current_text = st.session_state.input_text_area
-    if current_text != st.session_state.last_input:
-        st.session_state.last_input = current_text
-        st.session_state.input_text = current_text
-        if st.session_state.auto_translate and len(current_text.strip()) >= 3:
-            translated, err = fetch_ai_translation(current_text, target_lang)
-            if translated:
-                st.session_state.translated_text = translated
-            else:
-                st.session_state.translated_text = f"❌ {err}"
-
 input_text = st.text_area(
     "",
-    height=60,
+    height=100,
     placeholder="اكتب أو الصق النص هنا...",
     value=st.session_state.input_text,
-    key="input_text_area",
-    on_change=handle_text_input
+    key="input_text_area"
 )
 
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
-    if st.session_state.auto_translate and len(input_text.strip()) >= 3:
-        translated, err = fetch_ai_translation(input_text, target_lang)
-        if translated:
-            st.session_state.translated_text = translated
-        else:
-            st.session_state.translated_text = f"❌ {err}"
 
 # ====== سياق ======
-if st.session_state.input_text.strip():
-    detected = detect_domains(st.session_state.input_text)
+if input_text.strip():
+    detected = detect_domains(input_text)
     if detected:
         badges = ""
         for d in detected[:3]:
@@ -893,38 +901,41 @@ if st.session_state.input_text.strip():
             badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
         st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
 
-# ====== عرض نتيجة الترجمة ======
-if st.session_state.translated_text and st.session_state.input_text.strip():
-    if not st.session_state.translated_text.startswith("❌"):
-        st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="result-box">
-            <span class="label">✦ Translation</span>
-            <div class="text">{st.session_state.translated_text}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.code(st.session_state.translated_text, language=None)
+# ====== زر الترجمة ======
+if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
+    if not st.session_state.deepl_api_key:
+        st.error("❌ DeepL API key missing.")
+    elif not input_text.strip():
+        st.warning("الرجاء إدخال نص للترجمة.")
     else:
-        st.error(st.session_state.translated_text)
+        with st.spinner("جاري الترجمة..."):
+            translation_result, source_engine = fetch_ai_translation(input_text, target_lang)
 
-# ====== زر ترجمة يدوي ======
-if not st.session_state.auto_translate:
-    if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
-        if not st.session_state.input_text.strip():
-            st.warning("Please enter text to translate.")
-        else:
-            with st.spinner("Translating..."):
-                translated, err = fetch_ai_translation(st.session_state.input_text, target_lang)
-                if translated:
-                    st.session_state.translated_text = translated
-                    st.rerun()
-                else:
-                    st.error(f"❌ {err}")
+            if translation_result:
+                active_domain = "general"
+                if selected_domain and selected_domain != "general":
+                    active_domain = selected_domain
+                elif detected:
+                    active_domain = detected[0]
+
+                final_translation = translation_result
+
+                st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="result-box">
+                    <span class="label">✦ DeepL Translation</span>
+                    <div class="text">{final_translation}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.code(final_translation, language=None)
+            else:
+                st.error(f"❌ {translation_result}")
 
 # ====== Footer ======
 st.markdown("""
-<div style="text-align:center; padding: 0.8rem 0 0.2rem; color:rgba(100,130,170,0.3); font-size:9px;
+<div style="text-align:center; padding: 3rem 0 1rem; color:rgba(100,130,170,0.3); font-size:11px;
             letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
-    HN TRANSLATOR &nbsp;·&nbsp; Voice Translation Suite
+    Hassan Nasser &nbsp;·&nbsp; Voice Translation Suite &nbsp;·&nbsp; Powered by DeepL & Cohere
 </div>
 """, unsafe_allow_html=True)
+
