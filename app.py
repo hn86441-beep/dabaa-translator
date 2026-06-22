@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تم إصلاح خلفية textarea وتصميم زر الإزالة
+#  CSS — تصميم متطور مع زر إزالة أنيق
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -60,7 +60,7 @@ st.markdown("""
 }
 .app-header h1 .accent { color: #4ECBA0; }
 
-/* ====== بطاقات زجاجية ====== */
+/* ====== بطاقات ====== */
 .glass-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.09);
@@ -70,7 +70,7 @@ st.markdown("""
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
-/* ====== زر الميكروفون ====== */
+/* ====== الميكروفون ====== */
 div[data-testid="stAudioInput"] {
     display: flex !important;
     justify-content: center !important;
@@ -112,39 +112,40 @@ div[data-testid="stAudioInput"] button::before {
     font-size: 20px;
 }
 
-/* ====== زر الإزالة (✖) بجانب الميكروفون ====== */
-div[data-testid="column"]:has(button[key="clear_audio_btn"]) {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    padding-left: 0 !important;
+/* ====== زر الإزالة (✖) ====== */
+div.clear-btn-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 60px;
 }
 
-button[key="clear_audio_btn"] {
-    background: rgba(239,68,68,0.12) !important;
-    border: 1.5px solid rgba(239,68,68,0.3) !important;
-    color: #ff6b78 !important;
-    font-size: 18px !important;
+button[kind="secondary"][data-testid="baseButton-secondary"] {
+    background: rgba(239,68,68,0.1) !important;
+    border: 1.5px solid rgba(239,68,68,0.25) !important;
+    color: #f87171 !important;
+    font-size: 20px !important;
     font-weight: 700 !important;
     padding: 0 !important;
     border-radius: 50% !important;
-    width: 36px !important;
-    height: 36px !important;
+    width: 40px !important;
+    height: 40px !important;
     min-height: unset !important;
     line-height: 1 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     transition: all 0.3s ease !important;
-    box-shadow: 0 0 10px rgba(239,68,68,0.05) !important;
-    margin-top: 0.3rem !important;
+    box-shadow: 0 0 15px rgba(239,68,68,0.05) !important;
+    cursor: pointer !important;
 }
 
-button[key="clear_audio_btn"]:hover {
-    background: rgba(239,68,68,0.25) !important;
-    border-color: #ff6b78 !important;
-    box-shadow: 0 0 25px rgba(239,68,68,0.2) !important;
-    transform: scale(1.05) !important;
+button[kind="secondary"][data-testid="baseButton-secondary"]:hover {
+    background: rgba(239,68,68,0.2) !important;
+    border-color: #f87171 !important;
+    box-shadow: 0 0 30px rgba(239,68,68,0.15) !important;
+    transform: scale(1.08) !important;
 }
 
 /* ====== باقي العناصر ====== */
@@ -184,7 +185,6 @@ button[key="clear_audio_btn"]:hover {
     min-height: 28px !important;
 }
 
-/* ====== Textarea ====== */
 textarea {
     background: #1a1a2e !important;
     border: 1px solid rgba(255,255,255,0.15) !important;
@@ -206,7 +206,6 @@ textarea::placeholder {
     color: rgba(150,175,220,0.4) !important;
 }
 
-/* ====== صندوق النتيجة ====== */
 .result-box {
     background: rgba(78,203,160,0.06);
     border-radius: 12px;
@@ -302,7 +301,7 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
     div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
     .stButton > button { font-size: 11px !important; min-height: 34px !important; }
     textarea { font-size: 13px !important; min-height: 50px !important; }
-    button[key="clear_audio_btn"] { width: 32px !important; height: 32px !important; font-size: 16px !important; }
+    button[kind="secondary"][data-testid="baseButton-secondary"] { width: 34px !important; height: 34px !important; font-size: 17px !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -555,6 +554,14 @@ def swap_languages():
     
     st.rerun()
 
+def clear_audio():
+    """حذف التسجيل الصوتي وإعادة تعيين النصوص."""
+    if "mic_audio_main" in st.session_state:
+        del st.session_state.mic_audio_main
+    st.session_state.input_text = ""
+    st.session_state.translated_text = ""
+    st.rerun()
+
 # ════════════════════════════════════════════════════════════
 #  UI
 # ════════════════════════════════════════════════════════════
@@ -600,28 +607,27 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== الميكروفون مع زر الإزالة (✖) ======
+# ====== الميكروفون مع زر إزالة أنيق ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
-# صف يحتوي على الميكروفون وزر الإزالة (بجانب بعض)
+# عمودين: الميكروفون وزر الإزالة
 col_mic, col_clear = st.columns([5, 1])
 
 with col_mic:
-    # عنصر رفع الصوت
+    # الميكروفون مع key ثابت
     audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
 
 with col_clear:
-    # زر الإزالة يظهر فقط إذا كان هناك ملف صوتي مرفوع
-    if audio_value:
-        if st.button("✖", key="clear_audio_btn", help="حذف التسجيل"):
-            # مسح النصوص وإعادة تعيين الحالة
-            st.session_state.input_text = ""
-            st.session_state.translated_text = ""
-            st.rerun()
+    # التحقق من وجود ملف صوتي في session_state
+    if "mic_audio_main" in st.session_state and st.session_state.mic_audio_main is not None:
+        st.markdown('<div class="clear-btn-wrapper">', unsafe_allow_html=True)
+        if st.button("✖", key="clear_btn", help="حذف التسجيل", type="secondary"):
+            clear_audio()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# معالجة الصوت إذا كان موجوداً
-if audio_value:
+# معالجة الصوت المرفوع
+if audio_value is not None:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
         recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
