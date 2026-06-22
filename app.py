@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم الميكروفون بطريقة جديدة تعمل على الهواتف
+#  CSS — تصميم الميكروفون بشكل جميل ويعمل على الهواتف
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -75,14 +75,7 @@ st.markdown("""
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
-/* ====== زر الميكروفون (الطريقة الجديدة) ====== */
-.mic-wrapper {
-    display: flex;
-    justify-content: center;
-    margin: 0.5rem 0;
-}
-
-/* تخصيص عنصر st.audio_input ليكون كبيراً وجذاباً */
+/* ====== زر الميكروفون الجديد ====== */
 div[data-testid="stAudioInput"] {
     display: flex !important;
     justify-content: center !important;
@@ -105,7 +98,6 @@ div[data-testid="stAudioInput"] > div:hover {
     box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
 }
 
-/* زر التسجيل الداخلي */
 div[data-testid="stAudioInput"] button {
     background: transparent !important;
     border: none !important;
@@ -420,6 +412,7 @@ def translate_deepl(text, target_lang):
 def fetch_ai_translation(text, target_lang):
     return translate_deepl(text, target_lang)
 
+# ====== الدوال المعدلة لتعيد دائماً tuple ======
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
         return None, "API key missing"
@@ -438,7 +431,10 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         )
         if response.status_code == 200:
             text = response.json().get("text", "").strip()
-            return text if text else (None, "No speech detected")
+            if text:
+                return text, "Speech Recognition"   # ← دائماً tuple
+            else:
+                return None, "No speech detected"
         return None, f"Cohere error {response.status_code}"
     except Exception as e:
         return None, f"Error: {str(e)}"
@@ -462,7 +458,10 @@ def speech_to_text_whisper(audio_bytes):
             tmp_path = tmp_file.name
         segments, info = model.transcribe(tmp_path, language="ru", beam_size=5, vad_filter=True)
         text = " ".join(segment.text for segment in segments).strip()
-        return text if text else (None, "No speech detected"), "Speech Recognition"
+        if text:
+            return text, "Speech Recognition"
+        else:
+            return None, "No speech detected"
     except Exception as e:
         return None, f"Error: {str(e)}"
     finally:
@@ -537,11 +536,10 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== الميكروفون (يعمل على الهواتف الآن) ======
+# ====== الميكروفون ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
-# هذه هي الطريقة الجديدة: st.audio_input يظهر كزر كبير وجميل
 audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
 
 if audio_value:
@@ -587,7 +585,7 @@ if input_text.strip():
             badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
         st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
 
-# زر الترجمة
+# زر الترجمة الرئيسي
 if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
     if not st.session_state.deepl_api_key:
         st.error("❌ API key missing.")
