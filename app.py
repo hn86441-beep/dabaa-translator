@@ -927,3 +927,4 @@ st.markdown("""
             letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
     HN TRANSLATOR &nbsp;·&nbsp; Voice Translation Suite
 </div>
+""", unsafe_allow_html=True)
