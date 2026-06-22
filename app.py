@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم مضغوط جداً للهواتف
+#  CSS — تصميم أنيق (النسخة الأصلية) مع تعديلات طفيفة للهواتف
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -28,205 +28,368 @@ st.markdown("""
     min-height: 100vh;
 }
 
+.stApp::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(100,220,180,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100,220,180,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+}
+
 .block-container {
-    padding: 0.4rem 0.3rem !important;   /* هامش صغير جداً */
-    max-width: 100% !important;          /* استغلال كامل العرض */
+    padding-top: 0.6rem !important;
+    padding-bottom: 0.6rem !important;
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+    max-width: 720px !important;   /* أوسع قليلاً للهواتف */
     position: relative;
     z-index: 1;
 }
 
-/* ====== العنوان (مصغر جداً) ====== */
+/* ====== العنوان ====== */
 .app-header {
     text-align: center;
-    padding: 0.2rem 0 !important;
-    margin-bottom: 0.2rem !important;
+    padding: 0.4rem 0.5rem 0.3rem;
+    position: relative;
 }
 .app-header .brand {
-    font-size: 7px !important;
-    letter-spacing: 0.2em;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.35em;
+    color: #4ECBA0;
+    text-transform: uppercase;
+    display: block;
 }
 .app-header h1 {
-    font-size: 16px !important;
-    margin: 0 !important;
-    line-height: 1.2 !important;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px;   /* قلّصت قليلاً */
+    font-weight: 700;
+    color: #f0f4ff;
+    margin: 0 0 0.1rem 0;
+    line-height: 1.2;
 }
+.app-header h1 .accent { color: #4ECBA0; }
 .app-header .subtitle {
-    font-size: 8px !important;
-    margin: 0 !important;
+    font-size: 10px;
+    color: rgba(180,200,230,0.55);
+    margin: 0;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
 }
 
-/* ====== بطاقات (تقليل الحشو) ====== */
+/* ====== بطاقات ====== */
 .glass-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 10px;
-    padding: 0.3rem !important;
-    margin-bottom: 0.3rem !important;
+    border-radius: 14px;
+    padding: 0.5rem;    /* قلّصت قليلاً */
+    margin-bottom: 0.5rem;
     backdrop-filter: blur(12px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+}
+.glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
 }
 
-/* ====== زر الميكروفون (مصغر) ====== */
+/* ====== زر الميكروفون (بنفس التصميم السابق) ====== */
 div[data-testid="stAudioInput"] {
     display: flex !important;
     justify-content: center !important;
     width: 100% !important;
-    margin: 0.1rem 0 !important;
+    margin: 0.2rem 0 !important;
 }
 
 div[data-testid="stAudioInput"] > div {
     background: rgba(78,203,160,0.08) !important;
-    border: 1.5px solid rgba(78,203,160,0.3) !important;
-    border-radius: 40px !important;
-    padding: 0.1rem 0.2rem !important;
-    min-width: 120px !important;
+    border: 2px solid rgba(78,203,160,0.3) !important;
+    border-radius: 60px !important;
+    padding: 0.2rem 0.4rem !important;
+    width: auto !important;
+    min-width: 160px !important;
+    transition: all 0.3s !important;
     backdrop-filter: blur(8px);
 }
-
+div[data-testid="stAudioInput"] > div:hover {
+    border-color: #4ECBA0 !important;
+    box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
+}
 div[data-testid="stAudioInput"] button {
-    font-size: 12px !important;
-    padding: 0.2rem 0.8rem !important;
-    min-height: 28px !important;
+    background: transparent !important;
+    border: none !important;
+    color: #e8f0ff !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    padding: 0.4rem 1.5rem !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
 }
 div[data-testid="stAudioInput"] button::before {
     content: "🎤";
-    font-size: 16px;
+    font-size: 18px;
 }
 
-/* ====== Selectboxes (مصغرة) ====== */
+/* ====== Selectbox ====== */
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     color: #e8f0ff !important;
-    font-size: 11px !important;
-    padding: 0px 6px !important;
-    min-height: 26px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 12px !important;  /* قلّصت قليلاً */
+    transition: border-color 0.2s;
+    padding: 0px 8px !important;
+    min-height: 28px !important;  /* قلّصت قليلاً */
+}
+.stSelectbox > div > div:hover {
+    border-color: rgba(78,203,160,0.5) !important;
+}
+.stSelectbox > div > div:focus-within {
+    border-color: #4ECBA0 !important;
+    box-shadow: 0 0 0 3px rgba(78,203,160,0.12) !important;
 }
 .stSelectbox label {
-    font-size: 8px !important;
-    letter-spacing: 0.08em !important;
-    margin-bottom: 0 !important;
+    font-size: 8px !important;   /* قلّصت قليلاً */
+    font-weight: 600 !important;
+    color: rgba(78,203,160,0.75) !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+    margin-bottom: 1px !important;
 }
 
-/* ====== الأزرار (مصغرة) ====== */
+/* ====== الأزرار ====== */
 .stButton > button {
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     font-weight: 600 !important;
-    font-size: 11px !important;
-    padding: 0.2rem 0.4rem !important;
-    min-height: 28px !important;
+    font-size: 11px !important;  /* قلّصت قليلاً */
+    padding: 0.3rem 0.6rem !important;
+    background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
+    color: #0a1520 !important;
+    border: none !important;
+    width: 100% !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    letter-spacing: 0.03em !important;
+    transition: all 0.25s ease !important;
+    box-shadow: 0 4px 16px rgba(78,203,160,0.15) !important;
+    min-height: 30px !important;  /* قلّصت قليلاً */
+}
+.stButton > button:hover {
+    background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important;
+    box-shadow: 0 6px 24px rgba(78,203,160,0.3) !important;
+    transform: translateY(-1px) !important;
 }
 .stButton:has(button[title="Swap"]) > button {
-    font-size: 12px !important;
-    min-height: 24px !important;
-    padding: 0.05rem !important;
+    background: rgba(255,255,255,0.07) !important;
+    color: rgba(200,220,255,0.8) !important;
+    box-shadow: none !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    font-size: 13px !important;
+    padding: 0.1rem !important;
+    min-height: 26px !important;
+}
+.stButton:has(button[title="Swap"]) > button:hover {
+    background: rgba(78,203,160,0.12) !important;
+    border-color: rgba(78,203,160,0.3) !important;
+    box-shadow: none !important;
+    transform: none !important;
+    color: #4ECBA0 !important;
 }
 
-/* ====== Textarea (مضغوطة جداً) ====== */
+/* ====== Textarea ====== */
 textarea {
     background: #1a1a2e !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     color: #f0f4ff !important;
-    font-size: 13px !important;
-    padding: 6px 10px !important;
-    min-height: 48px !important;   /* أقل ارتفاع */
-    line-height: 1.4 !important;
+    font-size: 13px !important;   /* قلّصت قليلاً */
     font-family: 'Inter', sans-serif !important;
+    padding: 8px 12px !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+    line-height: 1.5 !important;
+    min-height: 60px !important;  /* قلّصت قليلاً */
 }
 textarea:focus {
     border-color: rgba(78,203,160,0.5) !important;
-    box-shadow: 0 0 0 2px rgba(78,203,160,0.1) !important;
+    box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
+    outline: none !important;
 }
 textarea::placeholder {
     color: rgba(150,175,220,0.3) !important;
-    font-size: 12px !important;
 }
 
-/* ====== صندوق النتيجة (مضغوط) ====== */
+/* ====== صندوق النتيجة ====== */
 .result-box {
     background: rgba(78,203,160,0.06);
-    border-radius: 10px;
-    padding: 0.3rem 0.5rem !important;
+    border-radius: 12px;
+    padding: 0.4rem 0.6rem;
     border: 1px solid rgba(78,203,160,0.2);
-    margin-top: 0.2rem !important;
+    margin-top: 0.3rem;
+    position: relative;
+}
+.result-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: linear-gradient(180deg, #4ECBA0, #2fa87a);
+    border-radius: 3px 0 0 3px;
 }
 .result-box .label {
-    font-size: 7px !important;
-    letter-spacing: 0.1em;
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: rgba(78,203,160,0.7);
+    letter-spacing: 0.15em;
+    display: block;
 }
 .result-box .text {
-    font-size: 13px !important;
-    line-height: 1.3 !important;
+    font-size: 14px;
+    color: #e8f0ff;
+    line-height: 1.5;
+    font-weight: 400;
 }
 
-/* ====== السياق (tags) ====== */
+/* ====== سياق المجال ====== */
 .context {
     background: rgba(78,203,160,0.07);
-    border-radius: 6px;
-    padding: 2px 8px !important;
-    font-size: 8px !important;
-    margin-bottom: 0.2rem !important;
-    gap: 2px;
+    border-radius: 8px;
+    padding: 3px 10px;
+    font-size: 10px;
+    color: rgba(78,203,160,0.9);
+    border: 1px solid rgba(78,203,160,0.15);
+    margin-bottom: 0.3rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
 }
 .tag {
-    font-size: 7px !important;
-    padding: 0px 4px !important;
-    border-radius: 8px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 12px;
+    font-size: 8px;
+    font-weight: 600;
 }
+.tag-pol  { background: rgba(230,57,70,0.2);   color: #ff6b78; border: 1px solid rgba(230,57,70,0.3); }
+.tag-leg  { background: rgba(83,74,183,0.2);   color: #9d96f0; border: 1px solid rgba(83,74,183,0.3); }
+.tag-eco  { background: rgba(244,162,97,0.2);  color: #f4b060; border: 1px solid rgba(244,162,97,0.3); }
+.tag-med  { background: rgba(42,157,143,0.2);  color: #3dd1bd; border: 1px solid rgba(42,157,143,0.3); }
+.tag-sci  { background: rgba(38,70,83,0.3);    color: #7dbfcf; border: 1px solid rgba(38,70,83,0.5); }
+.tag-eng  { background: rgba(29,158,117,0.2);  color: #42d4a0; border: 1px solid rgba(29,158,117,0.3); }
+.tag-mil  { background: rgba(139,0,0,0.2);     color: #ff7b7b; border: 1px solid rgba(139,0,0,0.35); }
+.tag-edu  { background: rgba(244,208,63,0.15); color: #f4d24a; border: 1px solid rgba(244,208,63,0.25); }
+.tag-rel  { background: rgba(108,52,131,0.2);  color: #c07fe0; border: 1px solid rgba(108,52,131,0.35); }
+.tag-spt  { background: rgba(230,126,34,0.2);  color: #f0944a; border: 1px solid rgba(230,126,34,0.3); }
+.tag-lit  { background: rgba(216,27,96,0.2);   color: #f06090; border: 1px solid rgba(216,27,96,0.3); }
+.tag-it   { background: rgba(0,172,193,0.2);   color: #3dd4e4; border: 1px solid rgba(0,172,193,0.3); }
+.tag-env  { background: rgba(67,160,71,0.2);   color: #6dd873; border: 1px solid rgba(67,160,71,0.3); }
+.tag-agr  { background: rgba(121,85,72,0.2);   color: #c4a08a; border: 1px solid rgba(121,85,72,0.3); }
+.tag-tour { background: rgba(0,131,143,0.2);   color: #30c8d8; border: 1px solid rgba(0,131,143,0.3); }
+.tag-gen  { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
 
-/* ====== عناوين الأقسام ====== */
+/* ====== رسائل ====== */
+.stSuccess { background: rgba(78,203,160,0.08) !important; border: 1px solid rgba(78,203,160,0.25) !important; color: #a8f0d8 !important; padding: 4px 10px !important; font-size: 11px !important; border-radius: 10px !important; }
+.stError { background: rgba(239,68,68,0.08) !important; border: 1px solid rgba(239,68,68,0.25) !important; padding: 4px 10px !important; font-size: 11px !important; border-radius: 10px !important; }
+.stWarning { background: rgba(245,158,11,0.08) !important; border: 1px solid rgba(245,158,11,0.2) !important; padding: 4px 10px !important; font-size: 11px !important; border-radius: 10px !important; }
+.stCode, code, pre {
+    background: rgba(0,0,0,0.35) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+    color: #a8f0d8 !important;
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+}
+hr {
+    margin: 0.5rem 0 !important;
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent) !important;
+}
+.stSpinner > div {
+    border-color: #4ECBA0 !important;
+}
+.stCheckbox label {
+    color: rgba(180,200,230,0.8) !important;
+    font-size: 11px !important;
+}
+.stCaption {
+    color: rgba(150,175,220,0.45) !important;
+    font-size: 9px !important;
+}
+[data-testid="column"] {
+    padding: 0 4px !important;
+}
 .section-heading {
-    font-size: 7px !important;
-    letter-spacing: 0.1em;
-    margin: 0.3rem 0 0.15rem !important;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(150,185,230,0.5);
+    margin: 0.5rem 0 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 .section-heading::before {
-    height: 8px !important;
+    content: '';
+    width: 2px;
+    height: 10px;
+    background: #4ECBA0;
+    border-radius: 2px;
+    flex-shrink: 0;
 }
 
-/* ====== الرسائل ====== */
-.stSuccess, .stError, .stWarning {
-    font-size: 10px !important;
-    padding: 2px 8px !important;
-    border-radius: 8px !important;
-    margin: 0.1rem 0 !important;
-}
-
-/* ====== الفواصل ====== */
-hr {
-    margin: 0.3rem 0 !important;
-}
-
-/* ====== الكود ====== */
-.stCode, code, pre {
-    font-size: 10px !important;
-    padding: 2px 6px !important;
-}
-
-/* ====== تحسين للهواتف جداً ====== */
-@media (max-width: 480px) {
-    .block-container { padding: 0.2rem !important; }
-    .app-header h1 { font-size: 14px !important; }
-    div[data-testid="stAudioInput"] > div { min-width: 100px !important; }
-    div[data-testid="stAudioInput"] button { font-size: 10px !important; padding: 0.1rem 0.6rem !important; }
-    .stSelectbox > div > div { font-size: 10px !important; min-height: 22px !important; }
-    .stButton > button { font-size: 10px !important; min-height: 24px !important; }
-    textarea { font-size: 12px !important; min-height: 40px !important; padding: 4px 8px !important; }
-    .result-box .text { font-size: 12px !important; }
+/* ====== تحسينات للهواتف (معتدلة) ====== */
+@media (max-width: 600px) {
+    .block-container {
+        padding-left: 0.4rem !important;
+        padding-right: 0.4rem !important;
+        padding-top: 0.4rem !important;
+        padding-bottom: 0.4rem !important;
+    }
+    .app-header h1 {
+        font-size: 20px !important;
+    }
+    .app-header .brand { font-size: 8px !important; }
+    .app-header .subtitle { font-size: 9px !important; }
+    div[data-testid="stAudioInput"] > div { min-width: 140px !important; }
+    div[data-testid="stAudioInput"] button { font-size: 13px !important; padding: 0.3rem 1rem !important; }
+    .stSelectbox > div > div { font-size: 11px !important; min-height: 26px !important; }
+    .stButton > button { font-size: 10px !important; min-height: 28px !important; }
+    textarea { font-size: 12px !important; min-height: 55px !important; padding: 6px 10px !important; }
+    .result-box .text { font-size: 13px !important; }
+    .section-heading { font-size: 7px !important; }
+    .glass-card { padding: 0.4rem !important; }
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  العنوان (مصغر)
+#  العنوان
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
     <span class="brand">✦ Smart Voice Translator ✦</span>
     <h1>HN <span class="accent">TRANSLATOR</span></h1>
-    <p class="subtitle">Voice &amp; Text · 8 Languages</p>
+    <p class="subtitle">Voice &amp; Text Translation · 8 Languages</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -332,7 +495,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
-    st.markdown('<div class="glass-card" style="text-align:center; font-size:12px;">🔐 Connect API Keys</div>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card" style="text-align:center; padding:0.8rem;">🔐 Connect API Keys</div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         if not st.session_state.deepl_api_key:
@@ -341,16 +504,16 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
                 st.session_state.deepl_api_key = deepl_input
                 st.rerun()
         else:
-            st.success("✅ DeepL")
+            st.success("✅ DeepL Active")
     with col2:
         if not st.session_state.cohere_api_key:
-            cohere_input = st.text_input("Cohere Key", type="password", placeholder="abcd-1234")
+            cohere_input = st.text_input("Cohere Key", type="password", placeholder="abcd-1234-efgh-5678")
             if cohere_input:
                 st.session_state.cohere_api_key = cohere_input
                 st.rerun()
         else:
-            st.success("✅ Cohere")
-    st.caption("Keys stored in session only.")
+            st.success("✅ Cohere Active")
+    st.caption("💡 Keys are never stored on any server — session only.")
     st.stop()
 
 # ════════════════════════════════════════════════════════════
@@ -456,7 +619,7 @@ def swap_languages():
     st.session_state.target_lang = old_source
 
 # ════════════════════════════════════════════════════════════
-#  UI (مضغوط جداً)
+#  UI
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -474,11 +637,11 @@ style_idx = style_list.index(st.session_state.selected_style) if st.session_stat
 
 # اللغات
 st.markdown('<div class="section-heading">Translation Direction</div>', unsafe_allow_html=True)
-col_left, col_mid, col_right = st.columns([1, 0.15, 1])
+col_left, col_mid, col_right = st.columns([1, 0.18, 1])
 with col_left:
     source_lang_name = st.selectbox("From", lang_list, index=src_idx)
 with col_mid:
-    st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
     if st.button("⇄", help="Swap", use_container_width=True):
         swap_languages()
 with col_right:
@@ -528,7 +691,7 @@ if audio_value:
 # ====== النص المكتوب ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Text Input</div>', unsafe_allow_html=True)
-input_text = st.text_area("", height=50, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
+input_text = st.text_area("", height=60, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
@@ -566,7 +729,8 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
                 st.error(f"❌ {translation_result}")
 
 st.markdown("""
-<div style="text-align:center; padding: 0.3rem 0; color:rgba(100,130,170,0.25); font-size:7px; letter-spacing:0.1em; text-transform:uppercase;">
-    HN TRANSLATOR · Voice Suite
+<div style="text-align:center; padding: 0.6rem 0 0.2rem; color:rgba(100,130,170,0.3); font-size:9px;
+            letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
+    HN TRANSLATOR &nbsp;·&nbsp; Voice Translation Suite
 </div>
 """, unsafe_allow_html=True)
