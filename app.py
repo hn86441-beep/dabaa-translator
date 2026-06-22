@@ -927,4 +927,3 @@ st.markdown("""
             letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
     HN TRANSLATOR &nbsp;·&nbsp; Voice Translation Suite
 </div>
-""", unsafe_allow_html=True)                                                                                                                    اريدك ان تعدل على هذا الكود لتجعل اما زر تسجيل الصوت او نص الترجمة ان تكتب نص وتسجيل صوت واترجم والاثنين في نفس الوقت لا اريده
