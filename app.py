@@ -149,7 +149,7 @@ div[data-testid="stAudioInput"] button::before {
     min-height: 28px !important;
 }
 
-/* ====== زر إزالة التسجيل ====== */
+/* ====== زر إزالة التسجيل (يظهر دائماً) ====== */
 .clear-audio-btn {
     margin-top: 0.3rem;
     text-align: center;
@@ -166,10 +166,14 @@ div[data-testid="stAudioInput"] button::before {
     font-weight: 600 !important;
     transition: all 0.3s !important;
 }
-.clear-audio-btn button:hover {
+.clear-audio-btn button:hover:not(:disabled) {
     background: rgba(239,68,68,0.25) !important;
     border-color: #ff6b78 !important;
     box-shadow: 0 0 20px rgba(239,68,68,0.15) !important;
+}
+.clear-audio-btn button:disabled {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
 }
 
 /* ====== Textarea ====== */
@@ -597,10 +601,11 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== الميكروفون ======
+# ====== الميكروفون وزر الإزالة ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
+# عنصر رفع الصوت
 audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
 
 # تحديث حالة الرفع
@@ -610,6 +615,7 @@ else:
     # إذا لم يكن هناك ملف مرفق، نضع الحالة إلى False
     st.session_state.audio_uploaded = False
 
+# معالجة الصوت إذا كان موجوداً
 if audio_value:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
@@ -634,11 +640,11 @@ if audio_value:
         else:
             st.error(f"❌ {engine_used}")
 
-    # زر إزالة التسجيل (يظهر فقط بعد رفع صوت)
-    st.markdown('<div class="clear-audio-btn">', unsafe_allow_html=True)
-    if st.button("🗑️ إزالة التسجيل", key="clear_audio_btn"):
-        clear_audio()
-    st.markdown('</div>', unsafe_allow_html=True)
+# زر إزالة التسجيل (يظهر دائماً، لكنه مفعل فقط عند وجود تسجيل)
+st.markdown('<div class="clear-audio-btn">', unsafe_allow_html=True)
+if st.button("🗑️ إزالة التسجيل", key="clear_audio_btn", disabled=not st.session_state.audio_uploaded):
+    clear_audio()
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ====== النص المكتوب ======
 st.markdown("---")
