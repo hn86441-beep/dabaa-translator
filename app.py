@@ -36,7 +36,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = ""
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم مضغوط ليظهر في صفحة واحدة
+#  CSS — تصميم مضغوط مع ميكروفون مدمج
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -137,25 +137,61 @@ st.markdown("""
 }
 
 /* ====== منطقة الميكروفون ====== */
-.mic-icon-wrap {
+.mic-wrapper {
+    text-align: center;
+    padding: 0.2rem 0 0.3rem;
+    cursor: pointer;
+    position: relative;
+}
+
+.mic-wrapper .mic-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 56px;
-    height: 56px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%);
     border: 1.5px solid rgba(78,203,160,0.25);
-    font-size: 26px;
+    font-size: 28px;
     margin-bottom: 0.2rem;
     box-shadow: 0 0 30px rgba(78,203,160,0.12), inset 0 1px 0 rgba(78,203,160,0.15);
+    transition: all 0.3s ease;
 }
 
-.mic-hint {
-    font-size: 11px;
-    color: rgba(180,200,230,0.6);
-    margin: 0;
-    font-weight: 400;
+.mic-wrapper .mic-icon:hover {
+    transform: scale(1.05);
+    border-color: rgba(78,203,160,0.5);
+    box-shadow: 0 0 40px rgba(78,203,160,0.2);
+}
+
+.mic-wrapper .mic-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e8f0ff;
+    margin-bottom: 1px;
+}
+
+.mic-wrapper .mic-hint {
+    font-size: 10px;
+    color: rgba(180,200,230,0.45);
+}
+
+/* ====== إخفاء عنصر audio_input الافتراضي مع جعله قابل للضغط ====== */
+.stAudioInput {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 0 !important;
+    cursor: pointer !important;
+    z-index: 10 !important;
+}
+
+.stAudioInput > div {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* ====== Selectbox ====== */
@@ -210,10 +246,6 @@ st.markdown("""
     background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important;
     box-shadow: 0 6px 28px rgba(78,203,160,0.45) !important;
     transform: translateY(-1px) !important;
-}
-
-.stButton > button:active {
-    transform: translateY(0) !important;
 }
 
 .stButton:has(button[title="Swap"]) > button {
@@ -448,6 +480,23 @@ hr {
     background: #4ECBA0;
     border-radius: 2px;
     flex-shrink: 0;
+}
+
+/* ====== جعل الميكروفون يغطي البطاقة بالكامل ====== */
+.mic-click-area {
+    position: relative;
+    cursor: pointer;
+}
+
+.mic-click-area .stAudioInput {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 0 !important;
+    cursor: pointer !important;
+    z-index: 10 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -764,24 +813,23 @@ if selected_style_label != st.session_state.selected_style:
     st.session_state.selected_style = selected_style_label
 selected_domain = STYLE_OPTIONS[selected_style_label]
 
-# ====== الميكروفون ======
+# ====== الميكروفون (يتم الضغط على البطاقة لفتح التسجيل) ======
 st.markdown("---")
-
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
+# بطاقة الميكروفون مع st.audio_input مخفي
 st.markdown("""
-<div class="glass-card" style="text-align:center; padding: 0.8rem 0.5rem 0.6rem;">
-    <div class="mic-icon-wrap">🎤</div>
-    <div style="font-size:13px; font-weight:600; color:#e8f0ff; margin-bottom:1px;">
-        Record Your Message
-    </div>
-    <div style="font-size:10px; color:rgba(180,200,230,0.45);">
-        Speak clearly for best results
+<div class="glass-card mic-click-area" style="text-align:center; padding: 0.8rem 0.5rem 0.6rem; cursor: pointer;">
+    <div class="mic-wrapper">
+        <div class="mic-icon">🎤</div>
+        <div class="mic-label">Record Your Message</div>
+        <div class="mic-hint">Click anywhere to start recording</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-audio_value = st.audio_input("")
+# وضع st.audio_input مخفي فوق البطاقة
+audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
 
 if audio_value:
     with st.spinner("⏳ Processing..."):
@@ -811,13 +859,11 @@ if audio_value:
 st.markdown("---")
 st.markdown('<div class="section-heading">Text Input</div>', unsafe_allow_html=True)
 
-# دالة معالجة النص والترجمة التلقائية
 def handle_text_input():
     current_text = st.session_state.input_text_area
     if current_text != st.session_state.last_input:
         st.session_state.last_input = current_text
         st.session_state.input_text = current_text
-        
         if st.session_state.auto_translate and len(current_text.strip()) >= 3:
             translated, err = fetch_ai_translation(current_text, target_lang)
             if translated:
@@ -869,7 +915,7 @@ if st.session_state.translated_text and st.session_state.input_text.strip():
     else:
         st.error(st.session_state.translated_text)
 
-# ====== زر ترجمة يدوي (في حال إلغاء الترجمة التلقائية) ======
+# ====== زر ترجمة يدوي ======
 if not st.session_state.auto_translate:
     if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
         if not st.session_state.input_text.strip():
