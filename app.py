@@ -1,779 +1,940 @@
 import streamlit as st
 import requests
 import os
+import json
+from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
 st.set_page_config(
-    page_title="مترجم حسن ناصر",
-    page_icon="🌐",
+    page_title="HASSAN NASSER | Voice Translator",
+    page_icon="🎤",
     layout="centered"
 )
 
 # ════════════════════════════════════════════════════════════
-#  SESSION STATE
+#  CSS — Premium Dark-Glass Design
 # ════════════════════════════════════════════════════════════
-defaults = {
-    "device_mode": "laptop",
-    "source_lang": "Auto-Detect",
-    "target_lang": "Arabic",
-    "selected_style": "Auto-Detect",
-    "prev_input": "",
-    "prev_translation": "",
-    "prev_target": "",
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-IS_MOBILE = st.session_state.device_mode == "mobile"
-
-# ════════════════════════════════════════════════════════════
-#  CSS
-# ════════════════════════════════════════════════════════════
-if IS_MOBILE:
-    MAX_W = "100%"
-    H1_SIZE = "24px"
-    BRAND_SIZE = "9px"
-    SUB_SIZE = "10px"
-    SEC_SIZE = "9px"
-    AREA_H = 130
-    BTN_PAD = "0.55rem 1rem"
-    BTN_FS = "13px"
-    CARD_PAD = "0.85rem"
-    CARD_R = "14px"
-    CON_PL = "0.75rem"
-    CON_PR = "0.75rem"
-else:
-    MAX_W = "700px"
-    H1_SIZE = "38px"
-    BRAND_SIZE = "10px"
-    SUB_SIZE = "12px"
-    SEC_SIZE = "10px"
-    AREA_H = 110
-    BTN_PAD = "0.65rem 1.5rem"
-    BTN_FS = "14px"
-    CARD_PAD = "1.25rem"
-    CARD_R = "18px"
-    CON_PL = "1rem"
-    CON_PR = "1rem"
-
-st.markdown(f"""
+st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-#MainMenu, footer, header {{ visibility: hidden; }}
-*, *::before, *::after {{ box-sizing: border-box; }}
+/* ====== Reset & Base ====== */
+#MainMenu, footer, header { visibility: hidden; }
 
-.stApp {{
-    background: linear-gradient(135deg, #080812 0%, #0d1522 45%, #081018 100%) !important;
+*, *::before, *::after { box-sizing: border-box; }
+
+.stApp {
+    background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important;
     font-family: 'Inter', sans-serif !important;
     min-height: 100vh;
-}}
+}
 
-.stApp::before {{
+/* شبكة خلفية ناعمة */
+.stApp::before {
     content: '';
     position: fixed;
     inset: 0;
     background-image:
-        linear-gradient(rgba(78,203,160,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(78,203,160,0.025) 1px, transparent 1px);
-    background-size: 48px 48px;
+        linear-gradient(rgba(100,220,180,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100,220,180,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
     pointer-events: none;
     z-index: 0;
-}}
+}
 
-.block-container {{
-    padding-top: 1.5rem !important;
+.block-container {
+    padding-top: 2rem !important;
     padding-bottom: 3rem !important;
-    padding-left: {CON_PL} !important;
-    padding-right: {CON_PR} !important;
-    max-width: {MAX_W} !important;
+    max-width: 680px !important;
     position: relative;
     z-index: 1;
-}}
+}
 
-/* ── Header ── */
-.app-header {{
+/* ====== العنوان الرئيسي ====== */
+.app-header {
     text-align: center;
-    padding: 1.5rem 0.5rem 1.25rem;
-}}
-.app-header .brand {{
+    padding: 2.5rem 1rem 2rem;
+    position: relative;
+}
+
+.app-header .brand {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: {BRAND_SIZE};
+    font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.3em;
-    color: rgba(78,203,160,0.6);
+    letter-spacing: 0.35em;
+    color: #4ECBA0;
     text-transform: uppercase;
+    margin-bottom: 0.75rem;
     display: block;
-    margin-bottom: 0.5rem;
-}}
-.app-header h1 {{
+}
+
+.app-header h1 {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: {H1_SIZE};
+    font-size: 42px;
     font-weight: 700;
     color: #f0f4ff;
-    margin: 0 0 0.35rem;
-    letter-spacing: -0.01em;
+    margin: 0 0 0.5rem 0;
     line-height: 1.1;
-}}
-.app-header h1 span {{ color: #4ECBA0; }}
-.app-header .sub {{
-    font-size: {SUB_SIZE};
-    color: rgba(160,185,230,0.45);
-    letter-spacing: 0.1em;
+    letter-spacing: -0.02em;
+}
+
+.app-header h1 .accent {
+    color: #4ECBA0;
+    position: relative;
+}
+
+.app-header .subtitle {
+    font-size: 13px;
+    color: rgba(180,200,230,0.55);
+    margin: 0;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     font-weight: 500;
-    margin: 0;
-}}
+}
 
-/* ── Device toggle ── */
-.dev-row {{
-    display: flex;
-    justify-content: flex-end;
-    gap: 5px;
-    margin-bottom: 0.2rem;
-}}
-
-/* ── Section heading ── */
-.sh {{
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: {SEC_SIZE};
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(140,175,220,0.45);
-    margin: 1.4rem 0 0.55rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}}
-.sh::before {{
-    content: '';
-    width: 3px; height: 12px;
-    background: #4ECBA0;
-    border-radius: 2px;
-    flex-shrink: 0;
-}}
-
-/* ── Glass card ── */
-.gc {{
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: {CARD_R};
-    padding: {CARD_PAD};
-    margin-bottom: 1rem;
+/* ====== بطاقات الزجاج ====== */
+.glass-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
     position: relative;
     overflow: hidden;
-}}
-.gc::before {{
+}
+
+.glass-card::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.35), transparent);
-}}
+    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
+}
 
-/* ── Mic strip ── */
-.mic-strip {{
+.card-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(78,203,160,0.7);
+    margin-bottom: 1rem;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0.65rem 1rem;
-    background: rgba(78,203,160,0.05);
-    border: 1px solid rgba(78,203,160,0.18);
-    border-radius: 12px;
-    margin-bottom: 0.6rem;
-}}
-.mic-dot {{
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(78,203,160,0.2), rgba(78,203,160,0.04));
-    border: 1px solid rgba(78,203,160,0.3);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
-    flex-shrink: 0;
-    box-shadow: 0 0 10px rgba(78,203,160,0.12);
-}}
-.mic-label {{
-    font-size: 12px;
-    font-weight: 600;
-    color: rgba(220,235,255,0.8);
-    letter-spacing: 0.01em;
-}}
-.mic-sub {{
-    font-size: 10px;
-    color: rgba(78,203,160,0.55);
-    margin-top: 1px;
-    letter-spacing: 0.03em;
-}}
+    gap: 6px;
+}
 
-/* ── Selectbox ── */
-.stSelectbox > div > div {{
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 12px !important;
+.card-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.07);
+}
+
+/* ====== منطقة الميكروفون ====== */
+.mic-zone {
+    text-align: center;
+    padding: 1.5rem 0 1rem;
+}
+
+.mic-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%);
+    border: 1.5px solid rgba(78,203,160,0.25);
+    font-size: 36px;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 0 30px rgba(78,203,160,0.12), inset 0 1px 0 rgba(78,203,160,0.15);
+}
+
+.mic-hint {
+    font-size: 13px;
+    color: rgba(180,200,230,0.6);
+    margin: 0;
+    font-weight: 400;
+}
+
+.engine-badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    background: rgba(78,203,160,0.12);
+    color: #4ECBA0;
+    border: 1px solid rgba(78,203,160,0.2);
+}
+
+/* ====== Selectbox ====== */
+.stSelectbox > div > div {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 14px !important;
     color: #e8f0ff !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 13px !important;
+    font-size: 14px !important;
     transition: border-color 0.2s;
-}}
-.stSelectbox > div > div:hover {{ border-color: rgba(78,203,160,0.4) !important; }}
-.stSelectbox label {{
-    font-size: 10px !important;
+}
+
+.stSelectbox > div > div:hover {
+    border-color: rgba(78,203,160,0.5) !important;
+}
+
+.stSelectbox > div > div:focus-within {
+    border-color: #4ECBA0 !important;
+    box-shadow: 0 0 0 3px rgba(78,203,160,0.12) !important;
+}
+
+.stSelectbox label {
+    font-size: 11px !important;
     font-weight: 600 !important;
-    color: rgba(78,203,160,0.65) !important;
+    color: rgba(78,203,160,0.75) !important;
     letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
-}}
+    margin-bottom: 4px !important;
+}
 
-/* ── Buttons ── */
-.stButton > button {{
-    border-radius: 12px !important;
+/* ====== الأزرار ====== */
+.stButton > button {
+    border-radius: 14px !important;
     font-weight: 600 !important;
-    font-size: {BTN_FS} !important;
-    padding: {BTN_PAD} !important;
-    background: linear-gradient(135deg, #4ECBA0, #28a074) !important;
-    color: #071512 !important;
+    font-size: 14px !important;
+    padding: 0.7rem 1.5rem !important;
+    background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
+    color: #0a1520 !important;
     border: none !important;
     width: 100% !important;
     font-family: 'Space Grotesk', sans-serif !important;
-    transition: all 0.2s ease !important;
-    box-shadow: 0 3px 16px rgba(78,203,160,0.28) !important;
-    letter-spacing: 0.02em !important;
-}}
-.stButton > button:hover {{
-    background: linear-gradient(135deg, #5ddbb0, #35b886) !important;
-    box-shadow: 0 5px 22px rgba(78,203,160,0.42) !important;
-    transform: translateY(-1px) !important;
-}}
+    letter-spacing: 0.03em !important;
+    transition: all 0.25s ease !important;
+    box-shadow: 0 4px 20px rgba(78,203,160,0.3) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
 
-/* ── Textarea ── */
-textarea {{
-    background: rgba(255,255,255,0.035) !important;
-    border: 1px solid rgba(255,255,255,0.09) !important;
-    border-radius: 14px !important;
-    color: #dce8ff !important;
+.stButton > button:hover {
+    background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important;
+    box-shadow: 0 6px 28px rgba(78,203,160,0.45) !important;
+    transform: translateY(-1px) !important;
+}
+
+.stButton > button:active {
+    transform: translateY(0) !important;
+}
+
+/* زر المبادلة ⇄ */
+.stButton:has(button[title="Swap"]) > button,
+.stButton > button[kind="secondary"] {
+    background: rgba(255,255,255,0.07) !important;
+    color: rgba(200,220,255,0.8) !important;
+    box-shadow: none !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    font-size: 18px !important;
+    padding: 0.5rem !important;
+}
+
+.stButton:has(button[title="Swap"]) > button:hover {
+    background: rgba(78,203,160,0.12) !important;
+    border-color: rgba(78,203,160,0.3) !important;
+    box-shadow: none !important;
+    transform: none !important;
+    color: #4ECBA0 !important;
+}
+
+/* ====== Textarea ====== */
+textarea {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 16px !important;
+    color: #e8f0ff !important;
     font-size: 15px !important;
     font-family: 'Inter', sans-serif !important;
-    padding: 13px 15px !important;
-    line-height: 1.65 !important;
+    padding: 14px 16px !important;
     transition: border-color 0.2s, box-shadow 0.2s !important;
-}}
-textarea:focus {{
-    border-color: rgba(78,203,160,0.45) !important;
-    box-shadow: 0 0 0 3px rgba(78,203,160,0.09) !important;
-    outline: none !important;
-}}
-textarea::placeholder {{ color: rgba(140,165,210,0.28) !important; }}
+    line-height: 1.6 !important;
+}
 
-/* ── Result box ── */
-.rb {{
-    background: rgba(78,203,160,0.055);
-    border: 1px solid rgba(78,203,160,0.18);
-    border-radius: 14px;
-    padding: 1rem 1.25rem 1rem 1.5rem;
+textarea:focus {
+    border-color: rgba(78,203,160,0.5) !important;
+    box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
+    outline: none !important;
+}
+
+textarea::placeholder {
+    color: rgba(150,175,220,0.3) !important;
+}
+
+/* ====== صندوق النتيجة ====== */
+.result-box {
+    background: rgba(78,203,160,0.06);
+    border-radius: 16px;
+    padding: 1.2rem 1.4rem;
+    border: 1px solid rgba(78,203,160,0.2);
     margin-top: 0.75rem;
     position: relative;
-}}
-.rb::before {{
+    overflow: hidden;
+}
+
+.result-box::before {
     content: '';
     position: absolute;
     top: 0; left: 0;
     width: 3px; height: 100%;
-    background: linear-gradient(180deg, #4ECBA0, #239e6a);
+    background: linear-gradient(180deg, #4ECBA0, #2fa87a);
     border-radius: 3px 0 0 3px;
-}}
-.rb-label {{
+}
+
+.result-box .label {
     font-size: 9px;
     font-weight: 700;
     text-transform: uppercase;
-    color: rgba(78,203,160,0.6);
-    letter-spacing: 0.14em;
+    color: rgba(78,203,160,0.7);
+    letter-spacing: 0.15em;
+    margin-bottom: 6px;
     display: block;
-    margin-bottom: 5px;
-}}
-.rb-text {{
-    font-size: 15px;
-    color: #dce8ff;
-    line-height: 1.7;
-}}
+}
 
-/* ── Live badge ── */
-.live-badge {{
+.result-box .text {
+    font-size: 16px;
+    color: #e8f0ff;
+    line-height: 1.65;
+    font-weight: 400;
+}
+
+/* ====== سياق المجال ====== */
+.context {
+    background: rgba(78,203,160,0.07);
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: rgba(78,203,160,0.9);
+    border: 1px solid rgba(78,203,160,0.15);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ====== شارات المجالات ====== */
+.tag {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
     font-size: 10px;
     font-weight: 600;
-    color: rgba(78,203,160,0.65);
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    margin-bottom: 0.4rem;
-}}
-.pdot {{
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #4ECBA0;
-    animation: pdot 1.4s ease-in-out infinite;
-    display: inline-block;
-}}
-@keyframes pdot {{
-    0%,100% {{ opacity:1; transform:scale(1); }}
-    50% {{ opacity:0.3; transform:scale(0.6); }}
-}}
+    margin-right: 5px;
+    letter-spacing: 0.03em;
+}
+.tag-pol  { background: rgba(230,57,70,0.2);   color: #ff6b78; border: 1px solid rgba(230,57,70,0.3); }
+.tag-leg  { background: rgba(83,74,183,0.2);   color: #9d96f0; border: 1px solid rgba(83,74,183,0.3); }
+.tag-eco  { background: rgba(244,162,97,0.2);  color: #f4b060; border: 1px solid rgba(244,162,97,0.3); }
+.tag-med  { background: rgba(42,157,143,0.2);  color: #3dd1bd; border: 1px solid rgba(42,157,143,0.3); }
+.tag-sci  { background: rgba(38,70,83,0.3);    color: #7dbfcf; border: 1px solid rgba(38,70,83,0.5); }
+.tag-eng  { background: rgba(29,158,117,0.2);  color: #42d4a0; border: 1px solid rgba(29,158,117,0.3); }
+.tag-mil  { background: rgba(139,0,0,0.2);     color: #ff7b7b; border: 1px solid rgba(139,0,0,0.35); }
+.tag-edu  { background: rgba(244,208,63,0.15); color: #f4d24a; border: 1px solid rgba(244,208,63,0.25); }
+.tag-rel  { background: rgba(108,52,131,0.2);  color: #c07fe0; border: 1px solid rgba(108,52,131,0.35); }
+.tag-spt  { background: rgba(230,126,34,0.2);  color: #f0944a; border: 1px solid rgba(230,126,34,0.3); }
+.tag-lit  { background: rgba(216,27,96,0.2);   color: #f06090; border: 1px solid rgba(216,27,96,0.3); }
+.tag-it   { background: rgba(0,172,193,0.2);   color: #3dd4e4; border: 1px solid rgba(0,172,193,0.3); }
+.tag-env  { background: rgba(67,160,71,0.2);   color: #6dd873; border: 1px solid rgba(67,160,71,0.3); }
+.tag-agr  { background: rgba(121,85,72,0.2);   color: #c4a08a; border: 1px solid rgba(121,85,72,0.3); }
+.tag-tour { background: rgba(0,131,143,0.2);   color: #30c8d8; border: 1px solid rgba(0,131,143,0.3); }
+.tag-gen  { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
 
-/* ── Domain tags ── */
-.ctx {{
-    background: rgba(78,203,160,0.06);
-    border: 1px solid rgba(78,203,160,0.13);
-    border-radius: 10px;
-    padding: 6px 12px;
+/* ====== رسائل النجاح والخطأ ====== */
+.stSuccess {
+    background: rgba(78,203,160,0.08) !important;
+    border: 1px solid rgba(78,203,160,0.25) !important;
+    border-radius: 14px !important;
+    color: #a8f0d8 !important;
+}
+
+.stSuccess > div { color: #a8f0d8 !important; }
+
+.stError, [data-baseweb="notification"][kind="negative"] {
+    background: rgba(239,68,68,0.08) !important;
+    border: 1px solid rgba(239,68,68,0.25) !important;
+    border-radius: 14px !important;
+}
+
+.stWarning {
+    background: rgba(245,158,11,0.08) !important;
+    border: 1px solid rgba(245,158,11,0.2) !important;
+    border-radius: 14px !important;
+}
+
+/* ====== كود ====== */
+.stCode, code, pre {
+    background: rgba(0,0,0,0.35) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 12px !important;
+    color: #a8f0d8 !important;
+    font-size: 13px !important;
+}
+
+/* ====== فاصل ====== */
+hr {
+    margin: 1.5rem 0 !important;
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent) !important;
+}
+
+/* ====== Spinner ====== */
+.stSpinner > div {
+    border-color: #4ECBA0 !important;
+}
+
+/* ====== Input text (password fields) ====== */
+.stTextInput input {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 12px !important;
+    color: #e8f0ff !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+.stTextInput input:focus {
+    border-color: rgba(78,203,160,0.5) !important;
+    box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
+}
+
+.stTextInput label {
+    color: rgba(78,203,160,0.75) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+}
+
+/* ====== Caption ====== */
+.stCaption {
+    color: rgba(150,175,220,0.45) !important;
+    font-size: 11px !important;
+}
+
+/* ====== Audio Input ====== */
+.stAudioInput {
+    border-radius: 40px !important;
+}
+
+/* ====== Columns gap ====== */
+[data-testid="column"] {
+    padding: 0 6px !important;
+}
+
+/* ====== Section headings ====== */
+.section-heading {
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 11px;
-    color: rgba(78,203,160,0.85);
-    margin-bottom: 0.6rem;
-}}
-.tag {{
-    display: inline-flex; align-items: center; gap: 3px;
-    padding: 2px 9px; border-radius: 20px;
-    font-size: 10px; font-weight: 600; margin-right: 4px;
-}}
-.tag-pol  {{ background:rgba(230,57,70,.18);  color:#ff6b78; border:1px solid rgba(230,57,70,.28); }}
-.tag-leg  {{ background:rgba(83,74,183,.18);  color:#9d96f0; border:1px solid rgba(83,74,183,.28); }}
-.tag-eco  {{ background:rgba(244,162,97,.18); color:#f4b060; border:1px solid rgba(244,162,97,.28); }}
-.tag-med  {{ background:rgba(42,157,143,.18); color:#3dd1bd; border:1px solid rgba(42,157,143,.28); }}
-.tag-sci  {{ background:rgba(38,70,83,.28);   color:#7dbfcf; border:1px solid rgba(38,70,83,.45); }}
-.tag-eng  {{ background:rgba(29,158,117,.18); color:#42d4a0; border:1px solid rgba(29,158,117,.28); }}
-.tag-mil  {{ background:rgba(139,0,0,.18);    color:#ff7b7b; border:1px solid rgba(139,0,0,.3); }}
-.tag-edu  {{ background:rgba(244,208,63,.12); color:#f4d24a; border:1px solid rgba(244,208,63,.22); }}
-.tag-rel  {{ background:rgba(108,52,131,.18); color:#c07fe0; border:1px solid rgba(108,52,131,.3); }}
-.tag-spt  {{ background:rgba(230,126,34,.18); color:#f0944a; border:1px solid rgba(230,126,34,.28); }}
-.tag-lit  {{ background:rgba(216,27,96,.18);  color:#f06090; border:1px solid rgba(216,27,96,.28); }}
-.tag-it   {{ background:rgba(0,172,193,.18);  color:#3dd4e4; border:1px solid rgba(0,172,193,.28); }}
-.tag-env  {{ background:rgba(67,160,71,.18);  color:#6dd873; border:1px solid rgba(67,160,71,.28); }}
-.tag-agr  {{ background:rgba(121,85,72,.18);  color:#c4a08a; border:1px solid rgba(121,85,72,.28); }}
-.tag-tour {{ background:rgba(0,131,143,.18);  color:#30c8d8; border:1px solid rgba(0,131,143,.28); }}
-.tag-gen  {{ background:rgba(107,114,128,.18);color:#9ca3af; border:1px solid rgba(107,114,128,.28); }}
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(150,185,230,0.5);
+    margin: 1.5rem 0 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
 
-/* ── Alerts ── */
-.stSuccess {{ background:rgba(78,203,160,0.07)!important; border:1px solid rgba(78,203,160,0.22)!important; border-radius:12px!important; }}
-.stError   {{ background:rgba(239,68,68,0.07)!important;  border:1px solid rgba(239,68,68,0.22)!important;  border-radius:12px!important; }}
-.stWarning {{ background:rgba(245,158,11,0.07)!important; border:1px solid rgba(245,158,11,0.18)!important; border-radius:12px!important; }}
+.section-heading::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: #4ECBA0;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
 
-.stCode, code, pre {{
-    background:rgba(0,0,0,0.32)!important;
-    border:1px solid rgba(255,255,255,0.07)!important;
-    border-radius:10px!important;
-    color:#a8f0d8!important;
-    font-size:13px!important;
-}}
-
-hr {{
-    margin:1.25rem 0!important; border:none!important; height:1px!important;
-    background:linear-gradient(90deg,transparent,rgba(78,203,160,0.18),transparent)!important;
-}}
-
-.stTextInput input {{
-    background:rgba(255,255,255,0.045)!important;
-    border:1px solid rgba(255,255,255,0.09)!important;
-    border-radius:10px!important;
-    color:#e8f0ff!important;
-    font-family:'Inter',sans-serif!important;
-}}
-.stTextInput input:focus {{
-    border-color:rgba(78,203,160,0.45)!important;
-    box-shadow:0 0 0 3px rgba(78,203,160,0.09)!important;
-}}
-.stTextInput label {{
-    color:rgba(78,203,160,0.7)!important; font-size:10px!important;
-    font-weight:600!important; letter-spacing:0.1em!important; text-transform:uppercase!important;
-}}
-
-.stCaption {{ color:rgba(140,170,220,0.4)!important; font-size:10px!important; }}
-[data-testid="column"] {{ padding: 0 4px !important; }}
+/* ====== Dots decoration ====== */
+.dots {
+    text-align: center;
+    color: rgba(78,203,160,0.25);
+    font-size: 18px;
+    letter-spacing: 6px;
+    margin: 0.5rem 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  DEVICE TOGGLE
-# ════════════════════════════════════════════════════════════
-dcol1, dcol2, dcol3 = st.columns([4, 1, 1])
-with dcol2:
-    if st.button("💻", key="dev_lap", use_container_width=True,
-                 help="وضع اللابتوب"):
-        st.session_state.device_mode = "laptop"
-        st.rerun()
-with dcol3:
-    if st.button("📱", key="dev_mob", use_container_width=True,
-                 help="وضع الهاتف"):
-        st.session_state.device_mode = "mobile"
-        st.rerun()
-
-# Show active mode indicator
-mode_label = "📱 وضع الهاتف" if IS_MOBILE else "💻 وضع اللابتوب"
-st.markdown(f"""
-<div style="text-align:right; font-size:10px; color:rgba(78,203,160,0.5);
-            font-weight:600; letter-spacing:0.06em; margin-top:-0.5rem; margin-bottom:0.25rem;">
-    {mode_label}
-</div>
-""", unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════
-#  HEADER
+#  العنوان الرئيسي
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
-    <span class="brand">✦ مترجم متخصص ✦</span>
-    <h1>حسن <span>ناصر</span></h1>
-    <p class="sub">مترجم صوتي · ٨ لغات</p>
+    <span class="brand">✦ Professional Translation Suite ✦</span>
+    <h1>HASSAN <span class="accent">NASSER</span></h1>
+    <p class="subtitle">Voice Translator &nbsp;·&nbsp; 8 Languages</p>
 </div>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  CONFIG
+#  CONFIGURATION
 # ════════════════════════════════════════════════════════════
 languages_dict = {
-    "Auto-Detect": "auto", "Arabic": "ar", "English": "en",
-    "Russian": "ru", "Chinese": "zh", "German": "de",
-    "Spanish": "es", "Portuguese": "pt", "Korean": "ko"
+    "Auto-Detect": "auto",
+    "Arabic": "ar",
+    "English": "en",
+    "Russian": "ru",
+    "Chinese": "zh",
+    "German": "de",
+    "Spanish": "es",
+    "Portuguese": "pt",
+    "Korean": "ko"
 }
+
 DOMAINS = {
-    "political":    {"emoji":"🏛️","name_en":"Political"},
-    "legal":        {"emoji":"⚖️","name_en":"Legal"},
-    "economic":     {"emoji":"📈","name_en":"Economic"},
-    "medical":      {"emoji":"🏥","name_en":"Medical"},
-    "scientific":   {"emoji":"🔬","name_en":"Scientific"},
-    "engineering":  {"emoji":"🏗️","name_en":"Engineering"},
-    "military":     {"emoji":"🎖️","name_en":"Military"},
-    "educational":  {"emoji":"📚","name_en":"Educational"},
-    "religious":    {"emoji":"🕌","name_en":"Religious"},
-    "sports":       {"emoji":"⚽","name_en":"Sports"},
-    "literary":     {"emoji":"📖","name_en":"Literary"},
-    "it":           {"emoji":"💻","name_en":"IT / Tech"},
-    "environmental":{"emoji":"🌿","name_en":"Environmental"},
-    "agricultural": {"emoji":"🌾","name_en":"Agricultural"},
-    "media":        {"emoji":"📺","name_en":"Media"},
-    "tourism":      {"emoji":"✈️","name_en":"Tourism"},
-    "general":      {"emoji":"💬","name_en":"General"},
+    "political":  {"emoji": "🏛️", "name_en": "Political",     "color": "#E63946"},
+    "legal":      {"emoji": "⚖️", "name_en": "Legal",         "color": "#534AB7"},
+    "economic":   {"emoji": "📈", "name_en": "Economic",      "color": "#F4A261"},
+    "medical":    {"emoji": "🏥", "name_en": "Medical",       "color": "#2A9D8F"},
+    "scientific": {"emoji": "🔬", "name_en": "Scientific",    "color": "#264653"},
+    "engineering":{"emoji": "🏗️", "name_en": "Engineering",   "color": "#1D9E75"},
+    "military":   {"emoji": "🎖️", "name_en": "Military",      "color": "#8B0000"},
+    "educational":{"emoji": "📚", "name_en": "Educational",   "color": "#F4D03F"},
+    "religious":  {"emoji": "🕌", "name_en": "Religious",     "color": "#6C3483"},
+    "sports":     {"emoji": "⚽", "name_en": "Sports",        "color": "#E67E22"},
+    "literary":   {"emoji": "📖", "name_en": "Literary",      "color": "#D81B60"},
+    "it":         {"emoji": "💻", "name_en": "IT / Tech",     "color": "#00ACC1"},
+    "environmental":{"emoji": "🌿", "name_en": "Environmental", "color": "#43A047"},
+    "agricultural":{"emoji": "🌾", "name_en": "Agricultural",  "color": "#795548"},
+    "media":      {"emoji": "📺", "name_en": "Media",         "color": "#5E35B1"},
+    "tourism":    {"emoji": "✈️", "name_en": "Tourism",       "color": "#00838F"},
+    "general":    {"emoji": "💬", "name_en": "General",       "color": "#6B7280"},
 }
+
 STYLE_OPTIONS = {
     "Auto-Detect": None,
-    "🏛️ Political":"political","⚖️ Legal":"legal","📈 Economic":"economic",
-    "🏥 Medical":"medical","🔬 Scientific":"scientific","🏗️ Engineering":"engineering",
-    "🎖️ Military":"military","📚 Educational":"educational","🕌 Religious":"religious",
-    "⚽ Sports":"sports","📖 Literary":"literary","💻 IT / Tech":"it",
-    "🌿 Environmental":"environmental","🌾 Agricultural":"agricultural",
-    "📺 Media":"media","✈️ Tourism":"tourism","💬 General":"general",
+    "🏛️ Political": "political",
+    "⚖️ Legal": "legal",
+    "📈 Economic": "economic",
+    "🏥 Medical": "medical",
+    "🔬 Scientific": "scientific",
+    "🏗️ Engineering": "engineering",
+    "🎖️ Military": "military",
+    "📚 Educational": "educational",
+    "🕌 Religious": "religious",
+    "⚽ Sports": "sports",
+    "📖 Literary": "literary",
+    "💻 IT / Tech": "it",
+    "🌿 Environmental": "environmental",
+    "🌾 Agricultural": "agricultural",
+    "📺 Media": "media",
+    "✈️ Tourism": "tourism",
+    "💬 General": "general",
 }
+
+# ════════════════════════════════════════════════════════════
+#  DOMAIN KEYWORDS
+# ════════════════════════════════════════════════════════════
 DOMAIN_KEYWORDS = {
-    "political":["minister","government","parliament","political","diplomatic","treaty","election","policy","president","وزير","حكومة","برلمان","سياسة","دبلوماسي","معاهدة","انتخابات","رئيس"],
-    "legal":["contract","agreement","clause","legal","court","judgment","law","عقد","اتفاق","قانون","محكمة","حكم"],
-    "economic":["economic","financial","investment","cost","budget","revenue","profit","loss","اقتصاد","مالية","استثمار","تكلفة","ميزانية","ربح"],
-    "medical":["doctor","hospital","treatment","disease","diagnosis","surgery","patient","طبيب","مستشفى","علاج","مرض","تشخيص","عملية","مريض"],
-    "scientific":["research","study","experiment","theory","scientific","technology","data","بحث","دراسة","تجربة","نظرية","علمي","تقنية","بيانات"],
-    "engineering":["engineering","structural","civil","electrical","mechanical","concrete","construction","هندسة","إنشائي","مدني","كهرباء","ميكانيك","خرسانة","بناء"],
-    "military":["military","army","defense","war","weapon","base","جيش","عسكري","دفاع","حرب","سلاح","قاعدة"],
-    "educational":["school","university","education","teacher","student","exam","مدرسة","جامعة","تعليم","معلم","طالب","امتحان"],
-    "religious":["mosque","church","prayer","Quran","Bible","religion","faith","مسجد","كنيسة","صلاة","قرآن","إنجيل","دين"],
-    "sports":["sports","football","basketball","tennis","stadium","team","player","رياضة","كرة القدم","كرة السلة","تنس","ملعب","فريق"],
-    "literary":["literature","story","novel","poetry","writer","author","text","أدب","قصة","رواية","شعر","كاتب","نص"],
-    "it":["programming","computer","network","software","application","website","database","برمجة","حاسوب","شبكة","برنامج","موقع","قاعدة بيانات"],
-    "environmental":["environment","pollution","climate","renewable","solar","wind","بيئة","تلوث","مناخ","متجددة","شمسية","رياح"],
-    "agricultural":["agriculture","farm","crop","wheat","rice","trees","irrigation","زراعة","مزرعة","محصول","قمح","أرز","أشجار"],
-    "media":["media","journalism","television","radio","news","report","إعلام","صحافة","تلفزيون","إذاعة","خبر","تقرير"],
-    "tourism":["tourism","hotel","travel","airport","passport","visa","tour","سياحة","فندق","سفر","مطار","جواز","تأشيرة"],
+    "political": ["minister", "government", "parliament", "political", "diplomatic", "treaty", "election", "policy", "president", "وزير", "حكومة", "برلمان", "سياسة", "دبلوماسي", "معاهدة", "انتخابات", "رئيس"],
+    "legal": ["contract", "agreement", "clause", "legal", "court", "judgment", "law", "عقد", "اتفاق", "قانون", "محكمة", "حكم"],
+    "economic": ["economic", "financial", "investment", "cost", "budget", "revenue", "profit", "loss", "اقتصاد", "مالية", "استثمار", "تكلفة", "ميزانية", "ربح"],
+    "medical": ["doctor", "hospital", "treatment", "disease", "diagnosis", "surgery", "patient", "طبيب", "مستشفى", "علاج", "مرض", "تشخيص", "عملية", "مريض"],
+    "scientific": ["research", "study", "experiment", "theory", "scientific", "technology", "data", "بحث", "دراسة", "تجربة", "نظرية", "علمي", "تقنية", "بيانات"],
+    "engineering": ["engineering", "structural", "civil", "electrical", "mechanical", "concrete", "construction", "هندسة", "إنشائي", "مدني", "كهرباء", "ميكانيك", "خرسانة", "بناء"],
+    "military": ["military", "army", "defense", "war", "weapon", "base", "جيش", "عسكري", "دفاع", "حرب", "سلاح", "قاعدة"],
+    "educational": ["school", "university", "education", "teacher", "student", "exam", "مدرسة", "جامعة", "تعليم", "معلم", "طالب", "امتحان"],
+    "religious": ["mosque", "church", "prayer", "Quran", "Bible", "religion", "faith", "مسجد", "كنيسة", "صلاة", "قرآن", "إنجيل", "دين"],
+    "sports": ["sports", "football", "basketball", "tennis", "stadium", "team", "player", "رياضة", "كرة القدم", "كرة السلة", "تنس", "ملعب", "فريق"],
+    "literary": ["literature", "story", "novel", "poetry", "writer", "author", "text", "أدب", "قصة", "رواية", "شعر", "كاتب", "نص"],
+    "it": ["programming", "computer", "network", "software", "application", "website", "database", "برمجة", "حاسوب", "شبكة", "برنامج", "موقع", "قاعدة بيانات"],
+    "environmental": ["environment", "pollution", "climate", "renewable", "solar", "wind", "بيئة", "تلوث", "مناخ", "متجددة", "شمسية", "رياح"],
+    "agricultural": ["agriculture", "farm", "crop", "wheat", "rice", "trees", "irrigation", "زراعة", "مزرعة", "محصول", "قمح", "أرز", "أشجار"],
+    "media": ["media", "journalism", "television", "radio", "news", "report", "إعلام", "صحافة", "تلفزيون", "إذاعة", "خبر", "تقرير"],
+    "tourism": ["tourism", "hotel", "travel", "airport", "passport", "visa", "tour", "سياحة", "فندق", "سفر", "مطار", "جواز", "تأشيرة"],
 }
 
 def detect_domains(text):
-    tl = text.lower()
+    text_lower = text.lower()
     scores = {}
-    for d, kws in DOMAIN_KEYWORDS.items():
-        s = sum(tl.count(k.lower()) for k in kws)
-        if s > 0:
-            scores[d] = s
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        score = sum(text_lower.count(kw.lower()) for kw in keywords)
+        if score > 0:
+            scores[domain] = score
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
 #  API KEYS
 # ════════════════════════════════════════════════════════════
-try:    deepl_secret = st.secrets.get("DEEPL_API_KEY", "")
-except: deepl_secret = ""
-try:    cohere_secret = st.secrets.get("COHERE_API_KEY", "")
-except: cohere_secret = ""
+try:
+    deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
+except:
+    deepl_from_secrets = ""
+
+try:
+    cohere_from_secrets = st.secrets.get("COHERE_API_KEY", "")
+except:
+    cohere_from_secrets = ""
 
 if "deepl_api_key" not in st.session_state:
-    st.session_state.deepl_api_key = deepl_secret
-if "cohere_api_key" not in st.session_state:
-    st.session_state.cohere_api_key = cohere_secret
+    st.session_state.deepl_api_key = deepl_from_secrets
 
+if "cohere_api_key" not in st.session_state:
+    st.session_state.cohere_api_key = cohere_from_secrets
+
+# ════════════════════════════════════════════════════════════
+#  إدارة المفاتيح
+# ════════════════════════════════════════════════════════════
 if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.markdown("""
-    <div class="gc" style="text-align:center; padding:2rem;">
-        <div style="font-size:32px; margin-bottom:0.75rem;">🔐</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700;
-                    color:#e8f0ff; margin-bottom:0.3rem;">أدخل مفاتيح API</div>
-        <div style="font-size:11px; color:rgba(140,175,220,0.45);">
-            تُحفظ في الجلسة فقط ولا تُرسل لأي جهة
+    <div class="glass-card" style="text-align:center; padding: 2.5rem 2rem;">
+        <div style="font-size:36px; margin-bottom:1rem;">🔐</div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:700;
+                    color:#e8f0ff; margin-bottom:0.4rem;">Connect Your API Keys</div>
+        <div style="font-size:12px; color:rgba(150,185,230,0.5); letter-spacing:0.04em;">
+            Securely stored in your browser session only
         </div>
     </div>
     """, unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
         if not st.session_state.deepl_api_key:
-            v = st.text_input("DeepL API Key", type="password", placeholder="xxxx:fx")
-            if v:
-                st.session_state.deepl_api_key = v
+            deepl_input = st.text_input("DeepL API Key", type="password", placeholder="abc...xyz:fx")
+            if deepl_input:
+                st.session_state.deepl_api_key = deepl_input
+                st.success("✅ DeepL connected")
                 st.rerun()
         else:
-            st.success("✅ DeepL")
-    with c2:
+            st.success("✅ DeepL Active")
+    
+    with col2:
         if not st.session_state.cohere_api_key:
-            v = st.text_input("Cohere API Key", type="password", placeholder="xxxx-xxxx")
-            if v:
-                st.session_state.cohere_api_key = v
+            cohere_input = st.text_input("Cohere API Key", type="password", placeholder="abcd-1234-efgh-5678")
+            if cohere_input:
+                st.session_state.cohere_api_key = cohere_input
+                st.success("✅ Cohere connected")
                 st.rerun()
         else:
-            st.success("✅ Cohere")
+            st.success("✅ Cohere Active")
+    
+    st.caption("💡 Keys are never stored on any server — session only.")
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION
+#  TRANSLATION ENGINE
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
+    if not st.session_state.deepl_api_key:
+        return None, "No DeepL API key configured"
+        
     tl = target_lang.upper()
-    ep = "https://api-free.deepl.com/v2/translate" if st.session_state.deepl_api_key.endswith(":fx") else "https://api.deepl.com/v2/translate"
+    
+    if st.session_state.deepl_api_key.endswith(":fx"):
+        endpoint = "https://api-free.deepl.com/v2/translate"
+    else:
+        endpoint = "https://api.deepl.com/v2/translate"
+        
     try:
-        r = requests.post(ep,
+        resp = requests.post(
+            endpoint,
             headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"},
-            data={"text": text, "target_lang": tl}, timeout=15)
-        if r.status_code == 200:
-            return r.json()["translations"][0]["text"], None
-        return None, f"خطأ {r.status_code}"
+            data={"text": text, "target_lang": tl},
+            timeout=15
+        )
+        if resp.status_code == 200:
+            return resp.json()["translations"][0]["text"], None
+        else:
+            return None, f"DeepL error {resp.status_code}: {resp.text}"
     except Exception as e:
-        return None, str(e)
+        return None, f"Request error: {str(e)}"
 
-def do_translate(text, target_lang):
-    result, err = translate_deepl(text, target_lang)
-    return (result, None) if result else (None, err)
+def fetch_ai_translation(text, target_lang):
+    result, error = translate_deepl(text, target_lang)
+    if result:
+        return result, "DeepL"
+    return None, error
 
 # ════════════════════════════════════════════════════════════
-#  SPEECH-TO-TEXT
+#  SPEECH-TO-TEXT (Cohere)
 # ════════════════════════════════════════════════════════════
-def stt_cohere(audio_bytes, lang="auto"):
+def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
-        return None, "مفتاح Cohere غير موجود"
+        return None, "مفتاح Cohere API غير موجود."
+
     try:
         fields = OrderedDict()
-        fields['language'] = "en" if lang in ("auto", None) else lang
+        
+        if language_code == "auto" or language_code is None:
+            lang = "en"
+        else:
+            lang = language_code
+        
+        fields['language'] = lang
         fields['model'] = 'cohere-transcribe-03-2026'
         fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
-        enc = MultipartEncoder(fields=fields)
-        r = requests.post("https://api.cohere.com/v2/audio/transcriptions",
-            headers={"Authorization": f"Bearer {st.session_state.cohere_api_key}", "Content-Type": enc.content_type},
-            data=enc, timeout=30)
-        if r.status_code == 200:
-            t = r.json().get("text", "").strip()
-            return (t, None) if t else (None, "لم يتم التعرف على كلام")
-        return None, f"خطأ {r.status_code}"
-    except Exception as e:
-        return None, str(e)
 
+        encoder = MultipartEncoder(fields=fields)
+
+        response = requests.post(
+            "https://api.cohere.com/v2/audio/transcriptions",
+            headers={
+                "Authorization": f"Bearer {st.session_state.cohere_api_key}",
+                "Content-Type": encoder.content_type,
+            },
+            data=encoder,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            text = result.get("text", "").strip()
+            if text:
+                return text, "Cohere Transcribe"
+            else:
+                return None, "لم يتم التعرف على أي كلام"
+        else:
+            return None, f"Cohere error {response.status_code}: {response.text}"
+
+    except Exception as e:
+        return None, f"خطأ في Cohere: {str(e)}"
+
+# ════════════════════════════════════════════════════════════
+#  SPEECH-TO-TEXT (Faster-Whisper للروسية)
+# ════════════════════════════════════════════════════════════
 @st.cache_resource
-def load_whisper():
+def load_whisper_model():
     try:
         from faster_whisper import WhisperModel
         return WhisperModel("small", device="cpu", compute_type="int8")
-    except:
+    except ImportError:
+        return None
+    except Exception:
         return None
 
-def stt_whisper(audio_bytes):
-    model = load_whisper()
+def speech_to_text_whisper(audio_bytes):
+    model = load_whisper_model()
     if not model:
-        return None, "نموذج Whisper غير متاح"
-    tmp = None
+        return None, "⚠️ نموذج التعرف غير متاح"
+    
+    tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            f.write(audio_bytes); tmp = f.name
-        segs, _ = model.transcribe(tmp, language="ru", beam_size=5, temperature=0.0, vad_filter=True)
-        t = " ".join(s.text for s in segs).strip()
-        return (t, None) if t else (None, "لم يتم التعرف على كلام")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+        
+        segments, info = model.transcribe(
+            tmp_path,
+            language="ru",
+            beam_size=5,
+            temperature=0.0,
+            vad_filter=True
+        )
+        
+        text = " ".join(segment.text for segment in segments).strip()
+        
+        if text:
+            return text, "Faster-Whisper"
+        else:
+            return None, "لم يتم التعرف على أي كلام بالروسية"
     except Exception as e:
-        return None, str(e)
+        return None, f"خطأ: {str(e)}"
     finally:
         try:
-            if tmp and os.path.exists(tmp): os.unlink(tmp)
-        except: pass
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except:
+            pass
 
-def stt(audio_bytes, lang="auto"):
-    if lang == "ru":
-        return stt_whisper(audio_bytes)
-    return stt_cohere(audio_bytes, lang)
+def speech_to_text(audio_bytes, language_code="auto"):
+    if language_code == "ru":
+        return speech_to_text_whisper(audio_bytes)
+    else:
+        return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  LANGUAGE SELECTORS
+#  SESSION STATE
 # ════════════════════════════════════════════════════════════
-lang_list  = list(languages_dict.keys())
+if "source_lang" not in st.session_state:
+    st.session_state.source_lang = "Auto-Detect"
+if "target_lang" not in st.session_state:
+    st.session_state.target_lang = "Arabic"
+if "input_text" not in st.session_state:
+    st.session_state.input_text = ""
+if "selected_style" not in st.session_state:
+    st.session_state.selected_style = "Auto-Detect"
+if "translated_text" not in st.session_state:
+    st.session_state.translated_text = ""
+
+def swap_languages():
+    old_source = st.session_state.source_lang
+    old_target = st.session_state.target_lang
+    st.session_state.source_lang = old_target
+    st.session_state.target_lang = old_source
+
+# ════════════════════════════════════════════════════════════
+#  UI - بسيط وجذاب
+# ════════════════════════════════════════════════════════════
+lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
 
 if st.session_state.target_lang == st.session_state.source_lang:
-    for l in lang_list:
-        if l != st.session_state.source_lang:
-            st.session_state.target_lang = l; break
+    for lang in lang_list:
+        if lang != st.session_state.source_lang:
+            st.session_state.target_lang = lang
+            break
 
-src_idx  = lang_list.index(st.session_state.source_lang) if st.session_state.source_lang in lang_list else 0
-tgt_opts = [k for k in lang_list if k != st.session_state.source_lang and k != "Auto-Detect"]
-tgt_idx  = tgt_opts.index(st.session_state.target_lang) if st.session_state.target_lang in tgt_opts else 0
-sty_idx  = style_list.index(st.session_state.selected_style) if st.session_state.selected_style in style_list else 0
+src_idx = lang_list.index(st.session_state.source_lang) if st.session_state.source_lang in lang_list else 0
+tgt_options = [k for k in lang_list if k != st.session_state.source_lang and k != "Auto-Detect"]
+tgt_idx = tgt_options.index(st.session_state.target_lang) if st.session_state.target_lang in tgt_options else 0
+style_idx = style_list.index(st.session_state.selected_style) if st.session_state.selected_style in style_list else 0
 
-def swap_langs():
-    s, t = st.session_state.source_lang, st.session_state.target_lang
-    st.session_state.source_lang, st.session_state.target_lang = t, s
+# ====== اللغات ======
+st.markdown('<div class="section-heading">Translation Direction</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="sh">اتجاه الترجمة</div>', unsafe_allow_html=True)
-cl, cm, cr = st.columns([1, 0.18, 1])
-with cl:
-    src_name = st.selectbox("من", lang_list, index=src_idx)
-with cm:
-    st.markdown("<div style='height:26px;'></div>", unsafe_allow_html=True)
-    if st.button("⇄", use_container_width=True):
-        swap_langs()
-with cr:
-    tgt_name = st.selectbox("إلى", tgt_opts, index=tgt_idx)
+col_left, col_mid, col_right = st.columns([1, 0.18, 1])
 
-st.session_state.source_lang = src_name
-st.session_state.target_lang = tgt_name
-src_lang = languages_dict[src_name]
-tgt_lang = languages_dict[tgt_name]
+with col_left:
+    source_lang_name = st.selectbox("From", lang_list, index=src_idx)
 
-st.markdown('<div class="sh">المجال</div>', unsafe_allow_html=True)
-sel_style = st.selectbox("المجال", style_list, index=sty_idx, label_visibility="collapsed")
-sel_domain = STYLE_OPTIONS[sel_style]
-st.session_state.selected_style = sel_style
+with col_mid:
+    st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+    if st.button("⇄", help="Swap", use_container_width=True):
+        swap_languages()
 
-# ════════════════════════════════════════════════════════════
-#  VOICE INPUT — صغيرة ومدمجة
-# ════════════════════════════════════════════════════════════
+with col_right:
+    target_lang_name = st.selectbox("To", tgt_options, index=tgt_idx)
+
+st.session_state.source_lang = source_lang_name
+st.session_state.target_lang = target_lang_name
+
+source_lang = languages_dict[source_lang_name]
+target_lang = languages_dict[target_lang_name]
+
+# ====== النمط ======
+st.markdown('<div class="section-heading">Domain Style</div>', unsafe_allow_html=True)
+selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_visibility="collapsed")
+selected_domain = STYLE_OPTIONS[selected_style_label]
+st.session_state.selected_style = selected_style_label
+
+# ====== الميكروفون ======
 st.markdown("---")
 
-lang_hint = {"ru": "روسي (Whisper)", "auto": "كشف تلقائي", "ar": "عربي", "en": "إنجليزي",
-             "zh": "صيني", "de": "ألماني", "es": "إسباني", "pt": "برتغالي", "ko": "كوري"}
-hint = lang_hint.get(src_lang, src_name)
+st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
+
+if source_lang == "ru":
+    engine_info = "Faster-Whisper · High-accuracy Russian"
+elif source_lang == "auto":
+    engine_info = "Cohere · Auto Language Detection"
+else:
+    engine_info = f"Cohere · {source_lang_name}"
 
 st.markdown(f"""
-<div class="mic-strip">
-    <div class="mic-dot">🎙️</div>
-    <div>
-        <div class="mic-label">تسجيل صوتي</div>
-        <div class="mic-sub">{hint} · ترجمة فورية بعد التسجيل</div>
+<div class="glass-card" style="text-align:center; padding: 2rem 1rem 1.5rem;">
+    <div class="mic-icon-wrap">🎤</div>
+    <div style="font-size:15px; font-weight:600; color:#e8f0ff; margin-bottom:4px;">
+        Record Your Message
     </div>
+    <span class="engine-badge">{engine_info}</span>
 </div>
 """, unsafe_allow_html=True)
 
-audio_value = st.audio_input("", label_visibility="collapsed")
+audio_value = st.audio_input("")
 
 if audio_value:
-    with st.spinner("جارٍ التعرف على الكلام..."):
-        recognized, err = stt(audio_value.getvalue(), src_lang)
-    if recognized:
-        st.success(f"✅ {recognized}")
-        with st.spinner("جارٍ الترجمة..."):
-            result, terr = do_translate(recognized, tgt_lang)
-        if result:
-            st.markdown('<div class="sh">نتيجة الترجمة الصوتية</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="rb"><span class="rb-label">✦ ترجمة</span><div class="rb-text">{result}</div></div>', unsafe_allow_html=True)
-            st.code(result, language=None)
+    with st.spinner("⏳ جاري التعرف..."):
+        audio_bytes = audio_value.getvalue()
+        recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
+        
+        if recognized_text:
+            st.success(f"✅ {recognized_text}")
+            st.session_state.input_text = recognized_text
+            
+            if st.button("Translate ✦", use_container_width=True):
+                with st.spinner("⏳ جاري الترجمة..."):
+                    translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
+                    if translated_text:
+                        st.session_state.translated_text = translated_text
+                        st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="result-box">
+                            <span class="label">✦ DeepL Translation</span>
+                            <div class="text">{translated_text}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.code(translated_text, language=None)
+                    else:
+                        st.error(f"❌ {engine}")
         else:
-            st.error(f"❌ {terr}")
-    else:
-        st.error(f"❌ {err}")
+            st.error(f"❌ {engine_used}")
 
-# ════════════════════════════════════════════════════════════
-#  TEXT INPUT — ترجمة فورية عند الكتابة
-# ════════════════════════════════════════════════════════════
+# ====== نص مكتوب ======
 st.markdown("---")
-st.markdown('<div class="sh">النص المكتوب</div>', unsafe_allow_html=True)
-
-st.markdown("""
-<div class="live-badge">
-    <span class="pdot"></span>
-    ترجمة فورية عند الكتابة
-</div>
-""", unsafe_allow_html=True)
+st.markdown('<div class="section-heading">Text Input</div>', unsafe_allow_html=True)
 
 input_text = st.text_area(
-    "", height=AREA_H,
-    placeholder="اكتب النص هنا... / Type here...",
-    key="live_input"
+    "",
+    height=100,
+    placeholder="اكتب أو الصق النص هنا...",
+    value=st.session_state.input_text,
+    key="input_text_area"
 )
 
-# ── كشف المجال ──
-detected = []
+if input_text != st.session_state.input_text:
+    st.session_state.input_text = input_text
+
+# ====== سياق ======
 if input_text.strip():
     detected = detect_domains(input_text)
     if detected:
-        badges = "".join(
-            f'<span class="tag tag-{d}">{DOMAINS[d]["emoji"]} {DOMAINS[d]["name_en"]}</span>'
-            for d in detected[:3]
-        )
-        st.markdown(f'<div class="ctx">🔍 {badges}</div>', unsafe_allow_html=True)
+        badges = ""
+        for d in detected[:3]:
+            dn = DOMAINS[d]["name_en"]
+            emoji = DOMAINS[d]["emoji"]
+            css_class = f"tag-{d}" if d in DOMAINS else "tag-gen"
+            badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
+        st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
 
-# ── الترجمة الفورية ──
-# المنطق: إذا تغير النص أو تغيرت لغة الهدف → نترجم
-current_text = input_text.strip()
-current_target = tgt_lang
+# ====== زر الترجمة ======
+if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
+    if not st.session_state.deepl_api_key:
+        st.error("❌ DeepL API key missing.")
+    elif not input_text.strip():
+        st.warning("الرجاء إدخال نص للترجمة.")
+    else:
+        with st.spinner("جاري الترجمة..."):
+            translation_result, source_engine = fetch_ai_translation(input_text, target_lang)
 
-needs_translation = (
-    current_text
-    and len(current_text) >= 3
-    and (
-        current_text != st.session_state.prev_input
-        or current_target != st.session_state.prev_target
-    )
-)
+            if translation_result:
+                active_domain = "general"
+                if selected_domain and selected_domain != "general":
+                    active_domain = selected_domain
+                elif detected:
+                    active_domain = detected[0]
 
-if needs_translation:
-    with st.spinner("⚡ جارٍ الترجمة..."):
-        live_result, live_err = do_translate(current_text, current_target)
+                final_translation = translation_result
 
-    if live_result:
-        st.session_state.prev_input = current_text
-        st.session_state.prev_target = current_target
-        st.session_state.prev_translation = live_result
+                st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="result-box">
+                    <span class="label">✦ DeepL Translation</span>
+                    <div class="text">{final_translation}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.code(final_translation, language=None)
+            else:
+                st.error(f"❌ {translation_result}")
 
-        active = sel_domain or (detected[0] if detected else "general")
-        d_emoji = DOMAINS.get(active, {}).get("emoji", "💬")
-        d_name  = DOMAINS.get(active, {}).get("name_en", "General")
-
-        st.markdown('<div class="sh">الترجمة</div>', unsafe_allow_html=True)
-        st.markdown(
-            f'<div class="rb"><span class="rb-label">✦ {d_emoji} {d_name}</span>'
-            f'<div class="rb-text">{live_result}</div></div>',
-            unsafe_allow_html=True
-        )
-        st.code(live_result, language=None)
-
-    elif len(current_text) >= 10:
-        st.error(f"❌ {live_err}")
-
-elif (
-    st.session_state.prev_translation
-    and current_text == st.session_state.prev_input
-    and current_target == st.session_state.prev_target
-):
-    # عرض آخر ترجمة إذا لم يتغير النص
-    active = sel_domain or (detected[0] if detected else "general")
-    d_emoji = DOMAINS.get(active, {}).get("emoji", "💬")
-    d_name  = DOMAINS.get(active, {}).get("name_en", "General")
-    st.markdown('<div class="sh">الترجمة</div>', unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="rb"><span class="rb-label">✦ {d_emoji} {d_name}</span>'
-        f'<div class="rb-text">{st.session_state.prev_translation}</div></div>',
-        unsafe_allow_html=True
-    )
-    st.code(st.session_state.prev_translation, language=None)
-
-elif not current_text:
-    st.session_state.prev_input = ""
-    st.session_state.prev_translation = ""
-    st.session_state.prev_target = ""
+# ====== Footer ======
+st.markdown("""
+<div style="text-align:center; padding: 3rem 0 1rem; color:rgba(100,130,170,0.3); font-size:11px;
+            letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
+    Hassan Nasser &nbsp;·&nbsp; Voice Translation Suite &nbsp;·&nbsp; Powered by DeepL & Cohere
+</div>
+""", unsafe_allow_html=True)
