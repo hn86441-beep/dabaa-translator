@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم متطور مع زر إزالة أنيق
+#  CSS
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -637,7 +637,7 @@ with col_clear:
             clear_audio()
         st.markdown('</div>', unsafe_allow_html=True)
 
-# معالجة الصوت المرفوع
+# ====== معالجة الصوت المرفوع ======
 if audio_value is not None:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
@@ -663,8 +663,6 @@ if audio_value is not None:
                     # ✅ حذف التسجيل الصوتي نهائياً وإعادة التشغيل
                     if "mic_audio_main" in st.session_state:
                         del st.session_state.mic_audio_main
-                    # نستمر في التنفيذ لإعادة التشغيل بعد عرض الترجمة
-                    # سنقوم بإعادة التشغيل بعد فترة قصيرة للسماح بعرض الترجمة
                     st.rerun()
                 else:
                     st.error(f"❌ {engine}")
