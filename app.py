@@ -36,7 +36,7 @@ if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = ""
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم مضغوط مع ميكروفون صغير
+#  CSS — تصميم مضغوط مع زر ميكروفون صغير
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -136,32 +136,16 @@ st.markdown("""
     background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
 }
 
-/* ====== ميكروفون صغير ====== */
+/* ====== زر الميكروفون الصغير ====== */
 div[data-testid="stAudioInput"] {
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.09) !important;
-    border-radius: 12px !important;
+    background: transparent !important;
+    border: none !important;
     padding: 0 !important;
-    margin-bottom: 0.4rem !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06) !important;
-    position: relative !important;
-    overflow: hidden !important;
-    transition: all 0.3s ease !important;
-}
-
-div[data-testid="stAudioInput"]:hover {
-    border-color: rgba(78,203,160,0.4) !important;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 30px rgba(78,203,160,0.05) !important;
-}
-
-div[data-testid="stAudioInput"]::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(78,203,160,0.4), transparent);
+    margin: 0 !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    width: auto !important;
+    display: inline-block !important;
 }
 
 div[data-testid="stAudioInput"] label {
@@ -169,54 +153,33 @@ div[data-testid="stAudioInput"] label {
 }
 
 div[data-testid="stAudioInput"] button {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0.6rem 0.5rem !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.09) !important;
+    border-radius: 50% !important;
+    padding: 0.3rem !important;
     margin: 0 !important;
-    min-height: 50px !important;
-    width: 100% !important;
-    border-radius: 12px !important;
+    min-height: 44px !important;
+    min-width: 44px !important;
+    width: 44px !important;
+    height: 44px !important;
     display: flex !important;
-    flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
+    transition: all 0.3s ease !important;
+}
+
+div[data-testid="stAudioInput"] button:hover {
+    transform: scale(1.05);
+    border-color: rgba(78,203,160,0.5) !important;
+    box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
 }
 
 div[data-testid="stAudioInput"] button > div {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 100% !important;
-}
-
-div[data-testid="stAudioInput"] button .mic-icon-custom {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%);
-    border: 1.5px solid rgba(78,203,160,0.25);
-    font-size: 20px;
-    margin-bottom: 0.1rem;
-    box-shadow: 0 0 20px rgba(78,203,160,0.1), inset 0 1px 0 rgba(78,203,160,0.15);
-    transition: all 0.3s ease;
-}
-
-div[data-testid="stAudioInput"] button .mic-label-custom {
-    font-size: 11px;
-    font-weight: 600;
-    color: #e8f0ff;
-    margin-bottom: 0px;
-}
-
-div[data-testid="stAudioInput"] button .mic-hint-custom {
-    font-size: 9px;
-    color: rgba(180,200,230,0.45);
+    font-size: 20px !important;
+    line-height: 1 !important;
+    color: #e8f0ff !important;
 }
 
 /* ====== Selectbox ====== */
@@ -793,26 +756,14 @@ if selected_style_label != st.session_state.selected_style:
     st.session_state.selected_style = selected_style_label
 selected_domain = STYLE_OPTIONS[selected_style_label]
 
-# ====== الميكروفون الصغير ======
+# ====== زر الميكروفون الصغير (بدون أي مربع أبيض) ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
-# استخدام st.audio_input مع تنسيق صغير
+# العنصر الوحيد هو st.audio_input المصمم كزر
 audio_value = st.audio_input("", key="mic_audio", label_visibility="collapsed")
 
-# وضع المحتوى المخصص فوق العنصر
-st.markdown("""
-<div style="text-align:center; margin-top: -1.8rem; margin-bottom: 0.2rem; pointer-events: none;">
-    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0.2rem 0;">
-        <div style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:radial-gradient(circle, rgba(78,203,160,0.15) 0%, rgba(78,203,160,0.04) 70%); border:1.5px solid rgba(78,203,160,0.25); font-size:18px; margin-bottom:0.1rem;">
-            🎤
-        </div>
-        <div style="font-size:11px; font-weight:600; color:#e8f0ff;">Record</div>
-        <div style="font-size:8px; color:rgba(180,200,230,0.4);">Click to speak</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
+# ستظهر أيقونة الميكروفون داخل الزر تلقائياً بسبب CSS
 if audio_value:
     with st.spinner("⏳ Processing..."):
         audio_bytes = audio_value.getvalue()
@@ -820,7 +771,6 @@ if audio_value:
         if recognized_text:
             st.success(f"✅ {recognized_text}")
             st.session_state.input_text = recognized_text
-            # الترجمة التلقائية مباشرة
             with st.spinner("⏳ Translating..."):
                 translated_text, err = fetch_ai_translation(recognized_text, target_lang)
                 if translated_text:
