@@ -8,8 +8,8 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
 st.set_page_config(
-    page_title="HASSAN NASSER | Voice Translator",
-    page_icon="🎤",
+    page_title="HN TRANSLATOR",
+    page_icon="🌐",
     layout="centered"
 )
 
@@ -31,7 +31,6 @@ st.markdown("""
     min-height: 100vh;
 }
 
-/* شبكة خلفية ناعمة */
 .stApp::before {
     content: '';
     position: fixed;
@@ -162,19 +161,6 @@ st.markdown("""
     font-weight: 400;
 }
 
-.engine-badge {
-    display: inline-block;
-    margin-top: 6px;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    background: rgba(78,203,160,0.12);
-    color: #4ECBA0;
-    border: 1px solid rgba(78,203,160,0.2);
-}
-
 /* ====== Selectbox ====== */
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
@@ -232,7 +218,6 @@ st.markdown("""
     transform: translateY(0) !important;
 }
 
-/* زر المبادلة ⇄ */
 .stButton:has(button[title="Swap"]) > button,
 .stButton > button[kind="secondary"] {
     background: rgba(255,255,255,0.07) !important;
@@ -475,9 +460,9 @@ hr {
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
-    <span class="brand">✦ Professional Translation Suite ✦</span>
-    <h1>HASSAN <span class="accent">NASSER</span></h1>
-    <p class="subtitle">Voice Translator &nbsp;·&nbsp; 8 Languages</p>
+    <span class="brand">✦ Smart Voice Translator ✦</span>
+    <h1>HN <span class="accent">TRANSLATOR</span></h1>
+    <p class="subtitle">Voice &amp; Text Translation · 8 Languages</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -609,7 +594,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
             deepl_input = st.text_input("DeepL API Key", type="password", placeholder="abc...xyz:fx")
             if deepl_input:
                 st.session_state.deepl_api_key = deepl_input
-                st.success("✅ DeepL connected")
+                st.success("✅ Connected")
                 st.rerun()
         else:
             st.success("✅ DeepL Active")
@@ -619,7 +604,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
             cohere_input = st.text_input("Cohere API Key", type="password", placeholder="abcd-1234-efgh-5678")
             if cohere_input:
                 st.session_state.cohere_api_key = cohere_input
-                st.success("✅ Cohere connected")
+                st.success("✅ Connected")
                 st.rerun()
         else:
             st.success("✅ Cohere Active")
@@ -632,7 +617,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
-        return None, "No DeepL API key configured"
+        return None, "No API key configured"
         
     tl = target_lang.upper()
     
@@ -658,7 +643,7 @@ def translate_deepl(text, target_lang):
 def fetch_ai_translation(text, target_lang):
     result, error = translate_deepl(text, target_lang)
     if result:
-        return result, "DeepL"
+        return result, "Translator"
     return None, error
 
 # ════════════════════════════════════════════════════════════
@@ -666,7 +651,7 @@ def fetch_ai_translation(text, target_lang):
 # ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
-        return None, "مفتاح Cohere API غير موجود."
+        return None, "مفتاح API غير موجود."
 
     try:
         fields = OrderedDict()
@@ -696,14 +681,14 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
             result = response.json()
             text = result.get("text", "").strip()
             if text:
-                return text, "Cohere Transcribe"
+                return text, "Speech Recognition"
             else:
                 return None, "لم يتم التعرف على أي كلام"
         else:
             return None, f"Cohere error {response.status_code}: {response.text}"
 
     except Exception as e:
-        return None, f"خطأ في Cohere: {str(e)}"
+        return None, f"خطأ: {str(e)}"
 
 # ════════════════════════════════════════════════════════════
 #  SPEECH-TO-TEXT (Faster-Whisper للروسية)
@@ -740,9 +725,9 @@ def speech_to_text_whisper(audio_bytes):
         text = " ".join(segment.text for segment in segments).strip()
         
         if text:
-            return text, "Faster-Whisper"
+            return text, "Speech Recognition"
         else:
-            return None, "لم يتم التعرف على أي كلام بالروسية"
+            return None, "لم يتم التعرف على أي كلام"
     except Exception as e:
         return None, f"خطأ: {str(e)}"
     finally:
@@ -828,20 +813,15 @@ st.markdown("---")
 
 st.markdown('<div class="section-heading">Voice Input</div>', unsafe_allow_html=True)
 
-if source_lang == "ru":
-    engine_info = "Faster-Whisper · High-accuracy Russian"
-elif source_lang == "auto":
-    engine_info = "Cohere · Auto Language Detection"
-else:
-    engine_info = f"Cohere · {source_lang_name}"
-
 st.markdown(f"""
 <div class="glass-card" style="text-align:center; padding: 2rem 1rem 1.5rem;">
     <div class="mic-icon-wrap">🎤</div>
     <div style="font-size:15px; font-weight:600; color:#e8f0ff; margin-bottom:4px;">
         Record Your Message
     </div>
-    <span class="engine-badge">{engine_info}</span>
+    <div style="font-size:12px; color:rgba(180,200,230,0.45);">
+        Speak clearly for best results
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -864,7 +844,7 @@ if audio_value:
                         st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                         st.markdown(f"""
                         <div class="result-box">
-                            <span class="label">✦ DeepL Translation</span>
+                            <span class="label">✦ Translation</span>
                             <div class="text">{translated_text}</div>
                         </div>
                         """, unsafe_allow_html=True)
@@ -904,7 +884,7 @@ if input_text.strip():
 # ====== زر الترجمة ======
 if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
     if not st.session_state.deepl_api_key:
-        st.error("❌ DeepL API key missing.")
+        st.error("❌ API key missing.")
     elif not input_text.strip():
         st.warning("الرجاء إدخال نص للترجمة.")
     else:
@@ -923,7 +903,7 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                 st.markdown(f"""
                 <div class="result-box">
-                    <span class="label">✦ DeepL Translation</span>
+                    <span class="label">✦ Translation</span>
                     <div class="text">{final_translation}</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -935,6 +915,6 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
 st.markdown("""
 <div style="text-align:center; padding: 3rem 0 1rem; color:rgba(100,130,170,0.3); font-size:11px;
             letter-spacing:0.12em; font-family:Inter,sans-serif; text-transform:uppercase;">
-    Hassan Nasser &nbsp;·&nbsp; Voice Translation Suite &nbsp;·&nbsp; Powered by DeepL & Cohere
+    HN TRANSLATOR &nbsp;·&nbsp; Voice Translation Suite
 </div>
 """, unsafe_allow_html=True)
