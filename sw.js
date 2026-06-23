@@ -1,58 +1,37 @@
+// sw.js - Service Worker لتطبيق HN Translator
 const CACHE_NAME = 'hn-translator-v1';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  // أضف أيقونات التطبيق هنا
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
-// تثبيت السيرفيس ووركر
+// تثبيت Service Worker وتخزين الملفات في الكاش
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('تم التخزين المؤقت للملفات');
-        return cache.addAll(urlsToCache);
-      })
+      .then(cache => cache.addAll(urlsToCache))
   );
 });
 
-// اعتراض الطلبات وتقديم نسخة مخزنة
+// اعتراض الطلبات وإرجاع النسخة المخزنة إذا كانت متاحة
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
-      .then(response => {
-        // إذا كانت الصفحة موجودة في التخزين المؤقت، قدمها
-        if (response) {
-          return response;
-        }
-        // وإلا، احصل عليها من الشبكة
-        return fetch(event.request)
-          .then(response => {
-            // لا تخزن الطلبات التي تفشل
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-            // تخزين نسخة من الاستجابة
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-            return response;
-          });
-      })
+      .then(response => response || fetch(event.request))
   );
 });
 
-// تحديث التخزين المؤقت عند تفعيل السيرفيس الجديد
+// تحديث Service Worker وحذف الكاش القديم
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
+          if (!cacheWhitelist.includes(cacheName)) {
             return caches.delete(cacheName);
           }
         })
