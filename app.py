@@ -453,8 +453,8 @@ def load_accentizer():
         # تعيين مسار الكاش قبل التحميل
         accentizer.cache_dir = cache_dir
         
-        # تحميل النموذج مع تعطيل الكاش (للتأكد من عدم استخدام المجلد الافتراضي)
-        accentizer.load(omograph_model_size='turbo3.1', use_dictionary=True, use_cache=False)
+        # تحميل النموذج (بدون use_cache لأن الإصدار لا يدعمه)
+        accentizer.load(omograph_model_size='turbo3.1', use_dictionary=True)
         return accentizer
     except Exception as e:
         st.error(f"⚠️ فشل تحميل نموذج النبر: {e}")
