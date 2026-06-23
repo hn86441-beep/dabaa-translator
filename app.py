@@ -440,20 +440,21 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  تحميل نموذج RUAccent (مع حل مشكلة صلاحية الكاش)
+#  تحميل نموذج RUAccent (حل جذري لمشكلة الصلاحية)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_accentizer():
-    """تحميل نموذج إضافة علامات النبر للغة الروسية مع تعيين مسار كاش قابل للكتابة."""
+    """تحميل نموذج إضافة علامات النبر مع حل مشكلة الكاش."""
     try:
-        # تعيين مسار الكاش إلى مجلد مؤقت (قابل للكتابة في جميع البيئات)
-        cache_dir = "/tmp/ruaccent_cache"
-        os.makedirs(cache_dir, exist_ok=True)
-        os.environ["RUACCENT_CACHE"] = cache_dir
+        # إنشاء مجلد مؤقت مخصص للكاش (قابل للكتابة)
+        cache_dir = tempfile.mkdtemp(prefix="ruaccent_")
         
         accentizer = RUAccent()
-        # تحميل القاموس والنموذج الخفيف (turbo3.1 سريع ودقيق)
-        accentizer.load(omograph_model_size='turbo3.1', use_dictionary=True)
+        # تعيين مسار الكاش قبل التحميل
+        accentizer.cache_dir = cache_dir
+        
+        # تحميل النموذج مع تعطيل الكاش (للتأكد من عدم استخدام المجلد الافتراضي)
+        accentizer.load(omograph_model_size='turbo3.1', use_dictionary=True, use_cache=False)
         return accentizer
     except Exception as e:
         st.error(f"⚠️ فشل تحميل نموذج النبر: {e}")
