@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
-from ruaccent import RUAccent  # <-- مكتبة إضافة علامات النبر المتقدمة
+from ruaccent import RUAccent  # مكتبة إضافة علامات النبر المتقدمة
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -440,12 +440,17 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  تحميل نموذج RUAccent (مرة واحدة فقط)
+#  تحميل نموذج RUAccent (مع حل مشكلة صلاحية الكاش)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_accentizer():
-    """تحميل نموذج إضافة علامات النبر للغة الروسية."""
+    """تحميل نموذج إضافة علامات النبر للغة الروسية مع تعيين مسار كاش قابل للكتابة."""
     try:
+        # تعيين مسار الكاش إلى مجلد مؤقت (قابل للكتابة في جميع البيئات)
+        cache_dir = "/tmp/ruaccent_cache"
+        os.makedirs(cache_dir, exist_ok=True)
+        os.environ["RUACCENT_CACHE"] = cache_dir
+        
         accentizer = RUAccent()
         # تحميل القاموس والنموذج الخفيف (turbo3.1 سريع ودقيق)
         accentizer.load(omograph_model_size='turbo3.1', use_dictionary=True)
