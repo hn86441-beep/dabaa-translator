@@ -8,16 +8,29 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
 # ════════════════════════════════════════════════════════════
-#  محاولة استيراد tsnorm
+#  محاولة استيراد ruaccent مع حل مشكلة الكاش
 # ════════════════════════════════════════════════════════════
 try:
-    import tsnorm
-    HAS_TSNORM = True
-    tsnorm_normalize = tsnorm.normalize
+    from ruaccent import RUAccent
+    HAS_RUACCENT = True
 except ImportError:
-    HAS_TSNORM = False
-    def tsnorm_normalize(text):
-        return text
+    HAS_RUACCENT = False
+
+# تحميل النموذج إذا كانت المكتبة متوفرة
+accentizer = None
+if HAS_RUACCENT:
+    try:
+        # تعيين مجلد الكاش إلى مجلد مؤقت (لتجنب Permission denied)
+        cache_dir = os.path.join(tempfile.gettempdir(), "ruaccent_cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        os.environ["RUACCENT_CACHE"] = cache_dir
+        
+        accentizer = RUAccent()
+        accentizer.cache_dir = cache_dir
+        accentizer.load(omograph_model_size='turbo3', use_dictionary=False)
+    except Exception as e:
+        st.error(f"⚠️ فشل تحميل نموذج ruaccent: {e}")
+        accentizer = None
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -344,10 +357,12 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 # ════════════════════════════════════════════════════════════
 #  عرض حالة المكتبة
 # ════════════════════════════════════════════════════════════
-if HAS_TSNORM:
-    st.success("✅ **مكتبة tsnorm مثبتة** - علامات النبر للغة الروسية متاحة")
+if HAS_RUACCENT and accentizer is not None:
+    st.success("✅ **ruaccent مثبتة وتعمل** - علامات النبر للغة الروسية متاحة")
+elif HAS_RUACCENT and accentizer is None:
+    st.warning("⚠️ **ruaccent مثبتة لكن فشل التحميل** - تحقق من إعدادات الكاش")
 else:
-    st.warning("⚠️ **مكتبة tsnorm غير مثبتة** - لن تعمل علامات النبر. قم بتثبيتها عبر `pip install tsnorm`")
+    st.error("❌ **ruaccent غير مثبتة** - لن تعمل علامات النبر. قم بتثبيتها عبر `pip install ruaccent`")
 
 # ════════════════════════════════════════════════════════════
 #  العنوان
@@ -482,16 +497,20 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  دالة إضافة النبر باستخدام tsnorm
+#  دالة إضافة النبر باستخدام ruaccent
 # ════════════════════════════════════════════════════════════
 def add_russian_stress(text, target_lang):
-    """إضافة علامات النبر للغة الروسية باستخدام tsnorm."""
-    if not text or target_lang != "ru" or not HAS_TSNORM:
+    """إضافة علامات النبر للغة الروسية باستخدام ruaccent."""
+    if not text or target_lang != "ru":
         return text
-    try:
-        return tsnorm_normalize(text)
-    except Exception:
-        return text
+    
+    if accentizer is not None:
+        try:
+            return accentizer.process_all(text)
+        except Exception as e:
+            # في حالة الفشل، نرجع النص الأصلي
+            return text
+    return text
 
 # ════════════════════════════════════════════════════════════
 #  TRANSLATION & SPEECH FUNCTIONS
@@ -718,9 +737,9 @@ if input_text != st.session_state.input_text:
 if input_text.strip() and (source_lang == "ru" or target_lang == "ru"):
     st.markdown('<div class="stress-btn">', unsafe_allow_html=True)
     if st.button("🔊 إضافة علامات النبر (تشكيل)", key="stress_btn"):
-        if HAS_TSNORM:
+        if accentizer is not None:
             try:
-                stressed = tsnorm_normalize(input_text)
+                stressed = accentizer.process_all(input_text)
                 if stressed and stressed != input_text:
                     st.session_state.input_text = stressed
                     st.success("✅ تم إضافة علامات النبر بنجاح")
@@ -730,20 +749,20 @@ if input_text.strip() and (source_lang == "ru" or target_lang == "ru"):
             except Exception as e:
                 st.error(f"❌ فشل التشكيل: {e}")
         else:
-            st.error("❌ مكتبة tsnorm غير مثبتة")
+            st.error("❌ نموذج ruaccent غير متاح")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ====== زر اختبار النبر ======
 if st.button("🧪 اختبار النبر (تجربة)", key="test_stress"):
-    if HAS_TSNORM:
+    if accentizer is not None:
         try:
             test_text = "привет мир"
-            result = tsnorm_normalize(test_text)
+            result = accentizer.process_all(test_text)
             st.info(f"**النص الأصلي:** {test_text}\n\n**بعد النبر:** {result}")
         except Exception as e:
             st.error(f"❌ فشل الاختبار: {e}")
     else:
-        st.error("❌ tsnorm غير مثبتة")
+        st.error("❌ نموذج ruaccent غير متاح")
 
 # ====== السياق ======
 if input_text.strip():
