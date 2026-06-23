@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
+from ruaccent import RUAccent  # <-- مكتبة إضافة علامات النبر المتقدمة
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -439,6 +440,24 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
+#  تحميل نموذج RUAccent (مرة واحدة فقط)
+# ════════════════════════════════════════════════════════════
+@st.cache_resource
+def load_accentizer():
+    """تحميل نموذج إضافة علامات النبر للغة الروسية."""
+    try:
+        accentizer = RUAccent()
+        # تحميل القاموس والنموذج الخفيف (turbo3.1 سريع ودقيق)
+        accentizer.load(omograph_model_size='turbo3.1', use_dictionary=True)
+        return accentizer
+    except Exception as e:
+        st.error(f"⚠️ فشل تحميل نموذج النبر: {e}")
+        return None
+
+# تحميل النموذج
+accentizer = load_accentizer()
+
+# ════════════════════════════════════════════════════════════
 #  TRANSLATION & SPEECH FUNCTIONS
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
@@ -454,8 +473,23 @@ def translate_deepl(text, target_lang):
     except Exception as e:
         return None, f"Error: {str(e)}"
 
+def add_russian_stress(text, target_lang):
+    """إضافة علامات النبر للنص إذا كانت اللغة الهدف هي الروسية والنموذج محمّل."""
+    if target_lang == "ru" and text and accentizer is not None:
+        try:
+            return accentizer.process_all(text)
+        except Exception as e:
+            # في حالة الفشل، نرجع النص الأصلي
+            return text
+    return text
+
 def fetch_ai_translation(text, target_lang):
-    return translate_deepl(text, target_lang)
+    result, error = translate_deepl(text, target_lang)
+    if result:
+        # إضافة علامات النبر إذا كانت اللغة الهدف روسية
+        result = add_russian_stress(result, target_lang)
+        return result, "Translator"
+    return None, error
 
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
