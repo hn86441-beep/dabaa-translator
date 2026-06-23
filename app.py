@@ -7,13 +7,15 @@ import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
-# محاولة استيراد tsnorm، وفي حالة الفشل استخدام دالة بديلة
+# ════════════════════════════════════════════════════════════
+#  محاولة استيراد tsnorm مع معالجة الأخطاء
+# ════════════════════════════════════════════════════════════
 try:
     import tsnorm
     HAS_TSNORM = True
 except ImportError:
     HAS_TSNORM = False
-    # دالة احتياطية تعيد النص كما هو دون تغيير
+    # دالة احتياطية تعيد النص كما هو
     def tsnorm_normalize(text):
         return text
 else:
@@ -342,6 +344,14 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
+#  عرض حالة مكتبة النبر
+# ════════════════════════════════════════════════════════════
+if HAS_TSNORM:
+    st.info("✅ **مكتبة tsnorm مثبتة** - علامات النبر للغة الروسية متاحة")
+else:
+    st.warning("⚠️ **مكتبة tsnorm غير مثبتة** - لن تعمل علامات النبر. قم بتثبيتها عبر `pip install tsnorm`")
+
+# ════════════════════════════════════════════════════════════
 #  العنوان
 # ════════════════════════════════════════════════════════════
 st.markdown("""
@@ -491,18 +501,26 @@ def translate_deepl(text, target_lang):
 
 def add_russian_stress(text, target_lang):
     """
-    إضافة علامات النبر للغة الروسية.
-    تعمل إذا كانت اللغة المصدر أو الهدف روسية، أو عند الطلب المباشر.
+    إضافة علامات النبر للغة الروسية باستخدام tsnorm.
+    تعمل فقط إذا كانت المكتبة مثبتة واللغة الهدف روسية.
     """
     if not text or not HAS_TSNORM:
         return text
     
-    # تطبيق النبر على أي نص روسي
-    # نتحقق إذا كانت اللغة المصدر أو الهدف روسية، أو نطبق مباشرة
+    # تطبيق النبر فقط إذا كانت اللغة الهدف روسية
     if target_lang == "ru":
         try:
-            return tsnorm_normalize(text)
-        except Exception:
+            # محاولة إضافة النبر
+            stressed = tsnorm_normalize(text)
+            # إذا كانت النتيجة مختلفة عن النص الأصلي، نرجعها
+            if stressed and stressed != text:
+                return stressed
+            else:
+                # محاولة مرة أخرى مع التأكد من أن النص من نوع str
+                return tsnorm_normalize(str(text))
+        except Exception as e:
+            # في حالة الفشل، نرجع النص الأصلي مع رسالة خطأ خفيفة
+            st.warning(f"⚠️ فشل إضافة النبر: {e}")
             return text
     return text
 
@@ -718,16 +736,35 @@ if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
 # ====== زر إضافة النبر (يظهر فقط للنص الروسي) ======
-if input_text.strip() and (source_lang == "Russian" or target_lang == "Russian"):
+if input_text.strip() and (source_lang == "ru" or target_lang == "ru"):
     st.markdown('<div class="stress-btn">', unsafe_allow_html=True)
     if st.button("🔊 إضافة علامات النبر (تشكيل)", key="stress_btn"):
         if HAS_TSNORM:
-            stressed_text = tsnorm_normalize(input_text)
-            st.session_state.input_text = stressed_text
-            st.rerun()
+            try:
+                stressed_text = tsnorm_normalize(input_text)
+                if stressed_text and stressed_text != input_text:
+                    st.session_state.input_text = stressed_text
+                    st.success("✅ تم إضافة علامات النبر بنجاح")
+                    st.rerun()
+                else:
+                    st.warning("⚠️ لم تتغير النصوص، قد يكون النص غير قابل للتشكيل")
+            except Exception as e:
+                st.error(f"❌ فشل التشكيل: {e}")
         else:
-            st.warning("⚠️ مكتبة tsnorm غير مثبتة. يرجى تثبيتها لتشغيل هذه الميزة.")
+            st.error("❌ مكتبة tsnorm غير مثبتة")
     st.markdown('</div>', unsafe_allow_html=True)
+
+# ====== زر اختبار النبر ======
+if st.button("🧪 اختبار النبر (تجربة)", key="test_stress"):
+    if HAS_TSNORM:
+        try:
+            test_text = "привет мир"
+            result = tsnorm_normalize(test_text)
+            st.info(f"**النص الأصلي:** {test_text}\n\n**بعد النبر:** {result}")
+        except Exception as e:
+            st.error(f"❌ خطأ في الاختبار: {e}")
+    else:
+        st.error("❌ tsnorm غير مثبتة")
 
 # ====== السياق ======
 if input_text.strip():
