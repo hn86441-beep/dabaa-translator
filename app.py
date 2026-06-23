@@ -8,55 +8,47 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
 # ════════════════════════════════════════════════════════════
-#  محاولة استيراد ruaccent مع حل مشكلة الكاش
+#  حل مشكلة صلاحية ruaccent قبل الاستيراد
 # ════════════════════════════════════════════════════════════
-HAS_RUACCENT = False
-HAS_TSNORM = False
-accentizer = None
+# تعيين متغير البيئة لتوجيه الكاش إلى مجلد مؤقت
+cache_dir = os.path.join(tempfile.gettempdir(), "ruaccent_cache")
+os.makedirs(cache_dir, exist_ok=True)
+os.environ["RUACCENT_CACHE"] = cache_dir
 
-# 1. محاولة استيراد ruaccent
+# محاولة استيراد ruaccent
 try:
     from ruaccent import RUAccent
     HAS_RUACCENT = True
 except ImportError:
-    pass
+    HAS_RUACCENT = False
 
-# 2. محاولة استيراد tsnorm كبديل
+# محاولة استيراد tsnorm كبديل
 try:
     import tsnorm
     HAS_TSNORM = True
 except ImportError:
-    pass
+    HAS_TSNORM = False
 
 # ════════════════════════════════════════════════════════════
-#  تحميل نموذج ruaccent مع حل الصلاحية
+#  تحميل نموذج ruaccent مع إعدادات آمنة
 # ════════════════════════════════════════════════════════════
 def load_ruaccent():
-    """تحميل نموذج ruaccent مع حل مشكلة Permission denied."""
+    """تحميل ruaccent مع حل مشكلة Permission denied."""
     if not HAS_RUACCENT:
         return None
     
     try:
-        # الطريقة الأكثر فعالية: تعيين مسار الكاش إلى مجلد المستخدم
-        home_dir = os.path.expanduser("~")
-        cache_dir = os.path.join(home_dir, ".ruaccent_cache")
-        os.makedirs(cache_dir, exist_ok=True)
-        os.environ["RUACCENT_CACHE"] = cache_dir
-        
-        # محاولة ثانية: استخدام /tmp إذا فشل الأول
-        if not os.access(cache_dir, os.W_OK):
-            cache_dir = os.path.join(tempfile.gettempdir(), "ruaccent_cache")
-            os.makedirs(cache_dir, exist_ok=True)
-            os.environ["RUACCENT_CACHE"] = cache_dir
-        
         accentizer = RUAccent()
+        # تعيين مسار الكاش إلى المجلد المؤقت
         accentizer.cache_dir = cache_dir
         
-        # تحميل النموذج الخفيف مع تعطيل القاموس
-        accentizer.load(
-            omograph_model_size='turbo3',
-            use_dictionary=False,
-        )
+        # محاولة التحميل بدون استخدام الكاش (إذا كان الإصدار يدعم)
+        try:
+            accentizer.load(omograph_model_size='turbo3', use_dictionary=False, use_cache=False)
+        except TypeError:
+            # إذا لم يدعم use_cache، نحاول بدونها
+            accentizer.load(omograph_model_size='turbo3', use_dictionary=False)
+        
         return accentizer
     except Exception as e:
         st.warning(f"⚠️ ruaccent فشل التحميل: {e}")
