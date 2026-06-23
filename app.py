@@ -6,7 +6,14 @@ from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
-from ruaccent import RUAccent  # مكتبة إضافة علامات النبر المتقدمة
+
+# محاولة استيراد ruaccent، وفي حالة الفشل استخدام tsnorm
+try:
+    from ruaccent import RUAccent
+    RUACCENT_AVAILABLE = True
+except ImportError:
+    RUACCENT_AVAILABLE = False
+    import tsnorm
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -440,24 +447,31 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  تحميل نموذج RUAccent (حل جذري لمشكلة الصلاحية)
+#  تحميل نموذج إضافة النبر (ruaccent مع حل لمشكلة الصلاحية)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_accentizer():
-    """تحميل نموذج إضافة علامات النبر مع حل مشكلة الكاش."""
+    """تحميل نموذج إضافة النبر باستخدام ruaccent مع حل مشكلة الكاش."""
+    if not RUACCENT_AVAILABLE:
+        return None
+    
     try:
-        # إنشاء مجلد مؤقت مخصص للكاش (قابل للكتابة)
+        # تعيين متغير البيئة لتوجيه الكاش إلى مجلد مؤقت
         cache_dir = tempfile.mkdtemp(prefix="ruaccent_")
+        os.environ["RUACCENT_CACHE"] = cache_dir
         
         accentizer = RUAccent()
-        # تعيين مسار الكاش قبل التحميل
+        # تعيين مسار الكاش داخل الكائن
         accentizer.cache_dir = cache_dir
         
-        # تحميل النموذج (بدون use_cache لأن الإصدار لا يدعمه)
-        accentizer.load(omograph_model_size='turbo3.1', use_dictionary=True)
+        # تحميل النموذج الخفيف مع تعطيل استخدام القاموس (لتجنب ملفات إضافية)
+        accentizer.load(
+            omograph_model_size='turbo3',  # نموذج خفيف
+            use_dictionary=False,          # تعطيل القاموس لتقليل الاعتماد على الكاش
+        )
         return accentizer
     except Exception as e:
-        st.error(f"⚠️ فشل تحميل نموذج النبر: {e}")
+        st.warning(f"⚠️ تعذر تحميل ruaccent: {e}. سيتم استخدام tsnorm كبديل.")
         return None
 
 # تحميل النموذج
@@ -480,14 +494,23 @@ def translate_deepl(text, target_lang):
         return None, f"Error: {str(e)}"
 
 def add_russian_stress(text, target_lang):
-    """إضافة علامات النبر للنص إذا كانت اللغة الهدف هي الروسية والنموذج محمّل."""
-    if target_lang == "ru" and text and accentizer is not None:
+    """إضافة علامات النبر للغة الروسية باستخدام ruaccent أو tsnorm كبديل."""
+    if target_lang != "ru" or not text:
+        return text
+    
+    # المحاولة باستخدام ruaccent
+    if accentizer is not None:
         try:
             return accentizer.process_all(text)
-        except Exception as e:
-            # في حالة الفشل، نرجع النص الأصلي
-            return text
-    return text
+        except Exception:
+            pass  # في حالة الفشل، ننتقل إلى البديل
+    
+    # البديل باستخدام tsnorm
+    try:
+        import tsnorm
+        return tsnorm.normalize(text)
+    except ImportError:
+        return text  # إذا لم توجد أي مكتبة، نرجع النص الأصلي
 
 def fetch_ai_translation(text, target_lang):
     result, error = translate_deepl(text, target_lang)
