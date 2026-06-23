@@ -160,6 +160,28 @@ button[kind="secondary"][data-testid="baseButton-secondary"]:hover {
     transform: scale(1.08) !important;
 }
 
+/* ====== زر التشكيل ====== */
+.stress-btn {
+    margin-top: 0.3rem;
+}
+.stress-btn button {
+    background: rgba(78,203,160,0.12) !important;
+    border: 1px solid rgba(78,203,160,0.25) !important;
+    color: #4ECBA0 !important;
+    font-size: 11px !important;
+    padding: 0.25rem 0.6rem !important;
+    border-radius: 20px !important;
+    width: auto !important;
+    min-height: 28px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s !important;
+}
+.stress-btn button:hover {
+    background: rgba(78,203,160,0.2) !important;
+    border-color: #4ECBA0 !important;
+    box-shadow: 0 0 20px rgba(78,203,160,0.15) !important;
+}
+
 /* ====== باقي العناصر ====== */
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
@@ -314,6 +336,7 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
     .stButton > button { font-size: 11px !important; min-height: 34px !important; }
     textarea { font-size: 13px !important; min-height: 50px !important; }
     button[kind="secondary"][data-testid="baseButton-secondary"] { width: 34px !important; height: 34px !important; font-size: 17px !important; }
+    .stress-btn button { font-size: 10px !important; padding: 0.15rem 0.5rem !important; min-height: 24px !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -467,8 +490,16 @@ def translate_deepl(text, target_lang):
         return None, f"Error: {str(e)}"
 
 def add_russian_stress(text, target_lang):
-    """إضافة علامات النبر للغة الروسية باستخدام tsnorm (مع خيار احتياطي)."""
-    if target_lang == "ru" and text and HAS_TSNORM:
+    """
+    إضافة علامات النبر للغة الروسية.
+    تعمل إذا كانت اللغة المصدر أو الهدف روسية، أو عند الطلب المباشر.
+    """
+    if not text or not HAS_TSNORM:
+        return text
+    
+    # تطبيق النبر على أي نص روسي
+    # نتحقق إذا كانت اللغة المصدر أو الهدف روسية، أو نطبق مباشرة
+    if target_lang == "ru":
         try:
             return tsnorm_normalize(text)
         except Exception:
@@ -680,11 +711,25 @@ if audio_value is not None:
 # ====== النص المكتوب ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Text Input</div>', unsafe_allow_html=True)
+
+# text_area مع قيمة من session_state
 input_text = st.text_area("", height=70, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
-# السياق
+# ====== زر إضافة النبر (يظهر فقط للنص الروسي) ======
+if input_text.strip() and (source_lang == "Russian" or target_lang == "Russian"):
+    st.markdown('<div class="stress-btn">', unsafe_allow_html=True)
+    if st.button("🔊 إضافة علامات النبر (تشكيل)", key="stress_btn"):
+        if HAS_TSNORM:
+            stressed_text = tsnorm_normalize(input_text)
+            st.session_state.input_text = stressed_text
+            st.rerun()
+        else:
+            st.warning("⚠️ مكتبة tsnorm غير مثبتة. يرجى تثبيتها لتشغيل هذه الميزة.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ====== السياق ======
 if input_text.strip():
     detected = detect_domains(input_text)
     if detected:
@@ -696,7 +741,7 @@ if input_text.strip():
             badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
         st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
 
-# زر الترجمة الرئيسي
+# ====== زر الترجمة الرئيسي ======
 if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
     if not st.session_state.deepl_api_key:
         st.error("❌ API key missing.")
