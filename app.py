@@ -7,80 +7,6 @@ import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
-# ════════════════════════════════════════════════════════════
-#  حل مشكلة صلاحية ruaccent قبل الاستيراد
-# ════════════════════════════════════════════════════════════
-# تعيين متغير البيئة لتوجيه الكاش إلى مجلد مؤقت
-cache_dir = os.path.join(tempfile.gettempdir(), "ruaccent_cache")
-os.makedirs(cache_dir, exist_ok=True)
-os.environ["RUACCENT_CACHE"] = cache_dir
-
-# محاولة استيراد ruaccent
-try:
-    from ruaccent import RUAccent
-    HAS_RUACCENT = True
-except ImportError:
-    HAS_RUACCENT = False
-
-# محاولة استيراد tsnorm كبديل
-try:
-    import tsnorm
-    HAS_TSNORM = True
-except ImportError:
-    HAS_TSNORM = False
-
-# ════════════════════════════════════════════════════════════
-#  تحميل نموذج ruaccent مع إعدادات آمنة
-# ════════════════════════════════════════════════════════════
-def load_ruaccent():
-    """تحميل ruaccent مع حل مشكلة Permission denied."""
-    if not HAS_RUACCENT:
-        return None
-    
-    try:
-        accentizer = RUAccent()
-        # تعيين مسار الكاش إلى المجلد المؤقت
-        accentizer.cache_dir = cache_dir
-        
-        # محاولة التحميل بدون استخدام الكاش (إذا كان الإصدار يدعم)
-        try:
-            accentizer.load(omograph_model_size='turbo3', use_dictionary=False, use_cache=False)
-        except TypeError:
-            # إذا لم يدعم use_cache، نحاول بدونها
-            accentizer.load(omograph_model_size='turbo3', use_dictionary=False)
-        
-        return accentizer
-    except Exception as e:
-        st.warning(f"⚠️ ruaccent فشل التحميل: {e}")
-        return None
-
-accentizer = load_ruaccent()
-
-# ════════════════════════════════════════════════════════════
-#  دالة إضافة النبر (تعمل مع ruaccent أو tsnorm)
-# ════════════════════════════════════════════════════════════
-def add_russian_stress(text, target_lang):
-    """إضافة علامات النبر للغة الروسية."""
-    if not text or target_lang != "ru":
-        return text
-
-    # 1. المحاولة باستخدام ruaccent
-    if accentizer is not None:
-        try:
-            return accentizer.process_all(text)
-        except Exception:
-            pass  # في حالة الفشل، ننتقل إلى البديل
-
-    # 2. المحاولة باستخدام tsnorm (إذا كانت متوفرة)
-    if HAS_TSNORM:
-        try:
-            return tsnorm.normalize(text)
-        except Exception:
-            pass
-
-    # 3. في حالة عدم وجود أي مكتبة، نرجع النص الأصلي
-    return text
-
 st.set_page_config(
     page_title="HN TRANSLATOR",
     page_icon="🌐",
@@ -220,28 +146,6 @@ button[kind="secondary"][data-testid="baseButton-secondary"]:hover {
     border-color: #f87171 !important;
     box-shadow: 0 0 30px rgba(239,68,68,0.15) !important;
     transform: scale(1.08) !important;
-}
-
-/* ====== زر التشكيل ====== */
-.stress-btn {
-    margin-top: 0.3rem;
-}
-.stress-btn button {
-    background: rgba(78,203,160,0.12) !important;
-    border: 1px solid rgba(78,203,160,0.25) !important;
-    color: #4ECBA0 !important;
-    font-size: 11px !important;
-    padding: 0.25rem 0.6rem !important;
-    border-radius: 20px !important;
-    width: auto !important;
-    min-height: 28px !important;
-    font-weight: 600 !important;
-    transition: all 0.3s !important;
-}
-.stress-btn button:hover {
-    background: rgba(78,203,160,0.2) !important;
-    border-color: #4ECBA0 !important;
-    box-shadow: 0 0 20px rgba(78,203,160,0.15) !important;
 }
 
 /* ====== باقي العناصر ====== */
@@ -398,22 +302,9 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
     .stButton > button { font-size: 11px !important; min-height: 34px !important; }
     textarea { font-size: 13px !important; min-height: 50px !important; }
     button[kind="secondary"][data-testid="baseButton-secondary"] { width: 34px !important; height: 34px !important; font-size: 17px !important; }
-    .stress-btn button { font-size: 10px !important; padding: 0.15rem 0.5rem !important; min-height: 24px !important; }
 }
 </style>
 """, unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════
-#  عرض حالة المكتبات
-# ════════════════════════════════════════════════════════════
-if accentizer is not None:
-    st.success("✅ **ruaccent** مثبتة وتعمل بشكل صحيح")
-elif HAS_RUACCENT:
-    st.warning("⚠️ **ruaccent** مثبتة لكن فشل التحميل (سيتم استخدام tsnorm كبديل)")
-elif HAS_TSNORM:
-    st.success("✅ **tsnorm** مثبتة (ruaccent غير متوفرة)")
-else:
-    st.error("❌ لا توجد مكتبة نبر متاحة. قم بتثبيت `ruaccent` أو `tsnorm`")
 
 # ════════════════════════════════════════════════════════════
 #  العنوان
@@ -564,11 +455,7 @@ def translate_deepl(text, target_lang):
         return None, f"Error: {str(e)}"
 
 def fetch_ai_translation(text, target_lang):
-    result, error = translate_deepl(text, target_lang)
-    if result:
-        result = add_russian_stress(result, target_lang)
-        return result, "Translator"
-    return None, error
+    return translate_deepl(text, target_lang)
 
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
@@ -724,18 +611,22 @@ st.session_state.selected_style = selected_style_label
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
+# عمودين: الميكروفون وزر الإزالة
 col_mic, col_clear = st.columns([5, 1])
 
 with col_mic:
+    # الميكروفون مع key ثابت
     audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
 
 with col_clear:
+    # التحقق من وجود ملف صوتي في session_state
     if "mic_audio_main" in st.session_state and st.session_state.mic_audio_main is not None:
         st.markdown('<div class="clear-btn-wrapper">', unsafe_allow_html=True)
         if st.button("✖", key="clear_btn", help="حذف التسجيل", type="secondary"):
             clear_audio()
         st.markdown('</div>', unsafe_allow_html=True)
 
+# معالجة الصوت المرفوع
 if audio_value is not None:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
@@ -763,47 +654,11 @@ if audio_value is not None:
 # ====== النص المكتوب ======
 st.markdown("---")
 st.markdown('<div class="section-heading">Text Input</div>', unsafe_allow_html=True)
-
 input_text = st.text_area("", height=70, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
-# ====== زر إضافة النبر ======
-if input_text.strip() and (source_lang == "ru" or target_lang == "ru"):
-    st.markdown('<div class="stress-btn">', unsafe_allow_html=True)
-    if st.button("🔊 إضافة علامات النبر (تشكيل)", key="stress_btn"):
-        # نستخدم الدالة add_russian_stress مع تمرير target_lang="ru"
-        stressed = add_russian_stress(input_text, "ru")
-        if stressed and stressed != input_text:
-            st.session_state.input_text = stressed
-            st.success("✅ تم إضافة علامات النبر بنجاح")
-            st.rerun()
-        else:
-            st.warning("⚠️ لم تتغير النصوص. قد يكون النص غير قابل للتشكيل أو المكتبة غير متوفرة.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ====== زر اختبار النبر ======
-if st.button("🧪 اختبار النبر (تجربة)", key="test_stress"):
-    test_text = "привет мир"
-    
-    # اختبار ruaccent
-    if accentizer is not None:
-        try:
-            result = accentizer.process_all(test_text)
-            st.info(f"**ruaccent:** {test_text} → {result}")
-        except Exception as e:
-            st.error(f"ruaccent فشل: {e}")
-    # اختبار tsnorm
-    elif HAS_TSNORM:
-        try:
-            result = tsnorm.normalize(test_text)
-            st.info(f"**tsnorm:** {test_text} → {result}")
-        except Exception as e:
-            st.error(f"tsnorm فشل: {e}")
-    else:
-        st.error("❌ لا توجد مكتبة نبر متاحة")
-
-# ====== السياق ======
+# السياق
 if input_text.strip():
     detected = detect_domains(input_text)
     if detected:
@@ -815,7 +670,7 @@ if input_text.strip():
             badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
         st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
 
-# ====== زر الترجمة الرئيسي ======
+# زر الترجمة الرئيسي
 if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
     if not st.session_state.deepl_api_key:
         st.error("❌ API key missing.")
