@@ -6,7 +6,18 @@ from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
-import tsnorm  # مكتبة إضافة علامات النبر للغة الروسية
+
+# محاولة استيراد tsnorm، وفي حالة الفشل استخدام دالة بديلة
+try:
+    import tsnorm
+    HAS_TSNORM = True
+except ImportError:
+    HAS_TSNORM = False
+    # دالة احتياطية تعيد النص كما هو دون تغيير
+    def tsnorm_normalize(text):
+        return text
+else:
+    tsnorm_normalize = tsnorm.normalize
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -456,12 +467,11 @@ def translate_deepl(text, target_lang):
         return None, f"Error: {str(e)}"
 
 def add_russian_stress(text, target_lang):
-    """إضافة علامات النبر للغة الروسية باستخدام tsnorm."""
-    if target_lang == "ru" and text:
+    """إضافة علامات النبر للغة الروسية باستخدام tsnorm (مع خيار احتياطي)."""
+    if target_lang == "ru" and text and HAS_TSNORM:
         try:
-            return tsnorm.normalize(text)
-        except Exception as e:
-            # في حالة الفشل، نرجع النص الأصلي
+            return tsnorm_normalize(text)
+        except Exception:
             return text
     return text
 
