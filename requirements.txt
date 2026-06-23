@@ -2,6 +2,3 @@ streamlit
 requests
 requests-toolbelt
 faster-whisper
-ruaccent
-tsnorm
-setuptools
