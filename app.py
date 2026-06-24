@@ -8,16 +8,16 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر باستخدام نموذج متعدد اللغات
+#  تحليل المشاعر باستخدام نموذج متعدد اللغات (خفيف)
 # ════════════════════════════════════════════════════════════
 from transformers import pipeline
 
 @st.cache_resource
 def load_emotion_classifier():
-    """تحميل نموذج متعدد اللغات"""
+    """تحميل نموذج متعدد اللغات خفيف وسريع"""
     try:
-        # نموذج متعدد اللغات (يدعم العربية والإنجليزية والروسية)
-        return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
+        # نموذج متعدد اللغات (يدعم العربية والإنجليزية والروسية وغيرها)
+        return pipeline("text-classification", model="tabularisai/multilingual-sentiment-analysis")
     except Exception as e:
         st.warning(f"⚠️ فشل تحميل النموذج: {e}")
         return None
@@ -27,24 +27,23 @@ emotion_classifier = load_emotion_classifier()
 def analyze_emotion(text):
     """
     تحليل المشاعر: ترجمة التصنيف إلى كلمات بسيطة.
-    - 1-2 نجوم → حزن
-    - 3 نجوم → محايد
-    - 4-5 نجوم → فرح
+    - POSITIVE → فرح
+    - NEGATIVE → حزن
+    - NEUTRAL → محايد
     """
     if not text or emotion_classifier is None:
         return "محايد"
 
     try:
         result = emotion_classifier(text[:512])[0]
-        label = result['label']  # "1 star", "2 stars", ... "5 stars"
-        star = int(label.split()[0])  # استخراج الرقم
+        label = result['label'].upper()  # POSITIVE, NEGATIVE, NEUTRAL
 
-        if star <= 2:
-            return "حزن"
-        elif star == 3:
-            return "محايد"
-        else:  # 4 or 5 stars
+        if "POSITIVE" in label:
             return "فرح"
+        elif "NEGATIVE" in label:
+            return "حزن"
+        else:
+            return "محايد"
     except Exception:
         return "محايد"
 
