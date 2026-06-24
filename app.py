@@ -8,7 +8,7 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
 # ════════════════════════════════════════════════════════════
-#  NEW: استيراد مكتبات تحليل المشاعر (بدون googletrans)
+#  استيراد مكتبات تحليل المشاعر
 # ════════════════════════════════════════════════════════════
 from transformers import pipeline
 
@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم متطور مع زر إزالة أنيق (نفس الكود السابق)
+#  CSS (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -312,48 +312,52 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  NEW: تحميل نموذج تحليل المشاعر متعدد اللغات (بدون googletrans)
+#  NEW: تحميل نموذج تحليل المشاعر العربي المتخصص
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
-    """تحميل نموذج تحليل المشاعر متعدد اللغات (يدعم العربية)"""
+    """تحميل نموذج تحليل المشاعر العربي بدقة عالية"""
     try:
-        # نموذج متعدد اللغات يعمل مباشرة على النصوص العربية دون ترجمة
-        return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
+        # نموذج عربي متخصص بدقة 94.4% (يعمل مباشرة على العربية)
+        return pipeline("text-classification", model="iMeshal/arabic-sentiment-classifier-marbert")
     except Exception as e:
-        st.warning(f"⚠️ فشل تحميل نموذج المشاعر: {e}")
-        return None
+        st.warning(f"⚠️ فشل تحميل النموذج العربي: {e}")
+        # محاولة استخدام نموذج احتياطي متعدد اللغات
+        try:
+            return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
+        except:
+            return None
 
 emotion_classifier = load_emotion_classifier()
 
 def analyze_emotion(text):
     """
-    تحليل مشاعر النص مباشرة (بدون ترجمة).
-    النموذج متعدد اللغات ويدعم العربية.
+    تحليل مشاعر النص باستخدام النموذج العربي المتخصص.
+    يعيد التصنيف: إيجابي، سلبي، محايد مع درجة الثقة.
     """
     if not text or emotion_classifier is None:
-        return "غير معروف", 0.0
+        return "😐 غير معروف", 0.0
 
     try:
         result = emotion_classifier(text)[0]
-        # النموذج يخرج تصنيفات: 1 star (سلبي جداً) إلى 5 stars (إيجابي جداً)
-        label = int(result['label'].split()[0])  # مثلاً "1 star" → 1
+        label = result['label']
         score = result['score']
 
-        # ترجمة التصنيف إلى مشاعر بشرية
-        if label <= 2:
-            emotion_ar = "😢 سلبي"
-        elif label == 3:
-            emotion_ar = "😐 محايد"
-        else:
+        # النموذج العربي iMeshal يخرج تصنيفات: positive, negative, neutral (بالعربية أحياناً)
+        # نطابق مع الرموز التعبيرية
+        if "positive" in label.lower() or "إيجابي" in label:
             emotion_ar = "😊 إيجابي"
+        elif "negative" in label.lower() or "سلبي" in label:
+            emotion_ar = "😢 سلبي"
+        else:
+            emotion_ar = "😐 محايد"
 
         return emotion_ar, score
     except Exception:
-        return "غير معروف", 0.0
+        return "😐 غير معروف", 0.0
 
 # ════════════════════════════════════════════════════════════
-#  العنوان
+#  العنوان (نفس الكود)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
@@ -363,7 +367,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION (نفس الكود السابق)
+#  CONFIGURATION (نفس الكود)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -653,13 +657,16 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  NEW: خيار تحليل المشاعر
+#  NEW: خيار تحليل المشاعر مع رسالة حالة النموذج
 # ════════════════════════════════════════════════════════════
 st.markdown("---")
 st.markdown('<div class="section-heading">⚡ Emotion Analysis</div>', unsafe_allow_html=True)
+if emotion_classifier is not None:
+    st.success("✅ **نموذج تحليل المشاعر العربي** جاهز للعمل")
+else:
+    st.error("❌ **نموذج تحليل المشاعر غير متاح** - تأكد من الاتصال بالإنترنت")
+
 enable_emotion = st.checkbox("🔍 تفعيل تحليل المشاعر", value=True, key="enable_emotion")
-if enable_emotion and emotion_classifier is None:
-    st.warning("⚠️ نموذج تحليل المشاعر غير متاح حالياً.")
 
 # ====== الميكروفون ======
 st.markdown("---")
