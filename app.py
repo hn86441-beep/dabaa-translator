@@ -6,11 +6,77 @@ from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
+import re
 
 # ════════════════════════════════════════════════════════════
-#  استيراد مكتبات تحليل المشاعر
+#  تحليل المشاعر: نموذج عربي + احتياطي بالكلمات المفتاحية
 # ════════════════════════════════════════════════════════════
 from transformers import pipeline
+
+@st.cache_resource
+def load_emotion_classifier():
+    """تحميل نموذج عربي بسيط وموثوق"""
+    try:
+        # نموذج خفيف وسريع، دقة جيدة للعربية
+        return pipeline("text-classification", model="CAMeL-Lab/bert-base-arabic-camelbert-ca-sentiment")
+    except Exception as e:
+        st.warning(f"⚠️ فشل تحميل النموذج: {e}")
+        return None
+
+emotion_classifier = load_emotion_classifier()
+
+# قاموس المشاعر بالكلمات المفتاحية (احتياطي)
+KEYWORD_SENTIMENT = {
+    # إيجابي
+    "سعيد": "positive", "فرح": "positive", "جميل": "positive", "رائع": "positive",
+    "ممتاز": "positive", "حلو": "positive", "أحب": "positive", "حبيت": "positive",
+    "ناجح": "positive", "متفائل": "positive", "أشكر": "positive", "شكراً": "positive",
+    "بخير": "positive", "رائعة": "positive", "عظيم": "positive", "رائعة": "positive",
+    "سعيدة": "positive", "فرحة": "positive", "جميلة": "positive", "رائعة": "positive",
+    # سلبي
+    "حزين": "negative", "سيء": "negative", "صعب": "negative", "متعِب": "negative",
+    "أكره": "negative", "غضبان": "negative", "غاضب": "negative", "خائف": "negative",
+    "قلق": "negative", "فشل": "negative", "ألم": "negative", "تعبان": "negative",
+    "مكسور": "negative", "بائس": "negative", "مخيب": "negative",
+    "حزينة": "negative", "سيئة": "negative", "صعبة": "negative", "متعبة": "negative",
+}
+
+def analyze_emotion(text):
+    """
+    تحليل المشاعر: يحاول النموذج أولاً، ثم الكلمات المفتاحية كاحتياطي.
+    """
+    if not text:
+        return "😐 غير معروف", 0.0
+
+    # 1. محاولة استخدام النموذج
+    if emotion_classifier is not None:
+        try:
+            result = emotion_classifier(text[:512])[0]  # تقطيع النص إن طال
+            label = result['label'].lower()
+            score = result['score']
+
+            # تحويل التصنيف إلى أيقونة
+            if "positive" in label or "إيجابي" in label:
+                return "😊 إيجابي", score
+            elif "negative" in label or "سلبي" in label:
+                return "😢 سلبي", score
+            else:
+                # إذا كان النموذج غير متأكد (neutral) ننتقل للاحتياطي
+                pass
+        except Exception:
+            pass
+
+    # 2. الاحتياطي: الكلمات المفتاحية
+    text_lower = text.lower()
+    positive_count = sum(1 for word in KEYWORD_SENTIMENT if word in text_lower and KEYWORD_SENTIMENT[word] == "positive")
+    negative_count = sum(1 for word in KEYWORD_SENTIMENT if word in text_lower and KEYWORD_SENTIMENT[word] == "negative")
+
+    if positive_count > negative_count:
+        return "😊 إيجابي", 0.85
+    elif negative_count > positive_count:
+        return "😢 سلبي", 0.85
+    else:
+        return "😐 محايد", 0.50
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -310,50 +376,6 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 }
 </style>
 """, unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════
-#  تحميل نموذج تحليل المشاعر العربي المتخصص
-# ════════════════════════════════════════════════════════════
-@st.cache_resource
-def load_emotion_classifier():
-    """تحميل نموذج تحليل المشاعر العربي بدقة عالية"""
-    try:
-        # نموذج عربي متخصص بدقة 94.4% (يعمل مباشرة على العربية)
-        return pipeline("text-classification", model="iMeshal/arabic-sentiment-classifier-marbert")
-    except Exception as e:
-        st.warning(f"⚠️ فشل تحميل النموذج العربي: {e}")
-        # محاولة استخدام نموذج احتياطي متعدد اللغات
-        try:
-            return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
-        except:
-            return None
-
-emotion_classifier = load_emotion_classifier()
-
-def analyze_emotion(text):
-    """
-    تحليل مشاعر النص باستخدام النموذج العربي المتخصص.
-    يعيد التصنيف مع أيقونة مناسبة.
-    """
-    if not text or emotion_classifier is None:
-        return "😐 غير معروف", 0.0
-
-    try:
-        result = emotion_classifier(text)[0]
-        label = result['label']
-        score = result['score']
-
-        # النموذج iMeshal يخرج تصنيفات: positive, negative, neutral
-        if "positive" in label.lower() or "إيجابي" in label:
-            emotion_ar = "😊 إيجابي 😊"
-        elif "negative" in label.lower() or "سلبي" in label:
-            emotion_ar = "😢 سلبي 😢"
-        else:
-            emotion_ar = "😐 محايد"
-
-        return emotion_ar, score
-    except Exception as e:
-        return "😐 غير معروف", 0.0
 
 # ════════════════════════════════════════════════════════════
 #  العنوان
@@ -657,31 +679,37 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  خيار تحليل المشاعر مع رسالة حالة النموذج
+#  خيار تحليل المشاعر
 # ════════════════════════════════════════════════════════════
 st.markdown("---")
 st.markdown('<div class="section-heading">⚡ Emotion Analysis</div>', unsafe_allow_html=True)
 if emotion_classifier is not None:
     st.success("✅ **نموذج تحليل المشاعر العربي** جاهز للعمل")
 else:
-    st.error("❌ **نموذج تحليل المشاعر غير متاح** - تأكد من الاتصال بالإنترنت")
+    st.info("ℹ️ سيتم استخدام نظام الكلمات المفتاحية لتحليل المشاعر (لا يحتاج تحميل نموذج)")
 
 enable_emotion = st.checkbox("🔍 تفعيل تحليل المشاعر", value=True, key="enable_emotion")
 
-# ====== الميكروفون ======
+# ====== الميكروفون مع زر إزالة أنيق ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
+# عمودين: الميكروفون وزر الإزالة
 col_mic, col_clear = st.columns([5, 1])
+
 with col_mic:
+    # الميكروفون مع key ثابت
     audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
+
 with col_clear:
+    # التحقق من وجود ملف صوتي في session_state
     if "mic_audio_main" in st.session_state and st.session_state.mic_audio_main is not None:
         st.markdown('<div class="clear-btn-wrapper">', unsafe_allow_html=True)
         if st.button("✖", key="clear_btn", help="حذف التسجيل", type="secondary"):
             clear_audio()
         st.markdown('</div>', unsafe_allow_html=True)
 
+# معالجة الصوت المرفوع
 if audio_value is not None:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
@@ -696,7 +724,7 @@ if audio_value is not None:
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                     
                     emotion_html = ""
-                    if enable_emotion and emotion_classifier is not None:
+                    if enable_emotion:
                         emotion_label, emotion_score = analyze_emotion(recognized_text)
                         emotion_html = f"""
                         <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(78,203,160,0.1); font-size: 12px; color: rgba(200,220,255,0.7); display: flex; align-items: center; gap: 8px;">
@@ -724,6 +752,7 @@ input_text = st.text_area("", height=70, placeholder="اكتب أو الصق ا�
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
+# السياق
 if input_text.strip():
     detected = detect_domains(input_text)
     if detected:
@@ -748,7 +777,7 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                 
                 emotion_html = ""
-                if enable_emotion and emotion_classifier is not None:
+                if enable_emotion:
                     emotion_label, emotion_score = analyze_emotion(input_text)
                     emotion_html = f"""
                     <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(78,203,160,0.1); font-size: 12px; color: rgba(200,220,255,0.7); display: flex; align-items: center; gap: 8px;">
