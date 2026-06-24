@@ -6,50 +6,104 @@ from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
+import re
 
 # ════════════════════════════════════════════════════════════
-#  استيراد نموذج تحليل المشاعر متعدد اللغات
+#  تحليل المشاعر متعدد اللغات (الكلمات المفتاحية + نموذج ذكي)
 # ════════════════════════════════════════════════════════════
 from transformers import pipeline
 
 @st.cache_resource
-def load_sentiment_model():
-    """
-    تحميل نموذج تحليل المشاعر متعدد اللغات (XLM-RoBERTa).
-    يعمل على أكثر من 100 لغة: العربية، الروسية، الإنجليزية، الصينية، إلخ.
-    """
+def load_emotion_classifier():
+    """تحميل نموذج تحليل المشاعر متعدد اللغات."""
     try:
-        model_name = "cardiffnlp/twitter-xlm-roberta-base-sentiment"
-        return pipeline("sentiment-analysis", model=model_name)
+        # نموذج متعدد اللغات (يدعم العربية والإنجليزية والروسية وغيرها)
+        return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
     except Exception as e:
         st.warning(f"⚠️ فشل تحميل النموذج: {e}")
         return None
 
-sentiment_model = load_sentiment_model()
+emotion_classifier = load_emotion_classifier()
 
-def analyze_sentiment(text):
+# قاموس الكلمات المفتاحية متعدد اللغات (موسع)
+KEYWORD_SENTIMENT = {
+    # العربية - إيجابي
+    "سعيد": "positive", "فرح": "positive", "جميل": "positive", "رائع": "positive",
+    "ممتاز": "positive", "حلو": "positive", "أحب": "positive", "حبيت": "positive",
+    "ناجح": "positive", "متفائل": "positive", "أشكر": "positive", "شكراً": "positive",
+    "بخير": "positive", "رائعة": "positive", "عظيم": "positive", "مبتهج": "positive",
+    "مسرور": "positive", "مرتاح": "positive", "مبسوط": "positive", "سعيدة": "positive",
+    # العربية - سلبي
+    "حزين": "negative", "سيء": "negative", "صعب": "negative", "متعِب": "negative",
+    "أكره": "negative", "غضبان": "negative", "غاضب": "negative", "خائف": "negative",
+    "قلق": "negative", "فشل": "negative", "ألم": "negative", "تعبان": "negative",
+    "مكسور": "negative", "بائس": "negative", "مخيب": "negative", "حزينة": "negative",
+    "سيئة": "negative", "صعبة": "negative", "متعبة": "negative", "مكتئب": "negative",
+    "كئيب": "negative", "محبط": "negative",
+    
+    # الإنجليزية - إيجابي
+    "happy": "positive", "joy": "positive", "beautiful": "positive", "wonderful": "positive",
+    "excellent": "positive", "love": "positive", "great": "positive", "amazing": "positive",
+    "good": "positive", "fantastic": "positive", "awesome": "positive", "glad": "positive",
+    "pleased": "positive", "delighted": "positive", "cheerful": "positive",
+    # الإنجليزية - سلبي
+    "sad": "negative", "bad": "negative", "difficult": "negative", "tired": "negative",
+    "hate": "negative", "angry": "negative", "afraid": "negative", "worried": "negative",
+    "fail": "negative", "pain": "negative", "depressed": "negative", "miserable": "negative",
+    "disappointed": "negative", "frustrated": "negative", "upset": "negative",
+    
+    # الروسية - إيجابي
+    "счастлив": "positive", "радость": "positive", "красивый": "positive", "отличный": "positive",
+    "прекрасный": "positive", "люблю": "positive", "хорошо": "positive", "великолепный": "positive",
+    "замечательный": "positive", "весёлый": "positive", "довольный": "positive",
+    # الروسية - سلبي
+    "грустный": "negative", "плохой": "negative", "трудный": "negative", "устал": "negative",
+    "ненавижу": "negative", "злой": "negative", "боюсь": "negative", "беспокоюсь": "negative",
+    "провал": "negative", "боль": "negative", "депрессия": "negative", "несчастный": "negative",
+}
+
+def analyze_emotion(text):
     """
-    تحليل المشاعر باستخدام النموذج المتعدد اللغات.
-    يُرجع التصنيف مع الأيقونة المناسبة.
+    تحليل المشاعر: الكلمات المفتاحية أولاً، ثم النموذج الذكي كاحتياطي.
+    تعمل مع العربية والإنجليزية والروسية.
     """
-    if not text or sentiment_model is None:
-        return "😐 غير معروف", 0.0
+    if not text:
+        return "😐 محايد", 0.0
 
-    try:
-        # النموذج يخرج نتيجة من نوع list (نأخذ أول عنصر)
-        result = sentiment_model(text[:512])[0]
-        label = result['label'].lower()
-        score = result['score']
+    # 1. الكلمات المفتاحية (الأولوية القصوى)
+    text_lower = text.lower()
+    positive_count = sum(1 for word in KEYWORD_SENTIMENT if word in text_lower and KEYWORD_SENTIMENT[word] == "positive")
+    negative_count = sum(1 for word in KEYWORD_SENTIMENT if word in text_lower and KEYWORD_SENTIMENT[word] == "negative")
 
-        # التصنيفات الناتجة: positive, negative, neutral
-        if "positive" in label:
-            return "😊 إيجابي", score
-        elif "negative" in label:
-            return "😢 سلبي", score
+    if positive_count > 0 or negative_count > 0:
+        if positive_count > negative_count:
+            return "😊 فرح", 0.90
+        elif negative_count > positive_count:
+            return "😢 حزن", 0.90
         else:
-            return "😐 محايد", score
-    except Exception as e:
-        return "😐 غير معروف", 0.0
+            return "😐 محايد", 0.50
+
+    # 2. النموذج الذكي متعدد اللغات (احتياطي)
+    if emotion_classifier is not None:
+        try:
+            result = emotion_classifier(text[:512])[0]
+            label = result['label'].lower()
+            score = result['score']
+
+            # النموذج يخرج تصنيفات: 1-5 نجوم
+            # 1-2 → سلبي, 3 → محايد, 4-5 → إيجابي
+            if "1" in label or "2" in label:
+                return "😢 حزن", score
+            elif "3" in label:
+                return "😐 محايد", score
+            elif "4" in label or "5" in label:
+                return "😊 فرح", score
+            else:
+                return "😐 محايد", score
+        except Exception:
+            pass
+
+    return "😐 محايد", 0.0
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -652,16 +706,11 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  خيار تحليل المشاعر
+#  خيار تحليل المشاعر (تم إزالة رسالة "نموذج تحليل المشاعر متعدد اللغات جاهز للعمل")
 # ════════════════════════════════════════════════════════════
 st.markdown("---")
-st.markdown('<div class="section-heading">⚡ Emotion Analysis (Multi-Lingual)</div>', unsafe_allow_html=True)
-if sentiment_model is not None:
-    st.success("✅ **نموذج تحليل المشاعر متعدد اللغات** جاهز للعمل")
-else:
-    st.warning("⚠️ النموذج غير متاح، تأكد من الاتصال بالإنترنت")
-
-enable_sentiment = st.checkbox("🔍 تفعيل تحليل المشاعر", value=True, key="enable_sentiment")
+st.markdown('<div class="section-heading">⚡ Emotion Analysis</div>', unsafe_allow_html=True)
+enable_emotion = st.checkbox("🔍 تفعيل تحليل المشاعر", value=True, key="enable_emotion")
 
 # ====== الميكروفون مع زر إزالة أنيق ======
 st.markdown("---")
@@ -696,20 +745,20 @@ if audio_value is not None:
                     st.session_state.translated_text = translated_text
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                     
-                    sentiment_html = ""
-                    if enable_sentiment and sentiment_model is not None:
-                        sentiment_label, sentiment_score = analyze_sentiment(recognized_text)
-                        sentiment_html = f"""
+                    emotion_html = ""
+                    if enable_emotion:
+                        emotion_label, emotion_score = analyze_emotion(recognized_text)
+                        emotion_html = f"""
                         <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(78,203,160,0.1); font-size: 12px; color: rgba(200,220,255,0.7); display: flex; align-items: center; gap: 8px;">
-                            <span style="font-size: 14px;">{sentiment_label}</span>
-                            <span style="font-size: 10px; color: rgba(200,220,255,0.4);">الثقة: {sentiment_score:.2f}</span>
+                            <span style="font-size: 14px;">{emotion_label}</span>
+                            <span style="font-size: 10px; color: rgba(200,220,255,0.4);">الثقة: {emotion_score:.2f}</span>
                         </div>
                         """
                     st.markdown(f"""
                     <div class="result-box">
                         <span class="label">✦ Translation</span>
                         <div class="text">{translated_text}</div>
-                        {sentiment_html}
+                        {emotion_html}
                     </div>
                     """, unsafe_allow_html=True)
                     st.code(translated_text, language=None)
@@ -749,20 +798,20 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
             if translation_result:
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                 
-                sentiment_html = ""
-                if enable_sentiment and sentiment_model is not None:
-                    sentiment_label, sentiment_score = analyze_sentiment(input_text)
-                    sentiment_html = f"""
+                emotion_html = ""
+                if enable_emotion:
+                    emotion_label, emotion_score = analyze_emotion(input_text)
+                    emotion_html = f"""
                     <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(78,203,160,0.1); font-size: 12px; color: rgba(200,220,255,0.7); display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 14px;">{sentiment_label}</span>
-                        <span style="font-size: 10px; color: rgba(200,220,255,0.4);">الثقة: {sentiment_score:.2f}</span>
+                        <span style="font-size: 14px;">{emotion_label}</span>
+                        <span style="font-size: 10px; color: rgba(200,220,255,0.4);">الثقة: {emotion_score:.2f}</span>
                     </div>
                     """
                 st.markdown(f"""
                 <div class="result-box">
                     <span class="label">✦ Translation</span>
                     <div class="text">{translation_result}</div>
-                    {sentiment_html}
+                    {emotion_html}
                 </div>
                 """, unsafe_allow_html=True)
                 st.code(translation_result, language=None)
