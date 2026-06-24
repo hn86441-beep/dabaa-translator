@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفس الكود السابق)
+#  CSS — تصميم متطور مع زر إزالة أنيق
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -312,7 +312,7 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  NEW: تحميل نموذج تحليل المشاعر العربي المتخصص
+#  تحميل نموذج تحليل المشاعر العربي المتخصص
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
@@ -333,7 +333,7 @@ emotion_classifier = load_emotion_classifier()
 def analyze_emotion(text):
     """
     تحليل مشاعر النص باستخدام النموذج العربي المتخصص.
-    يعيد التصنيف: إيجابي، سلبي، محايد مع درجة الثقة.
+    يعيد التصنيف مع أيقونة مناسبة.
     """
     if not text or emotion_classifier is None:
         return "😐 غير معروف", 0.0
@@ -343,21 +343,20 @@ def analyze_emotion(text):
         label = result['label']
         score = result['score']
 
-        # النموذج العربي iMeshal يخرج تصنيفات: positive, negative, neutral (بالعربية أحياناً)
-        # نطابق مع الرموز التعبيرية
+        # النموذج iMeshal يخرج تصنيفات: positive, negative, neutral
         if "positive" in label.lower() or "إيجابي" in label:
-            emotion_ar = "😊 إيجابي"
+            emotion_ar = "😊 إيجابي 😊"
         elif "negative" in label.lower() or "سلبي" in label:
-            emotion_ar = "😢 سلبي"
+            emotion_ar = "😢 سلبي 😢"
         else:
             emotion_ar = "😐 محايد"
 
         return emotion_ar, score
-    except Exception:
+    except Exception as e:
         return "😐 غير معروف", 0.0
 
 # ════════════════════════════════════════════════════════════
-#  العنوان (نفس الكود)
+#  العنوان
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
@@ -367,7 +366,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION (نفس الكود)
+#  CONFIGURATION
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -451,7 +450,7 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  API KEYS (نفس الكود)
+#  API KEYS
 # ════════════════════════════════════════════════════════════
 try:
     deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
@@ -489,7 +488,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION & SPEECH FUNCTIONS (نفس الكود)
+#  TRANSLATION & SPEECH FUNCTIONS
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -571,7 +570,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  SESSION STATE (نفس الكود)
+#  SESSION STATE
 # ════════════════════════════════════════════════════════════
 if "source_lang" not in st.session_state:
     st.session_state.source_lang = "Auto-Detect"
@@ -605,6 +604,7 @@ def swap_languages():
     st.rerun()
 
 def clear_audio():
+    """حذف التسجيل الصوتي وإعادة تعيين النصوص."""
     if "mic_audio_main" in st.session_state:
         del st.session_state.mic_audio_main
     st.session_state.input_text = ""
@@ -657,7 +657,7 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  NEW: خيار تحليل المشاعر مع رسالة حالة النموذج
+#  خيار تحليل المشاعر مع رسالة حالة النموذج
 # ════════════════════════════════════════════════════════════
 st.markdown("---")
 st.markdown('<div class="section-heading">⚡ Emotion Analysis</div>', unsafe_allow_html=True)
