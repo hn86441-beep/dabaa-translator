@@ -8,10 +8,9 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
 # ════════════════════════════════════════════════════════════
-#  NEW: استيراد مكتبات تحليل المشاعر
+#  NEW: استيراد مكتبات تحليل المشاعر (بدون googletrans)
 # ════════════════════════════════════════════════════════════
 from transformers import pipeline
-from googletrans import Translator
 
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -20,7 +19,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS — تصميم متطور مع زر إزالة أنيق
+#  CSS — تصميم متطور مع زر إزالة أنيق (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -313,52 +312,41 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  NEW: تحميل نموذج تحليل المشاعر
+#  NEW: تحميل نموذج تحليل المشاعر متعدد اللغات (بدون googletrans)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
-    """تحميل نموذج تحليل المشاعر (مرة واحدة فقط)"""
+    """تحميل نموذج تحليل المشاعر متعدد اللغات (يدعم العربية)"""
     try:
-        return pipeline("text-classification", model="arpanghoshal/EmoRoBERTa")
+        # نموذج متعدد اللغات يعمل مباشرة على النصوص العربية دون ترجمة
+        return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
     except Exception as e:
         st.warning(f"⚠️ فشل تحميل نموذج المشاعر: {e}")
         return None
 
 emotion_classifier = load_emotion_classifier()
-translator = Translator()
 
-def analyze_emotion(text, src_lang="auto"):
+def analyze_emotion(text):
     """
-    تحليل مشاعر النص.
-    - يقوم بترجمة النص إلى الإنجليزية إذا كانت لغته مختلفة.
-    - يستخدم نموذج EmoRoBERTa لتحليل المشاعر.
-    - يعيد التصنيف بالعربية مع درجة الثقة.
+    تحليل مشاعر النص مباشرة (بدون ترجمة).
+    النموذج متعدد اللغات ويدعم العربية.
     """
     if not text or emotion_classifier is None:
         return "غير معروف", 0.0
 
     try:
-        # ترجمة النص إلى الإنجليزية إذا لم تكن لغته الإنجليزية
-        if src_lang and src_lang != "en" and src_lang != "auto":
-            translated_text = translator.translate(text, dest='en').text
-        else:
-            translated_text = text
-
-        # تحليل المشاعر
-        result = emotion_classifier(translated_text)[0]
-        label = result['label']
+        result = emotion_classifier(text)[0]
+        # النموذج يخرج تصنيفات: 1 star (سلبي جداً) إلى 5 stars (إيجابي جداً)
+        label = int(result['label'].split()[0])  # مثلاً "1 star" → 1
         score = result['score']
 
-        # ترجمة التصنيف إلى العربية
-        emotion_ar = {
-            "joy": "😊 فرح",
-            "sadness": "😢 حزن",
-            "anger": "😡 غضب",
-            "fear": "😨 خوف",
-            "surprise": "😲 مفاجأة",
-            "disgust": "🤢 اشمئزاز",
-            "neutral": "😐 محايد"
-        }.get(label.lower(), f"🏷️ {label}")
+        # ترجمة التصنيف إلى مشاعر بشرية
+        if label <= 2:
+            emotion_ar = "😢 سلبي"
+        elif label == 3:
+            emotion_ar = "😐 محايد"
+        else:
+            emotion_ar = "😊 إيجابي"
 
         return emotion_ar, score
     except Exception:
@@ -375,7 +363,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION
+#  CONFIGURATION (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -459,7 +447,7 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  API KEYS
+#  API KEYS (نفس الكود)
 # ════════════════════════════════════════════════════════════
 try:
     deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
@@ -497,7 +485,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION & SPEECH FUNCTIONS
+#  TRANSLATION & SPEECH FUNCTIONS (نفس الكود)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -579,7 +567,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  SESSION STATE
+#  SESSION STATE (نفس الكود)
 # ════════════════════════════════════════════════════════════
 if "source_lang" not in st.session_state:
     st.session_state.source_lang = "Auto-Detect"
@@ -613,7 +601,6 @@ def swap_languages():
     st.rerun()
 
 def clear_audio():
-    """حذف التسجيل الصوتي وإعادة تعيين النصوص."""
     if "mic_audio_main" in st.session_state:
         del st.session_state.mic_audio_main
     st.session_state.input_text = ""
@@ -672,28 +659,22 @@ st.markdown("---")
 st.markdown('<div class="section-heading">⚡ Emotion Analysis</div>', unsafe_allow_html=True)
 enable_emotion = st.checkbox("🔍 تفعيل تحليل المشاعر", value=True, key="enable_emotion")
 if enable_emotion and emotion_classifier is None:
-    st.warning("⚠️ نموذج تحليل المشاعر غير متاح حالياً. قد يكون التحميل فشل.")
+    st.warning("⚠️ نموذج تحليل المشاعر غير متاح حالياً.")
 
-# ====== الميكروفون مع زر إزالة أنيق ======
+# ====== الميكروفون ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
-# عمودين: الميكروفون وزر الإزالة
 col_mic, col_clear = st.columns([5, 1])
-
 with col_mic:
-    # الميكروفون مع key ثابت
     audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
-
 with col_clear:
-    # التحقق من وجود ملف صوتي في session_state
     if "mic_audio_main" in st.session_state and st.session_state.mic_audio_main is not None:
         st.markdown('<div class="clear-btn-wrapper">', unsafe_allow_html=True)
         if st.button("✖", key="clear_btn", help="حذف التسجيل", type="secondary"):
             clear_audio()
         st.markdown('</div>', unsafe_allow_html=True)
 
-# معالجة الصوت المرفوع
 if audio_value is not None:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
@@ -707,10 +688,9 @@ if audio_value is not None:
                     st.session_state.translated_text = translated_text
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                     
-                    # NEW: تحليل المشاعر إذا كان مفعّلاً
                     emotion_html = ""
                     if enable_emotion and emotion_classifier is not None:
-                        emotion_label, emotion_score = analyze_emotion(recognized_text, source_lang)
+                        emotion_label, emotion_score = analyze_emotion(recognized_text)
                         emotion_html = f"""
                         <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(78,203,160,0.1); font-size: 12px; color: rgba(200,220,255,0.7); display: flex; align-items: center; gap: 8px;">
                             <span style="font-size: 14px;">{emotion_label}</span>
@@ -737,7 +717,6 @@ input_text = st.text_area("", height=70, placeholder="اكتب أو الصق ا�
 if input_text != st.session_state.input_text:
     st.session_state.input_text = input_text
 
-# السياق
 if input_text.strip():
     detected = detect_domains(input_text)
     if detected:
@@ -761,10 +740,9 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
             if translation_result:
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                 
-                # NEW: تحليل المشاعر إذا كان مفعّلاً
                 emotion_html = ""
                 if enable_emotion and emotion_classifier is not None:
-                    emotion_label, emotion_score = analyze_emotion(input_text, source_lang)
+                    emotion_label, emotion_score = analyze_emotion(input_text)
                     emotion_html = f"""
                     <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(78,203,160,0.1); font-size: 12px; color: rgba(200,220,255,0.7); display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 14px;">{emotion_label}</span>
