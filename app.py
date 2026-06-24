@@ -7,6 +7,12 @@ import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
 
+# ════════════════════════════════════════════════════════════
+#  NEW: استيراد مكتبات تحليل المشاعر
+# ════════════════════════════════════════════════════════════
+from transformers import pipeline
+from googletrans import Translator
+
 st.set_page_config(
     page_title="HN TRANSLATOR",
     page_icon="🌐",
@@ -305,6 +311,58 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
 }
 </style>
 """, unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════
+#  NEW: تحميل نموذج تحليل المشاعر
+# ════════════════════════════════════════════════════════════
+@st.cache_resource
+def load_emotion_classifier():
+    """تحميل نموذج تحليل المشاعر (مرة واحدة فقط)"""
+    try:
+        return pipeline("text-classification", model="arpanghoshal/EmoRoBERTa")
+    except Exception as e:
+        st.warning(f"⚠️ فشل تحميل نموذج المشاعر: {e}")
+        return None
+
+emotion_classifier = load_emotion_classifier()
+translator = Translator()
+
+def analyze_emotion(text, src_lang="auto"):
+    """
+    تحليل مشاعر النص.
+    - يقوم بترجمة النص إلى الإنجليزية إذا كانت لغته مختلفة.
+    - يستخدم نموذج EmoRoBERTa لتحليل المشاعر.
+    - يعيد التصنيف بالعربية مع درجة الثقة.
+    """
+    if not text or emotion_classifier is None:
+        return "غير معروف", 0.0
+
+    try:
+        # ترجمة النص إلى الإنجليزية إذا لم تكن لغته الإنجليزية
+        if src_lang and src_lang != "en" and src_lang != "auto":
+            translated_text = translator.translate(text, dest='en').text
+        else:
+            translated_text = text
+
+        # تحليل المشاعر
+        result = emotion_classifier(translated_text)[0]
+        label = result['label']
+        score = result['score']
+
+        # ترجمة التصنيف إلى العربية
+        emotion_ar = {
+            "joy": "😊 فرح",
+            "sadness": "😢 حزن",
+            "anger": "😡 غضب",
+            "fear": "😨 خوف",
+            "surprise": "😲 مفاجأة",
+            "disgust": "🤢 اشمئزاز",
+            "neutral": "😐 محايد"
+        }.get(label.lower(), f"🏷️ {label}")
+
+        return emotion_ar, score
+    except Exception:
+        return "غير معروف", 0.0
 
 # ════════════════════════════════════════════════════════════
 #  العنوان
@@ -607,6 +665,15 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
+# ════════════════════════════════════════════════════════════
+#  NEW: خيار تحليل المشاعر
+# ════════════════════════════════════════════════════════════
+st.markdown("---")
+st.markdown('<div class="section-heading">⚡ Emotion Analysis</div>', unsafe_allow_html=True)
+enable_emotion = st.checkbox("🔍 تفعيل تحليل المشاعر", value=True, key="enable_emotion")
+if enable_emotion and emotion_classifier is None:
+    st.warning("⚠️ نموذج تحليل المشاعر غير متاح حالياً. قد يكون التحميل فشل.")
+
 # ====== الميكروفون مع زر إزالة أنيق ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
@@ -639,10 +706,22 @@ if audio_value is not None:
                 if translated_text:
                     st.session_state.translated_text = translated_text
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                    
+                    # NEW: تحليل المشاعر إذا كان مفعّلاً
+                    emotion_html = ""
+                    if enable_emotion and emotion_classifier is not None:
+                        emotion_label, emotion_score = analyze_emotion(recognized_text, source_lang)
+                        emotion_html = f"""
+                        <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(78,203,160,0.1); font-size: 12px; color: rgba(200,220,255,0.7); display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 14px;">{emotion_label}</span>
+                            <span style="font-size: 10px; color: rgba(200,220,255,0.4);">الثقة: {emotion_score:.2f}</span>
+                        </div>
+                        """
                     st.markdown(f"""
                     <div class="result-box">
                         <span class="label">✦ Translation</span>
                         <div class="text">{translated_text}</div>
+                        {emotion_html}
                     </div>
                     """, unsafe_allow_html=True)
                     st.code(translated_text, language=None)
@@ -681,10 +760,22 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
             translation_result, source_engine = fetch_ai_translation(input_text, target_lang)
             if translation_result:
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                
+                # NEW: تحليل المشاعر إذا كان مفعّلاً
+                emotion_html = ""
+                if enable_emotion and emotion_classifier is not None:
+                    emotion_label, emotion_score = analyze_emotion(input_text, source_lang)
+                    emotion_html = f"""
+                    <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(78,203,160,0.1); font-size: 12px; color: rgba(200,220,255,0.7); display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 14px;">{emotion_label}</span>
+                        <span style="font-size: 10px; color: rgba(200,220,255,0.4);">الثقة: {emotion_score:.2f}</span>
+                    </div>
+                    """
                 st.markdown(f"""
                 <div class="result-box">
                     <span class="label">✦ Translation</span>
                     <div class="text">{translation_result}</div>
+                    {emotion_html}
                 </div>
                 """, unsafe_allow_html=True)
                 st.code(translation_result, language=None)
