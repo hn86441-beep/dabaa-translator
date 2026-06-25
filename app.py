@@ -6,17 +6,18 @@ from pathlib import Path
 import tempfile
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
-
-# ════════════════════════════════════════════════════════════
-#  تحليل المشاعر باستخدام نموذج متعدد اللغات (خفيف)
-# ════════════════════════════════════════════════════════════
 from transformers import pipeline
+from datetime import datetime
+import time
+import io
+import base64
 
+# ════════════════════════════════════════════════════════════
+#  تحليل المشاعر (متعدد اللغات)
+# ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
-    """تحميل نموذج متعدد اللغات خفيف وسريع"""
     try:
-        # نموذج متعدد اللغات (يدعم العربية والإنجليزية والروسية وغيرها)
         return pipeline("text-classification", model="tabularisai/multilingual-sentiment-analysis")
     except Exception as e:
         st.warning(f"⚠️ فشل تحميل النموذج: {e}")
@@ -25,36 +26,81 @@ def load_emotion_classifier():
 emotion_classifier = load_emotion_classifier()
 
 def analyze_emotion(text):
-    """
-    تحليل المشاعر: ترجمة التصنيف إلى كلمات بسيطة.
-    - POSITIVE → فرح
-    - NEGATIVE → حزن
-    - NEUTRAL → محايد
-    """
     if not text or emotion_classifier is None:
         return "محايد"
-
     try:
         result = emotion_classifier(text[:512])[0]
-        label = result['label'].upper()  # POSITIVE, NEGATIVE, NEUTRAL
-
+        label = result['label'].upper()
         if "POSITIVE" in label:
-            return "فرح"
+            return "😊 فرح"
         elif "NEGATIVE" in label:
-            return "حزن"
+            return "😢 حزن"
         else:
-            return "محايد"
+            return "😐 محايد"
     except Exception:
-        return "محايد"
+        return "😐 محايد"
 
+# ════════════════════════════════════════════════════════════
+#  تحويل النص إلى صوت (TTS) لجميع اللغات
+# ════════════════════════════════════════════════════════════
+from gtts import gTTS
+import pygame
+
+# دعم اللغات: gTTS تدعم معظم اللغات
+def get_tts_lang(lang_code):
+    """تحويل رمز اللغة إلى رمز gTTS"""
+    lang_map = {
+        "ar": "ar",   # العربية
+        "en": "en",   # الإنجليزية
+        "ru": "ru",   # الروسية
+        "zh": "zh-cn",# الصينية
+        "de": "de",   # الألمانية
+        "es": "es",   # الإسبانية
+        "pt": "pt",   # البرتغالية
+        "ko": "ko",   # الكورية
+    }
+    return lang_map.get(lang_code, "en")
+
+def text_to_speech(text, lang_code="en"):
+    """
+    تحويل النص إلى صوت وتشغيله باستخدام gTTS.
+    يدعم جميع اللغات المدعومة في التطبيق.
+    """
+    if not text or not text.strip():
+        st.warning("⚠️ لا يوجد نص للتشغيل")
+        return
+
+    try:
+        tts_lang = get_tts_lang(lang_code)
+        tts = gTTS(text=text, lang=tts_lang, slow=False)
+        
+        audio_bytes = io.BytesIO()
+        tts.write_to_fp(audio_bytes)
+        audio_bytes.seek(0)
+        
+        # تشغيل الصوت
+        pygame.mixer.init()
+        pygame.mixer.music.load(audio_bytes)
+        pygame.mixer.music.play()
+        
+        # انتظار انتهاء الصوت
+        while pygame.mixer.music.get_busy():
+            time.sleep(0.1)
+        pygame.mixer.music.unload()
+    except Exception as e:
+        st.error(f"❌ فشل تشغيل الصوت: {str(e)}")
+
+# ════════════════════════════════════════════════════════════
+#  إعدادات الصفحة
+# ════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="HN TRANSLATOR",
     page_icon="🌐",
-    layout="centered"
+    layout="wide"
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفس الكود السابق)
+#  CSS
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -71,12 +117,11 @@ st.markdown("""
 .block-container {
     padding-top: 0.8rem !important;
     padding-bottom: 1rem !important;
-    max-width: 680px !important;
+    max-width: 900px !important;
     position: relative;
     z-index: 1;
 }
 
-/* ====== العنوان ====== */
 .app-header {
     text-align: center;
     padding: 0.3rem 0.5rem 0.2rem;
@@ -100,7 +145,6 @@ st.markdown("""
 }
 .app-header h1 .accent { color: #4ECBA0; }
 
-/* ====== بطاقات ====== */
 .glass-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.09);
@@ -110,13 +154,11 @@ st.markdown("""
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
-/* ====== الميكروفون ====== */
 div[data-testid="stAudioInput"] {
     display: flex !important;
     justify-content: center !important;
     width: 100% !important;
 }
-
 div[data-testid="stAudioInput"] > div {
     background: rgba(78,203,160,0.08) !important;
     border: 2px solid rgba(78,203,160,0.3) !important;
@@ -127,12 +169,10 @@ div[data-testid="stAudioInput"] > div {
     transition: all 0.3s !important;
     backdrop-filter: blur(8px);
 }
-
 div[data-testid="stAudioInput"] > div:hover {
     border-color: #4ECBA0 !important;
     box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
 }
-
 div[data-testid="stAudioInput"] button {
     background: transparent !important;
     border: none !important;
@@ -146,13 +186,11 @@ div[data-testid="stAudioInput"] button {
     justify-content: center !important;
     gap: 8px !important;
 }
-
 div[data-testid="stAudioInput"] button::before {
     content: "🎤";
     font-size: 20px;
 }
 
-/* ====== زر الإزالة (✖) ====== */
 div.clear-btn-wrapper {
     display: flex;
     align-items: center;
@@ -160,7 +198,6 @@ div.clear-btn-wrapper {
     height: 100%;
     min-height: 60px;
 }
-
 button[kind="secondary"][data-testid="baseButton-secondary"] {
     background: rgba(239,68,68,0.1) !important;
     border: 1.5px solid rgba(239,68,68,0.25) !important;
@@ -180,7 +217,6 @@ button[kind="secondary"][data-testid="baseButton-secondary"] {
     box-shadow: 0 0 15px rgba(239,68,68,0.05) !important;
     cursor: pointer !important;
 }
-
 button[kind="secondary"][data-testid="baseButton-secondary"]:hover {
     background: rgba(239,68,68,0.2) !important;
     border-color: #f87171 !important;
@@ -188,7 +224,6 @@ button[kind="secondary"][data-testid="baseButton-secondary"]:hover {
     transform: scale(1.08) !important;
 }
 
-/* ====== باقي العناصر ====== */
 .stSelectbox > div > div {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
@@ -276,9 +311,15 @@ textarea::placeholder {
 }
 .result-box .emotion {
     margin-top: 4px;
-    font-size: 14px;
+    font-size: 13px;
     color: #4ECBA0;
     font-weight: 500;
+}
+.result-box .actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 .context {
     background: rgba(78,203,160,0.07);
@@ -339,6 +380,34 @@ hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90
     background: #4ECBA0;
 }
 
+/* تنسيق الشريط الجانبي */
+[data-testid="stSidebar"] {
+    background: rgba(10,10,26,0.95) !important;
+    border-right: 1px solid rgba(78,203,160,0.1) !important;
+}
+[data-testid="stSidebar"] .stMarkdown {
+    color: #e8f0ff !important;
+}
+.history-item {
+    background: rgba(78,203,160,0.06);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-left: 2px solid #4ECBA0;
+}
+.history-item .time {
+    font-size: 9px;
+    color: rgba(180,200,230,0.4);
+}
+.history-item .text {
+    font-size: 12px;
+    color: #e8f0ff;
+}
+.history-item .lang {
+    font-size: 9px;
+    color: rgba(78,203,160,0.6);
+}
+
 @media (max-width: 600px) {
     .block-container { padding: 0.4rem !important; }
     .app-header h1 { font-size: 20px !important; }
@@ -361,6 +430,56 @@ st.markdown("""
     <h1>HN <span class="accent">TRANSLATOR</span></h1>
 </div>
 """, unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════
+#  الشريط الجانبي: سجل الترجمات
+# ════════════════════════════════════════════════════════════
+with st.sidebar:
+    st.markdown("## 📜 سجل الترجمات")
+    
+    # تهيئة سجل الترجمات في session_state
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    
+    if "history_count" not in st.session_state:
+        st.session_state.history_count = 0
+    
+    # عرض السجل
+    if st.session_state.history:
+        # زر مسح السجل
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.write(f"**{len(st.session_state.history)}** ترجمة")
+        with col2:
+            if st.button("🗑️ مسح الكل", use_container_width=True):
+                st.session_state.history = []
+                st.session_state.history_count = 0
+                st.rerun()
+        
+        st.divider()
+        
+        # عرض آخر 50 ترجمة (الأحدث أولاً)
+        for item in reversed(st.session_state.history[-50:]):
+            st.markdown(f"""
+            <div class="history-item">
+                <div class="text">🔹 {item.get('original', '')[:50]}...</div>
+                <div class="text" style="color: #4ECBA0;">→ {item.get('translated', '')[:50]}...</div>
+                <div class="lang">
+                    {item.get('source_lang', '')} → {item.get('target_lang', '')} 
+                    · {item.get('emotion', '')}
+                </div>
+                <div class="time">{item.get('time', '')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # زر تصدير السجل كـ JSON
+        if st.button("📤 تصدير السجل (JSON)", use_container_width=True):
+            json_str = json.dumps(st.session_state.history, ensure_ascii=False, indent=2)
+            b64 = base64.b64encode(json_str.encode()).decode()
+            href = f'<a href="data:application/json;base64,{b64}" download="translation_history.json">📥 تحميل</a>'
+            st.markdown(href, unsafe_allow_html=True)
+    else:
+        st.info("📭 لا توجد ترجمات محفوظة حتى الآن")
 
 # ════════════════════════════════════════════════════════════
 #  CONFIGURATION
@@ -601,7 +720,6 @@ def swap_languages():
     st.rerun()
 
 def clear_audio():
-    """حذف التسجيل الصوتي وإعادة تعيين النصوص."""
     if "mic_audio_main" in st.session_state:
         del st.session_state.mic_audio_main
     st.session_state.input_text = ""
@@ -653,26 +771,20 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== الميكروفون مع زر إزالة أنيق ======
+# ====== الميكروفون ======
 st.markdown("---")
 st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
-# عمودين: الميكروفون وزر الإزالة
 col_mic, col_clear = st.columns([5, 1])
-
 with col_mic:
-    # الميكروفون مع key ثابت
     audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
-
 with col_clear:
-    # التحقق من وجود ملف صوتي في session_state
     if "mic_audio_main" in st.session_state and st.session_state.mic_audio_main is not None:
         st.markdown('<div class="clear-btn-wrapper">', unsafe_allow_html=True)
         if st.button("✖", key="clear_btn", help="حذف التسجيل", type="secondary"):
             clear_audio()
         st.markdown('</div>', unsafe_allow_html=True)
 
-# معالجة الصوت المرفوع
 if audio_value is not None:
     with st.spinner("⏳ جاري التعرف..."):
         audio_bytes = audio_value.getvalue()
@@ -684,18 +796,49 @@ if audio_value is not None:
                 translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
                 if translated_text:
                     st.session_state.translated_text = translated_text
+                    
+                    # تحليل المشاعر
+                    emotion = analyze_emotion(recognized_text)
+                    
+                    # عرض النتيجة
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                     
-                    # تحليل المشاعر وعرض النص فقط
-                    emotion = analyze_emotion(recognized_text)
+                    # الحصول على رمز اللغة للصوت
+                    tts_lang = target_lang
+                    
                     st.markdown(f"""
                     <div class="result-box">
                         <span class="label">✦ Translation</span>
                         <div class="text">{translated_text}</div>
                         <div class="emotion">{emotion}</div>
+                        <div class="actions">
+                            <button onclick="navigator.clipboard.writeText('{translated_text}')" 
+                                    style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;">
+                                📋 نسخ
+                            </button>
+                            <button onclick="playAudio()" 
+                                    style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;">
+                                🔊 استمع
+                            </button>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    # زر تشغيل الصوت (يتم تشغيله عند الضغط)
+                    if st.button("🔊 تشغيل الصوت", key="play_audio_voice"):
+                        text_to_speech(translated_text, tts_lang)
+                    
                     st.code(translated_text, language=None)
+                    
+                    # حفظ في السجل
+                    st.session_state.history.append({
+                        "original": recognized_text,
+                        "translated": translated_text,
+                        "emotion": emotion,
+                        "source_lang": source_lang_name,
+                        "target_lang": target_lang_name,
+                        "time": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    })
                 else:
                     st.error(f"❌ {engine}")
         else:
@@ -732,16 +875,45 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
             if translation_result:
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                 
-                # تحليل المشاعر وعرض النص فقط
+                # تحليل المشاعر
                 emotion = analyze_emotion(input_text)
+                
+                # الحصول على رمز اللغة للصوت
+                tts_lang = target_lang
+                
                 st.markdown(f"""
                 <div class="result-box">
                     <span class="label">✦ Translation</span>
                     <div class="text">{translation_result}</div>
                     <div class="emotion">{emotion}</div>
+                    <div class="actions">
+                        <button onclick="navigator.clipboard.writeText('{translation_result}')" 
+                                style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;">
+                            📋 نسخ
+                        </button>
+                        <button onclick="playAudio()" 
+                                style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;">
+                            🔊 استمع
+                        </button>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # زر تشغيل الصوت
+                if st.button("🔊 تشغيل الصوت", key="play_audio_text"):
+                    text_to_speech(translation_result, tts_lang)
+                
                 st.code(translation_result, language=None)
+                
+                # حفظ في السجل
+                st.session_state.history.append({
+                    "original": input_text,
+                    "translated": translation_result,
+                    "emotion": emotion,
+                    "source_lang": source_lang_name,
+                    "target_lang": target_lang_name,
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M")
+                })
             else:
                 st.error(f"❌ {translation_result}")
 
