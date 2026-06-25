@@ -11,9 +11,25 @@ from datetime import datetime
 import io
 import base64
 import sqlite3
-import easyocr
+import subprocess
+import sys
+
+# ════════════════════════════════════════════════════════════
+#  تثبيت Tesseract تلقائياً (لـ OCR)
+# ════════════════════════════════════════════════════════════
+try:
+    # محاولة تثبيت Tesseract على نظام Linux (Streamlit Cloud)
+    subprocess.run(['apt-get', 'update', '-qq'], check=False, capture_output=True)
+    subprocess.run(['apt-get', 'install', '-y', 'tesseract-ocr', 'tesseract-ocr-ara', 
+                    'tesseract-ocr-rus', 'tesseract-ocr-chi-sim', 'tesseract-ocr-deu',
+                    'tesseract-ocr-spa', 'tesseract-ocr-por', 'tesseract-ocr-kor'], 
+                   check=False, capture_output=True)
+except:
+    pass
+
+import pytesseract
 from PIL import Image
-import PyPDF2
+import pdfplumber
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -137,42 +153,67 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  OCR (EasyOCR) - يدعم جميع اللغات
+#  OCR (باستخدام pytesseract + easyocr كخيار احتياطي)
 # ════════════════════════════════════════════════════════════
-# قائمة اللغات المدعومة في EasyOCR (تطابق لغات التطبيق)
-OCR_LANGUAGES = ['ar', 'en', 'ru', 'ch_sim', 'de', 'es', 'pt', 'ko']
-# ch_sim = الصينية المبسطة، ch_tra = الصينية التقليدية (نستخدم المبسطة)
-
 @st.cache_resource
 def load_ocr_reader():
+    # المحاولة باستخدام easyocr أولاً (أسرع)
     try:
-        return easyocr.Reader(OCR_LANGUAGES, gpu=False)
-    except Exception as e:
-        st.error(f"فشل تحميل EasyOCR: {e}")
+        import easyocr
+        return easyocr.Reader(['ar', 'en', 'ru', 'ch_sim', 'de', 'es', 'pt', 'ko'], gpu=False)
+    except:
         return None
 
 ocr_reader = load_ocr_reader()
 
 def extract_text_from_image(image_bytes):
-    if ocr_reader is None:
-        return None, "OCR غير متاح"
     try:
         image = Image.open(io.BytesIO(image_bytes))
-        result = ocr_reader.readtext(image)
-        text = " ".join([item[1] for item in result])
-        return text.strip(), None
+        
+        # 1. المحاولة باستخدام easyocr
+        if ocr_reader is not None:
+            try:
+                result = ocr_reader.readtext(image)
+                text = " ".join([item[1] for item in result])
+                if text.strip():
+                    return text.strip(), None
+            except:
+                pass
+        
+        # 2. المحاولة باستخدام pytesseract
+        try:
+            # تحديد اللغة حسب محتوى الصورة (اختياري)
+            lang = 'ara+eng+rus+chi_sim+deu+spa+por+kor'
+            text = pytesseract.image_to_string(image, lang=lang)
+            if text.strip():
+                return text.strip(), None
+        except Exception as e:
+            pass
+        
+        # 3. محاولة باستخدام pytesseract للغة الإنجليزية فقط (كحل أخير)
+        try:
+            text = pytesseract.image_to_string(image, lang='eng')
+            if text.strip():
+                return text.strip(), None
+        except:
+            pass
+        
+        return None, "لم يتم العثور على نص في الصورة"
     except Exception as e:
         return None, str(e)
 
 def extract_text_from_pdf(file_bytes):
     try:
-        reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
         text = ""
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-        return text.strip(), None
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        if text.strip():
+            return text.strip(), None
+        else:
+            return None, "لم يتم العثور على نص في ملف PDF"
     except Exception as e:
         return None, str(e)
 
@@ -579,7 +620,7 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== التبويبات (Tabs) للميزات المختلفة ======
+# ====== التبويبات ======
 tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "🖼️ Image", "📄 PDF"])
 
 # ----- Tab 1: Voice -----
@@ -681,11 +722,11 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: Image Translation (OCR) - يدعم جميع اللغات -----
+# ----- Tab 3: Image Translation (OCR) -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">🖼️ Image Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم: العربية، الإنجليزية، الروسية، الصينية، الألمانية، الإسبانية، البرتغالية، الكورية)")
+    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم جميع اللغات المدعومة)")
     
     uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="image_uploader")
     
@@ -717,7 +758,6 @@ with tab3:
                             
                             save_translation(extracted_text, translated_text, emotion, "Image (OCR)", target_lang_name)
                             
-                            # زر تحميل الترجمة
                             st.download_button(
                                 label="📥 تحميل الترجمة (TXT)",
                                 data=translated_text,
@@ -729,7 +769,7 @@ with tab3:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: PDF Translation (يدعم جميع اللغات) -----
+# ----- Tab 4: PDF Translation -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 PDF Translation</div>', unsafe_allow_html=True)
@@ -746,7 +786,6 @@ with tab4:
                 extracted_text, err = extract_text_from_pdf(pdf_bytes)
                 if extracted_text:
                     st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
-                    # عرض أول 1000 حرف فقط
                     display_text = extracted_text[:1000] + ("..." if len(extracted_text) > 1000 else "")
                     st.code(display_text, language=None)
                     
