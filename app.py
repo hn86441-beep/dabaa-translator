@@ -13,12 +13,11 @@ import base64
 import sqlite3
 
 # ════════════════════════════════════════════════════════════
-#  تهيئة قاعدة البيانات
+#  قاعدة بيانات SQLite (حفظ الترجمات)
 # ════════════════════════════════════════════════════════════
 DB_PATH = "translations.db"
 
 def init_db():
-    """إنشاء جدول الترجمات إذا لم يكن موجوداً"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''
@@ -36,7 +35,6 @@ def init_db():
     conn.close()
 
 def save_translation(original, translated, emotion, source_lang, target_lang):
-    """حفظ ترجمة جديدة في قاعدة البيانات"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''
@@ -47,7 +45,6 @@ def save_translation(original, translated, emotion, source_lang, target_lang):
     conn.close()
 
 def get_history(limit=100):
-    """استرجاع آخر الترجمات من قاعدة البيانات"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''
@@ -71,7 +68,6 @@ def get_history(limit=100):
     ]
 
 def clear_history():
-    """مسح جميع الترجمات من قاعدة البيانات"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('DELETE FROM history')
@@ -79,15 +75,14 @@ def clear_history():
     conn.close()
 
 def export_history_json():
-    """تصدير السجل كـ JSON"""
     history = get_history(limit=1000)
     return json.dumps(history, ensure_ascii=False, indent=2)
 
-# تهيئة قاعدة البيانات عند بدء التشغيل
+# تهيئة قاعدة البيانات
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر (متعدد اللغات)
+#  تحليل المشاعر
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
@@ -150,17 +145,18 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  تهيئة session_state للوضع
+#  تهيئة حالة الوضع (Light/Dark)
 # ════════════════════════════════════════════════════════════
 if "theme" not in st.session_state:
-    st.session_state.theme = "dark"  # dark / light
+    st.session_state.theme = "dark"  # القيمة الافتراضية
 
 # ════════════════════════════════════════════════════════════
-#  CSS - دعم الوضع الفاتح والداكن
+#  CSS للوضع الفاتح والداكن
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
         return """
+        /* ====== الوضع الفاتح (Light Mode) ====== */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
         #MainMenu, footer, header { visibility: hidden; }
@@ -470,8 +466,9 @@ def get_css(theme):
             button[kind="secondary"][data-testid="baseButton-secondary"] { width: 34px !important; height: 34px !important; font-size: 17px !important; }
         }
         """
-    else:  # dark theme (default)
+    else:  # dark mode (default)
         return """
+        /* ====== الوضع الداكن (Dark Mode) ====== */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
         #MainMenu, footer, header { visibility: hidden; }
@@ -782,7 +779,7 @@ def get_css(theme):
         }
         """
 
-# عرض CSS حسب الوضع الحالي
+# تطبيق CSS حسب الوضع الحالي
 st.markdown(f"<style>{get_css(st.session_state.theme)}</style>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
@@ -796,10 +793,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  الشريط الجانبي: تبديل المظهر + سجل الترجمات
+#  الشريط الجانبي: تبديل المظهر + سجل الترجمات (من قاعدة البيانات)
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
-    # زر تبديل المظهر
     st.markdown("## 🌓 المظهر")
     if st.button("🌓 تبديل المظهر", use_container_width=True):
         st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
@@ -807,8 +803,6 @@ with st.sidebar:
     st.divider()
     
     st.markdown("## 📜 سجل الترجمات")
-    
-    # تحميل السجل من قاعدة البيانات
     history = get_history(limit=100)
     
     if history:
@@ -819,7 +813,6 @@ with st.sidebar:
             if st.button("🗑️ مسح الكل", use_container_width=True):
                 clear_history()
                 st.rerun()
-        
         st.divider()
         
         for item in history:
@@ -844,7 +837,7 @@ with st.sidebar:
         st.info("📭 لا توجد ترجمات محفوظة")
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION (نفس الكود السابق)
+#  باقي الكود (الإعدادات، API، الترجمة، إلخ)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -966,7 +959,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  دوال الترجمة والتعرف على الصوت (نفس الكود السابق)
+#  دوال الترجمة والتعرف على الصوت
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -1085,7 +1078,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI
+#  الواجهة الرئيسية (UI)
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -1171,7 +1164,6 @@ if audio_value is not None:
                     if audio_bytes_tts:
                         st.audio(audio_bytes_tts, format="audio/mp3")
                     
-                    # حفظ في قاعدة البيانات
                     save_translation(recognized_text, translated_text, emotion, source_lang_name, target_lang_name)
                 else:
                     st.error(f"❌ {engine}")
@@ -1222,7 +1214,6 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
                 if audio_bytes_tts:
                     st.audio(audio_bytes_tts, format="audio/mp3")
                 
-                # حفظ في قاعدة البيانات
                 save_translation(input_text, translation_result, emotion, source_lang_name, target_lang_name)
             else:
                 st.error(f"❌ {translation_result}")
