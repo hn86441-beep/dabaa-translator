@@ -137,12 +137,16 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  OCR (EasyOCR)
+#  OCR (EasyOCR) - يدعم جميع اللغات
 # ════════════════════════════════════════════════════════════
+# قائمة اللغات المدعومة في EasyOCR (تطابق لغات التطبيق)
+OCR_LANGUAGES = ['ar', 'en', 'ru', 'ch_sim', 'de', 'es', 'pt', 'ko']
+# ch_sim = الصينية المبسطة، ch_tra = الصينية التقليدية (نستخدم المبسطة)
+
 @st.cache_resource
 def load_ocr_reader():
     try:
-        return easyocr.Reader(['ar', 'en', 'ru'], gpu=False)
+        return easyocr.Reader(OCR_LANGUAGES, gpu=False)
     except Exception as e:
         st.error(f"فشل تحميل EasyOCR: {e}")
         return None
@@ -165,7 +169,9 @@ def extract_text_from_pdf(file_bytes):
         reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
         text = ""
         for page in reader.pages:
-            text += page.extract_text() + "\n"
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
         return text.strip(), None
     except Exception as e:
         return None, str(e)
@@ -529,7 +535,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  الواجهة الرئيسية (UI)
+#  الواجهة الرئيسية (UI) - Tabs
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -675,11 +681,11 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: Image Translation (OCR) -----
+# ----- Tab 3: Image Translation (OCR) - يدعم جميع اللغات -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">🖼️ Image Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته")
+    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم: العربية، الإنجليزية، الروسية، الصينية، الألمانية، الإسبانية، البرتغالية، الكورية)")
     
     uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="image_uploader")
     
@@ -723,11 +729,11 @@ with tab3:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: PDF Translation -----
+# ----- Tab 4: PDF Translation (يدعم جميع اللغات) -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 PDF Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع ملف PDF وسيتم استخراج النص وترجمته")
+    st.caption("ارفع ملف PDF وسيتم استخراج النص وترجمته (يدعم جميع اللغات)")
     
     uploaded_pdf = st.file_uploader("اختر ملف PDF", type=["pdf"], key="pdf_uploader")
     
@@ -740,7 +746,9 @@ with tab4:
                 extracted_text, err = extract_text_from_pdf(pdf_bytes)
                 if extracted_text:
                     st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
-                    st.code(extracted_text[:1000] + ("..." if len(extracted_text) > 1000 else ""), language=None)
+                    # عرض أول 1000 حرف فقط
+                    display_text = extracted_text[:1000] + ("..." if len(extracted_text) > 1000 else "")
+                    st.code(display_text, language=None)
                     
                     with st.spinner("جاري الترجمة..."):
                         translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
