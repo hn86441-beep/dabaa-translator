@@ -5,7 +5,7 @@ faster-whisper
 transformers
 torch
 gtts
-easyocr
-pytesseract
-Pillow
 pdfplumber
+python-docx
+openpyxl
+Pillow
