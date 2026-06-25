@@ -10,6 +10,81 @@ from transformers import pipeline
 from datetime import datetime
 import io
 import base64
+import sqlite3
+
+# ════════════════════════════════════════════════════════════
+#  تهيئة قاعدة البيانات
+# ════════════════════════════════════════════════════════════
+DB_PATH = "translations.db"
+
+def init_db():
+    """إنشاء جدول الترجمات إذا لم يكن موجوداً"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            original TEXT NOT NULL,
+            translated TEXT NOT NULL,
+            emotion TEXT,
+            source_lang TEXT,
+            target_lang TEXT,
+            timestamp TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_translation(original, translated, emotion, source_lang, target_lang):
+    """حفظ ترجمة جديدة في قاعدة البيانات"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO history (original, translated, emotion, source_lang, target_lang, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (original, translated, emotion, source_lang, target_lang, datetime.now().strftime("%Y-%m-%d %H:%M")))
+    conn.commit()
+    conn.close()
+
+def get_history(limit=100):
+    """استرجاع آخر الترجمات من قاعدة البيانات"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        SELECT original, translated, emotion, source_lang, target_lang, timestamp
+        FROM history
+        ORDER BY id DESC
+        LIMIT ?
+    ''', (limit,))
+    rows = c.fetchall()
+    conn.close()
+    return [
+        {
+            "original": row[0],
+            "translated": row[1],
+            "emotion": row[2],
+            "source_lang": row[3],
+            "target_lang": row[4],
+            "time": row[5]
+        }
+        for row in rows
+    ]
+
+def clear_history():
+    """مسح جميع الترجمات من قاعدة البيانات"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('DELETE FROM history')
+    conn.commit()
+    conn.close()
+
+def export_history_json():
+    """تصدير السجل كـ JSON"""
+    history = get_history(limit=1000)
+    return json.dumps(history, ensure_ascii=False, indent=2)
+
+# تهيئة قاعدة البيانات عند بدء التشغيل
+init_db()
 
 # ════════════════════════════════════════════════════════════
 #  تحليل المشاعر (متعدد اللغات)
@@ -75,319 +150,640 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  تهيئة session_state للوضع
 # ════════════════════════════════════════════════════════════
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"  # dark / light
 
-#MainMenu, footer, header { visibility: hidden; }
+# ════════════════════════════════════════════════════════════
+#  CSS - دعم الوضع الفاتح والداكن
+# ════════════════════════════════════════════════════════════
+def get_css(theme):
+    if theme == "light":
+        return """
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-.stApp {
-    background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important;
-    font-family: 'Inter', sans-serif !important;
-    min-height: 100vh;
-}
+        #MainMenu, footer, header { visibility: hidden; }
 
-.block-container {
-    padding-top: 0.8rem !important;
-    padding-bottom: 1rem !important;
-    max-width: 900px !important;
-    position: relative;
-    z-index: 1;
-}
+        .stApp {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%) !important;
+            font-family: 'Inter', sans-serif !important;
+            min-height: 100vh;
+        }
 
-.app-header {
-    text-align: center;
-    padding: 0.3rem 0.5rem 0.2rem;
-}
-.app-header .brand {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.35em;
-    color: #4ECBA0;
-    text-transform: uppercase;
-    display: block;
-    margin-bottom: 0.1rem;
-}
-.app-header h1 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 24px;
-    font-weight: 700;
-    color: #f0f4ff;
-    margin: 0;
-}
-.app-header h1 .accent { color: #4ECBA0; }
+        .block-container {
+            padding-top: 0.8rem !important;
+            padding-bottom: 1rem !important;
+            max-width: 900px !important;
+            position: relative;
+            z-index: 1;
+        }
 
-.glass-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 14px;
-    padding: 0.6rem;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-}
+        .app-header {
+            text-align: center;
+            padding: 0.3rem 0.5rem 0.2rem;
+        }
+        .app-header .brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 0.35em;
+            color: #2a7a60;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 0.1rem;
+        }
+        .app-header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin: 0;
+        }
+        .app-header h1 .accent { color: #2a7a60; }
 
-div[data-testid="stAudioInput"] {
-    display: flex !important;
-    justify-content: center !important;
-    width: 100% !important;
-}
-div[data-testid="stAudioInput"] > div {
-    background: rgba(78,203,160,0.08) !important;
-    border: 2px solid rgba(78,203,160,0.3) !important;
-    border-radius: 60px !important;
-    padding: 0.2rem 0.4rem !important;
-    width: auto !important;
-    min-width: 160px !important;
-    transition: all 0.3s !important;
-    backdrop-filter: blur(8px);
-}
-div[data-testid="stAudioInput"] > div:hover {
-    border-color: #4ECBA0 !important;
-    box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
-}
-div[data-testid="stAudioInput"] button {
-    background: transparent !important;
-    border: none !important;
-    color: #e8f0ff !important;
-    font-size: 16px !important;
-    font-weight: 600 !important;
-    padding: 0.5rem 1.8rem !important;
-    width: 100% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 8px !important;
-}
-div[data-testid="stAudioInput"] button::before {
-    content: "🎤";
-    font-size: 20px;
-}
+        .glass-card {
+            background: rgba(255,255,255,0.7);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 14px;
+            padding: 0.6rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.05);
+        }
 
-div.clear-btn-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    min-height: 60px;
-}
-button[kind="secondary"][data-testid="baseButton-secondary"] {
-    background: rgba(239,68,68,0.1) !important;
-    border: 1.5px solid rgba(239,68,68,0.25) !important;
-    color: #f87171 !important;
-    font-size: 20px !important;
-    font-weight: 700 !important;
-    padding: 0 !important;
-    border-radius: 50% !important;
-    width: 40px !important;
-    height: 40px !important;
-    min-height: unset !important;
-    line-height: 1 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 0 15px rgba(239,68,68,0.05) !important;
-    cursor: pointer !important;
-}
-button[kind="secondary"][data-testid="baseButton-secondary"]:hover {
-    background: rgba(239,68,68,0.2) !important;
-    border-color: #f87171 !important;
-    box-shadow: 0 0 30px rgba(239,68,68,0.15) !important;
-    transform: scale(1.08) !important;
-}
+        div[data-testid="stAudioInput"] {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+        }
+        div[data-testid="stAudioInput"] > div {
+            background: rgba(42,122,96,0.08) !important;
+            border: 2px solid rgba(42,122,96,0.3) !important;
+            border-radius: 60px !important;
+            padding: 0.2rem 0.4rem !important;
+            width: auto !important;
+            min-width: 160px !important;
+            transition: all 0.3s !important;
+            backdrop-filter: blur(8px);
+        }
+        div[data-testid="stAudioInput"] > div:hover {
+            border-color: #2a7a60 !important;
+            box-shadow: 0 0 30px rgba(42,122,96,0.15) !important;
+        }
+        div[data-testid="stAudioInput"] button {
+            background: transparent !important;
+            border: none !important;
+            color: #1a1a2e !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            padding: 0.5rem 1.8rem !important;
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+        }
+        div[data-testid="stAudioInput"] button::before {
+            content: "🎤";
+            font-size: 20px;
+        }
 
-.stSelectbox > div > div {
-    background: rgba(255,255,255,0.05) !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 10px !important;
-    color: #e8f0ff !important;
-    font-size: 13px !important;
-    padding: 0px 8px !important;
-    min-height: 30px !important;
-}
-.stSelectbox label {
-    font-size: 9px !important;
-    font-weight: 600 !important;
-    color: rgba(78,203,160,0.75) !important;
-    letter-spacing: 0.1em !important;
-    text-transform: uppercase !important;
-}
-.stButton > button {
-    border-radius: 10px !important;
-    font-weight: 600 !important;
-    font-size: 12px !important;
-    padding: 0.35rem 0.8rem !important;
-    background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
-    color: #0a1520 !important;
-    border: none !important;
-    width: 100% !important;
-    font-family: 'Space Grotesk', sans-serif !important;
-    min-height: 32px !important;
-}
-.stButton:has(button[title="Swap"]) > button {
-    background: rgba(255,255,255,0.07) !important;
-    color: rgba(200,220,255,0.8) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    font-size: 14px !important;
-    min-height: 28px !important;
-}
+        div.clear-btn-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 60px;
+        }
+        button[kind="secondary"][data-testid="baseButton-secondary"] {
+            background: rgba(200,50,50,0.1) !important;
+            border: 1.5px solid rgba(200,50,50,0.25) !important;
+            color: #c0392b !important;
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            padding: 0 !important;
+            border-radius: 50% !important;
+            width: 40px !important;
+            height: 40px !important;
+            min-height: unset !important;
+            line-height: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 0 15px rgba(200,50,50,0.05) !important;
+            cursor: pointer !important;
+        }
+        button[kind="secondary"][data-testid="baseButton-secondary"]:hover {
+            background: rgba(200,50,50,0.2) !important;
+            border-color: #c0392b !important;
+            box-shadow: 0 0 30px rgba(200,50,50,0.15) !important;
+            transform: scale(1.08) !important;
+        }
 
-textarea {
-    background: #1a1a2e !important;
-    border: 1px solid rgba(255,255,255,0.15) !important;
-    border-radius: 12px !important;
-    color: #f0f4ff !important;
-    font-size: 14px !important;
-    font-family: 'Inter', sans-serif !important;
-    padding: 8px 12px !important;
-    transition: border-color 0.2s, box-shadow 0.2s !important;
-    line-height: 1.5 !important;
-    min-height: 60px !important;
-}
-textarea:focus {
-    border-color: rgba(78,203,160,0.5) !important;
-    box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
-    outline: none !important;
-}
-textarea::placeholder {
-    color: rgba(150,175,220,0.4) !important;
-}
+        .stSelectbox > div > div {
+            background: rgba(255,255,255,0.6) !important;
+            border: 1px solid rgba(0,0,0,0.12) !important;
+            border-radius: 10px !important;
+            color: #1a1a2e !important;
+            font-size: 13px !important;
+            padding: 0px 8px !important;
+            min-height: 30px !important;
+        }
+        .stSelectbox label {
+            font-size: 9px !important;
+            font-weight: 600 !important;
+            color: #2a7a60 !important;
+            letter-spacing: 0.1em !important;
+            text-transform: uppercase !important;
+        }
+        .stButton > button {
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+            font-size: 12px !important;
+            padding: 0.35rem 0.8rem !important;
+            background: linear-gradient(135deg, #2a7a60 0%, #1a5a48 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            width: 100% !important;
+            font-family: 'Space Grotesk', sans-serif !important;
+            min-height: 32px !important;
+        }
+        .stButton:has(button[title="Swap"]) > button {
+            background: rgba(0,0,0,0.07) !important;
+            color: #1a1a2e !important;
+            border: 1px solid rgba(0,0,0,0.1) !important;
+            font-size: 14px !important;
+            min-height: 28px !important;
+        }
 
-.result-box {
-    background: rgba(78,203,160,0.06);
-    border-radius: 12px;
-    padding: 0.5rem 0.8rem;
-    border: 1px solid rgba(78,203,160,0.2);
-    margin-top: 0.4rem;
-    position: relative;
-}
-.result-box::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0;
-    width: 3px; height: 100%;
-    background: linear-gradient(180deg, #4ECBA0, #2fa87a);
-}
-.result-box .label {
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: rgba(78,203,160,0.7);
-    letter-spacing: 0.15em;
-    display: block;
-}
-.result-box .text {
-    font-size: 14px;
-    color: #e8f0ff;
-    line-height: 1.5;
-}
-.result-box .emotion {
-    margin-top: 4px;
-    font-size: 13px;
-    color: #4ECBA0;
-    font-weight: 500;
-}
-.context {
-    background: rgba(78,203,160,0.07);
-    border-radius: 8px;
-    padding: 4px 10px;
-    font-size: 10px;
-    color: rgba(78,203,160,0.9);
-    border: 1px solid rgba(78,203,160,0.15);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-.tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 1px 6px;
-    border-radius: 12px;
-    font-size: 8px;
-    font-weight: 600;
-}
-.tag-pol  { background: rgba(230,57,70,0.2);   color: #ff6b78; border: 1px solid rgba(230,57,70,0.3); }
-.tag-leg  { background: rgba(83,74,183,0.2);   color: #9d96f0; border: 1px solid rgba(83,74,183,0.3); }
-.tag-eco  { background: rgba(244,162,97,0.2);  color: #f4b060; border: 1px solid rgba(244,162,97,0.3); }
-.tag-med  { background: rgba(42,157,143,0.2);  color: #3dd1bd; border: 1px solid rgba(42,157,143,0.3); }
-.tag-sci  { background: rgba(38,70,83,0.3);    color: #7dbfcf; border: 1px solid rgba(38,70,83,0.5); }
-.tag-eng  { background: rgba(29,158,117,0.2);  color: #42d4a0; border: 1px solid rgba(29,158,117,0.3); }
-.tag-mil  { background: rgba(139,0,0,0.2);     color: #ff7b7b; border: 1px solid rgba(139,0,0,0.35); }
-.tag-edu  { background: rgba(244,208,63,0.15); color: #f4d24a; border: 1px solid rgba(244,208,63,0.25); }
-.tag-rel  { background: rgba(108,52,131,0.2);  color: #c07fe0; border: 1px solid rgba(108,52,131,0.35); }
-.tag-spt  { background: rgba(230,126,34,0.2);  color: #f0944a; border: 1px solid rgba(230,126,34,0.3); }
-.tag-lit  { background: rgba(216,27,96,0.2);   color: #f06090; border: 1px solid rgba(216,27,96,0.3); }
-.tag-it   { background: rgba(0,172,193,0.2);   color: #3dd4e4; border: 1px solid rgba(0,172,193,0.3); }
-.tag-env  { background: rgba(67,160,71,0.2);   color: #6dd873; border: 1px solid rgba(67,160,71,0.3); }
-.tag-agr  { background: rgba(121,85,72,0.2);   color: #c4a08a; border: 1px solid rgba(121,85,72,0.3); }
-.tag-tour { background: rgba(0,131,143,0.2);   color: #30c8d8; border: 1px solid rgba(0,131,143,0.3); }
-.tag-gen  { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
+        textarea {
+            background: rgba(255,255,255,0.8) !important;
+            border: 1px solid rgba(0,0,0,0.12) !important;
+            border-radius: 12px !important;
+            color: #1a1a2e !important;
+            font-size: 14px !important;
+            font-family: 'Inter', sans-serif !important;
+            padding: 8px 12px !important;
+            transition: border-color 0.2s, box-shadow 0.2s !important;
+            line-height: 1.5 !important;
+            min-height: 60px !important;
+        }
+        textarea:focus {
+            border-color: rgba(42,122,96,0.5) !important;
+            box-shadow: 0 0 0 3px rgba(42,122,96,0.1) !important;
+            outline: none !important;
+        }
+        textarea::placeholder {
+            color: rgba(100,100,120,0.4) !important;
+        }
 
-.stSuccess { background: rgba(78,203,160,0.08) !important; border: 1px solid rgba(78,203,160,0.25) !important; color: #a8f0d8 !important; }
-.stError { background: rgba(239,68,68,0.08) !important; border: 1px solid rgba(239,68,68,0.25) !important; }
-hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent); }
-.section-heading {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: rgba(150,185,230,0.5);
-    margin: 0.6rem 0 0.3rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.section-heading::before {
-    content: '';
-    width: 2px;
-    height: 10px;
-    background: #4ECBA0;
-}
+        .result-box {
+            background: rgba(42,122,96,0.06);
+            border-radius: 12px;
+            padding: 0.5rem 0.8rem;
+            border: 1px solid rgba(42,122,96,0.2);
+            margin-top: 0.4rem;
+            position: relative;
+        }
+        .result-box::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 3px; height: 100%;
+            background: linear-gradient(180deg, #2a7a60, #1a5a48);
+        }
+        .result-box .label {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: rgba(42,122,96,0.7);
+            letter-spacing: 0.15em;
+            display: block;
+        }
+        .result-box .text {
+            font-size: 14px;
+            color: #1a1a2e;
+            line-height: 1.5;
+        }
+        .result-box .emotion {
+            margin-top: 4px;
+            font-size: 13px;
+            color: #2a7a60;
+            font-weight: 500;
+        }
 
-[data-testid="stSidebar"] {
-    background: rgba(10,10,26,0.95) !important;
-    border-right: 1px solid rgba(78,203,160,0.1) !important;
-}
-[data-testid="stSidebar"] .stMarkdown {
-    color: #e8f0ff !important;
-}
-.history-item {
-    background: rgba(78,203,160,0.06);
-    border-radius: 8px;
-    padding: 8px 10px;
-    margin-bottom: 6px;
-    border-left: 2px solid #4ECBA0;
-}
-.history-item .time {
-    font-size: 9px;
-    color: rgba(180,200,230,0.4);
-}
-.history-item .text {
-    font-size: 12px;
-    color: #e8f0ff;
-}
-.history-item .lang {
-    font-size: 9px;
-    color: rgba(78,203,160,0.6);
-}
+        .context {
+            background: rgba(42,122,96,0.07);
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 10px;
+            color: #2a7a60;
+            border: 1px solid rgba(42,122,96,0.15);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 6px;
+            border-radius: 12px;
+            font-size: 8px;
+            font-weight: 600;
+        }
+        .tag-pol  { background: rgba(230,57,70,0.2);   color: #c0392b; border: 1px solid rgba(230,57,70,0.3); }
+        .tag-leg  { background: rgba(83,74,183,0.2);   color: #534ab7; border: 1px solid rgba(83,74,183,0.3); }
+        .tag-eco  { background: rgba(244,162,97,0.2);  color: #d88a3a; border: 1px solid rgba(244,162,97,0.3); }
+        .tag-med  { background: rgba(42,157,143,0.2);  color: #2a7a60; border: 1px solid rgba(42,157,143,0.3); }
+        .tag-sci  { background: rgba(38,70,83,0.3);    color: #2c5a6a; border: 1px solid rgba(38,70,83,0.5); }
+        .tag-eng  { background: rgba(29,158,117,0.2);  color: #1a6a50; border: 1px solid rgba(29,158,117,0.3); }
+        .tag-mil  { background: rgba(139,0,0,0.2);     color: #8a0000; border: 1px solid rgba(139,0,0,0.35); }
+        .tag-edu  { background: rgba(244,208,63,0.15); color: #b89020; border: 1px solid rgba(244,208,63,0.25); }
+        .tag-rel  { background: rgba(108,52,131,0.2);  color: #7a3a8a; border: 1px solid rgba(108,52,131,0.35); }
+        .tag-spt  { background: rgba(230,126,34,0.2);  color: #c07020; border: 1px solid rgba(230,126,34,0.3); }
+        .tag-lit  { background: rgba(216,27,96,0.2);   color: #b02050; border: 1px solid rgba(216,27,96,0.3); }
+        .tag-it   { background: rgba(0,172,193,0.2);   color: #0090a0; border: 1px solid rgba(0,172,193,0.3); }
+        .tag-env  { background: rgba(67,160,71,0.2);   color: #3a8a3a; border: 1px solid rgba(67,160,71,0.3); }
+        .tag-agr  { background: rgba(121,85,72,0.2);   color: #7a4a3a; border: 1px solid rgba(121,85,72,0.3); }
+        .tag-tour { background: rgba(0,131,143,0.2);   color: #007080; border: 1px solid rgba(0,131,143,0.3); }
+        .tag-gen  { background: rgba(107,114,128,0.2); color: #5a6270; border: 1px solid rgba(107,114,128,0.3); }
 
-@media (max-width: 600px) {
-    .block-container { padding: 0.4rem !important; }
-    .app-header h1 { font-size: 20px !important; }
-    .app-header { padding: 0.2rem 0.3rem 0.1rem !important; }
-    div[data-testid="stAudioInput"] > div { min-width: 140px !important; }
-    div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
-    .stButton > button { font-size: 11px !important; min-height: 34px !important; }
-    textarea { font-size: 13px !important; min-height: 50px !important; }
-    button[kind="secondary"][data-testid="baseButton-secondary"] { width: 34px !important; height: 34px !important; font-size: 17px !important; }
-}
-</style>
-""", unsafe_allow_html=True)
+        .stSuccess { background: rgba(42,122,96,0.08) !important; border: 1px solid rgba(42,122,96,0.25) !important; color: #1a5a48 !important; }
+        .stError { background: rgba(200,50,50,0.08) !important; border: 1px solid rgba(200,50,50,0.25) !important; color: #c0392b !important; }
+        hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(42,122,96,0.2), transparent); }
+        .section-heading {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: rgba(42,122,96,0.7);
+            margin: 0.6rem 0 0.3rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-heading::before {
+            content: '';
+            width: 2px;
+            height: 10px;
+            background: #2a7a60;
+        }
+
+        [data-testid="stSidebar"] {
+            background: rgba(255,255,255,0.9) !important;
+            border-right: 1px solid rgba(0,0,0,0.08) !important;
+        }
+        [data-testid="stSidebar"] .stMarkdown {
+            color: #1a1a2e !important;
+        }
+        .history-item {
+            background: rgba(42,122,96,0.06);
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            border-left: 2px solid #2a7a60;
+        }
+        .history-item .time {
+            font-size: 9px;
+            color: rgba(50,50,70,0.4);
+        }
+        .history-item .text {
+            font-size: 12px;
+            color: #1a1a2e;
+        }
+        .history-item .lang {
+            font-size: 9px;
+            color: rgba(42,122,96,0.6);
+        }
+
+        @media (max-width: 600px) {
+            .block-container { padding: 0.4rem !important; }
+            .app-header h1 { font-size: 20px !important; }
+            .app-header { padding: 0.2rem 0.3rem 0.1rem !important; }
+            div[data-testid="stAudioInput"] > div { min-width: 140px !important; }
+            div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
+            .stButton > button { font-size: 11px !important; min-height: 34px !important; }
+            textarea { font-size: 13px !important; min-height: 50px !important; }
+            button[kind="secondary"][data-testid="baseButton-secondary"] { width: 34px !important; height: 34px !important; font-size: 17px !important; }
+        }
+        """
+    else:  # dark theme (default)
+        return """
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+        #MainMenu, footer, header { visibility: hidden; }
+
+        .stApp {
+            background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important;
+            font-family: 'Inter', sans-serif !important;
+            min-height: 100vh;
+        }
+
+        .block-container {
+            padding-top: 0.8rem !important;
+            padding-bottom: 1rem !important;
+            max-width: 900px !important;
+            position: relative;
+            z-index: 1;
+        }
+
+        .app-header {
+            text-align: center;
+            padding: 0.3rem 0.5rem 0.2rem;
+        }
+        .app-header .brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 0.35em;
+            color: #4ECBA0;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 0.1rem;
+        }
+        .app-header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: #f0f4ff;
+            margin: 0;
+        }
+        .app-header h1 .accent { color: #4ECBA0; }
+
+        .glass-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 14px;
+            padding: 0.6rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        div[data-testid="stAudioInput"] {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+        }
+        div[data-testid="stAudioInput"] > div {
+            background: rgba(78,203,160,0.08) !important;
+            border: 2px solid rgba(78,203,160,0.3) !important;
+            border-radius: 60px !important;
+            padding: 0.2rem 0.4rem !important;
+            width: auto !important;
+            min-width: 160px !important;
+            transition: all 0.3s !important;
+            backdrop-filter: blur(8px);
+        }
+        div[data-testid="stAudioInput"] > div:hover {
+            border-color: #4ECBA0 !important;
+            box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
+        }
+        div[data-testid="stAudioInput"] button {
+            background: transparent !important;
+            border: none !important;
+            color: #e8f0ff !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            padding: 0.5rem 1.8rem !important;
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+        }
+        div[data-testid="stAudioInput"] button::before {
+            content: "🎤";
+            font-size: 20px;
+        }
+
+        div.clear-btn-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 60px;
+        }
+        button[kind="secondary"][data-testid="baseButton-secondary"] {
+            background: rgba(239,68,68,0.1) !important;
+            border: 1.5px solid rgba(239,68,68,0.25) !important;
+            color: #f87171 !important;
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            padding: 0 !important;
+            border-radius: 50% !important;
+            width: 40px !important;
+            height: 40px !important;
+            min-height: unset !important;
+            line-height: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 0 15px rgba(239,68,68,0.05) !important;
+            cursor: pointer !important;
+        }
+        button[kind="secondary"][data-testid="baseButton-secondary"]:hover {
+            background: rgba(239,68,68,0.2) !important;
+            border-color: #f87171 !important;
+            box-shadow: 0 0 30px rgba(239,68,68,0.15) !important;
+            transform: scale(1.08) !important;
+        }
+
+        .stSelectbox > div > div {
+            background: rgba(255,255,255,0.05) !important;
+            border: 1px solid rgba(255,255,255,0.12) !important;
+            border-radius: 10px !important;
+            color: #e8f0ff !important;
+            font-size: 13px !important;
+            padding: 0px 8px !important;
+            min-height: 30px !important;
+        }
+        .stSelectbox label {
+            font-size: 9px !important;
+            font-weight: 600 !important;
+            color: rgba(78,203,160,0.75) !important;
+            letter-spacing: 0.1em !important;
+            text-transform: uppercase !important;
+        }
+        .stButton > button {
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+            font-size: 12px !important;
+            padding: 0.35rem 0.8rem !important;
+            background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
+            color: #0a1520 !important;
+            border: none !important;
+            width: 100% !important;
+            font-family: 'Space Grotesk', sans-serif !important;
+            min-height: 32px !important;
+        }
+        .stButton:has(button[title="Swap"]) > button {
+            background: rgba(255,255,255,0.07) !important;
+            color: rgba(200,220,255,0.8) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            font-size: 14px !important;
+            min-height: 28px !important;
+        }
+
+        textarea {
+            background: #1a1a2e !important;
+            border: 1px solid rgba(255,255,255,0.15) !important;
+            border-radius: 12px !important;
+            color: #f0f4ff !important;
+            font-size: 14px !important;
+            font-family: 'Inter', sans-serif !important;
+            padding: 8px 12px !important;
+            transition: border-color 0.2s, box-shadow 0.2s !important;
+            line-height: 1.5 !important;
+            min-height: 60px !important;
+        }
+        textarea:focus {
+            border-color: rgba(78,203,160,0.5) !important;
+            box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
+            outline: none !important;
+        }
+        textarea::placeholder {
+            color: rgba(150,175,220,0.4) !important;
+        }
+
+        .result-box {
+            background: rgba(78,203,160,0.06);
+            border-radius: 12px;
+            padding: 0.5rem 0.8rem;
+            border: 1px solid rgba(78,203,160,0.2);
+            margin-top: 0.4rem;
+            position: relative;
+        }
+        .result-box::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 3px; height: 100%;
+            background: linear-gradient(180deg, #4ECBA0, #2fa87a);
+        }
+        .result-box .label {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: rgba(78,203,160,0.7);
+            letter-spacing: 0.15em;
+            display: block;
+        }
+        .result-box .text {
+            font-size: 14px;
+            color: #e8f0ff;
+            line-height: 1.5;
+        }
+        .result-box .emotion {
+            margin-top: 4px;
+            font-size: 13px;
+            color: #4ECBA0;
+            font-weight: 500;
+        }
+
+        .context {
+            background: rgba(78,203,160,0.07);
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 10px;
+            color: rgba(78,203,160,0.9);
+            border: 1px solid rgba(78,203,160,0.15);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 6px;
+            border-radius: 12px;
+            font-size: 8px;
+            font-weight: 600;
+        }
+        .tag-pol  { background: rgba(230,57,70,0.2);   color: #ff6b78; border: 1px solid rgba(230,57,70,0.3); }
+        .tag-leg  { background: rgba(83,74,183,0.2);   color: #9d96f0; border: 1px solid rgba(83,74,183,0.3); }
+        .tag-eco  { background: rgba(244,162,97,0.2);  color: #f4b060; border: 1px solid rgba(244,162,97,0.3); }
+        .tag-med  { background: rgba(42,157,143,0.2);  color: #3dd1bd; border: 1px solid rgba(42,157,143,0.3); }
+        .tag-sci  { background: rgba(38,70,83,0.3);    color: #7dbfcf; border: 1px solid rgba(38,70,83,0.5); }
+        .tag-eng  { background: rgba(29,158,117,0.2);  color: #42d4a0; border: 1px solid rgba(29,158,117,0.3); }
+        .tag-mil  { background: rgba(139,0,0,0.2);     color: #ff7b7b; border: 1px solid rgba(139,0,0,0.35); }
+        .tag-edu  { background: rgba(244,208,63,0.15); color: #f4d24a; border: 1px solid rgba(244,208,63,0.25); }
+        .tag-rel  { background: rgba(108,52,131,0.2);  color: #c07fe0; border: 1px solid rgba(108,52,131,0.35); }
+        .tag-spt  { background: rgba(230,126,34,0.2);  color: #f0944a; border: 1px solid rgba(230,126,34,0.3); }
+        .tag-lit  { background: rgba(216,27,96,0.2);   color: #f06090; border: 1px solid rgba(216,27,96,0.3); }
+        .tag-it   { background: rgba(0,172,193,0.2);   color: #3dd4e4; border: 1px solid rgba(0,172,193,0.3); }
+        .tag-env  { background: rgba(67,160,71,0.2);   color: #6dd873; border: 1px solid rgba(67,160,71,0.3); }
+        .tag-agr  { background: rgba(121,85,72,0.2);   color: #c4a08a; border: 1px solid rgba(121,85,72,0.3); }
+        .tag-tour { background: rgba(0,131,143,0.2);   color: #30c8d8; border: 1px solid rgba(0,131,143,0.3); }
+        .tag-gen  { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
+
+        .stSuccess { background: rgba(78,203,160,0.08) !important; border: 1px solid rgba(78,203,160,0.25) !important; color: #a8f0d8 !important; }
+        .stError { background: rgba(239,68,68,0.08) !important; border: 1px solid rgba(239,68,68,0.25) !important; }
+        hr { margin: 0.6rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent); }
+        .section-heading {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: rgba(150,185,230,0.5);
+            margin: 0.6rem 0 0.3rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-heading::before {
+            content: '';
+            width: 2px;
+            height: 10px;
+            background: #4ECBA0;
+        }
+
+        [data-testid="stSidebar"] {
+            background: rgba(10,10,26,0.95) !important;
+            border-right: 1px solid rgba(78,203,160,0.1) !important;
+        }
+        [data-testid="stSidebar"] .stMarkdown {
+            color: #e8f0ff !important;
+        }
+        .history-item {
+            background: rgba(78,203,160,0.06);
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            border-left: 2px solid #4ECBA0;
+        }
+        .history-item .time {
+            font-size: 9px;
+            color: rgba(180,200,230,0.4);
+        }
+        .history-item .text {
+            font-size: 12px;
+            color: #e8f0ff;
+        }
+        .history-item .lang {
+            font-size: 9px;
+            color: rgba(78,203,160,0.6);
+        }
+
+        @media (max-width: 600px) {
+            .block-container { padding: 0.4rem !important; }
+            .app-header h1 { font-size: 20px !important; }
+            .app-header { padding: 0.2rem 0.3rem 0.1rem !important; }
+            div[data-testid="stAudioInput"] > div { min-width: 140px !important; }
+            div[data-testid="stAudioInput"] button { font-size: 14px !important; padding: 0.4rem 1.2rem !important; }
+            .stButton > button { font-size: 11px !important; min-height: 34px !important; }
+            textarea { font-size: 13px !important; min-height: 50px !important; }
+            button[kind="secondary"][data-testid="baseButton-secondary"] { width: 34px !important; height: 34px !important; font-size: 17px !important; }
+        }
+        """
+
+# عرض CSS حسب الوضع الحالي
+st.markdown(f"<style>{get_css(st.session_state.theme)}</style>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
 #  العنوان
@@ -400,26 +796,33 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  الشريط الجانبي: سجل الترجمات
+#  الشريط الجانبي: تبديل المظهر + سجل الترجمات
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
+    # زر تبديل المظهر
+    st.markdown("## 🌓 المظهر")
+    if st.button("🌓 تبديل المظهر", use_container_width=True):
+        st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
+        st.rerun()
+    st.divider()
+    
     st.markdown("## 📜 سجل الترجمات")
     
-    if "history" not in st.session_state:
-        st.session_state.history = []
+    # تحميل السجل من قاعدة البيانات
+    history = get_history(limit=100)
     
-    if st.session_state.history:
+    if history:
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.write(f"**{len(st.session_state.history)}** ترجمة")
+            st.write(f"**{len(history)}** ترجمة")
         with col2:
             if st.button("🗑️ مسح الكل", use_container_width=True):
-                st.session_state.history = []
+                clear_history()
                 st.rerun()
         
         st.divider()
         
-        for item in reversed(st.session_state.history[-50:]):
+        for item in history:
             st.markdown(f"""
             <div class="history-item">
                 <div class="text">🔹 {item.get('original', '')[:50]}...</div>
@@ -433,7 +836,7 @@ with st.sidebar:
             """, unsafe_allow_html=True)
         
         if st.button("📤 تصدير السجل (JSON)", use_container_width=True):
-            json_str = json.dumps(st.session_state.history, ensure_ascii=False, indent=2)
+            json_str = export_history_json()
             b64 = base64.b64encode(json_str.encode()).decode()
             href = f'<a href="data:application/json;base64,{b64}" download="translation_history.json">📥 تحميل</a>'
             st.markdown(href, unsafe_allow_html=True)
@@ -441,7 +844,7 @@ with st.sidebar:
         st.info("📭 لا توجد ترجمات محفوظة")
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION
+#  CONFIGURATION (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -563,7 +966,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION & SPEECH FUNCTIONS
+#  دوال الترجمة والتعرف على الصوت (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -754,7 +1157,6 @@ if audio_value is not None:
                     emotion = analyze_emotion(recognized_text)
                     
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                    
                     st.markdown(f"""
                     <div class="result-box">
                         <span class="label">✦ Translation</span>
@@ -769,14 +1171,8 @@ if audio_value is not None:
                     if audio_bytes_tts:
                         st.audio(audio_bytes_tts, format="audio/mp3")
                     
-                    st.session_state.history.append({
-                        "original": recognized_text,
-                        "translated": translated_text,
-                        "emotion": emotion,
-                        "source_lang": source_lang_name,
-                        "target_lang": target_lang_name,
-                        "time": datetime.now().strftime("%Y-%m-%d %H:%M")
-                    })
+                    # حفظ في قاعدة البيانات
+                    save_translation(recognized_text, translated_text, emotion, source_lang_name, target_lang_name)
                 else:
                     st.error(f"❌ {engine}")
         else:
@@ -826,14 +1222,8 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
                 if audio_bytes_tts:
                     st.audio(audio_bytes_tts, format="audio/mp3")
                 
-                st.session_state.history.append({
-                    "original": input_text,
-                    "translated": translation_result,
-                    "emotion": emotion,
-                    "source_lang": source_lang_name,
-                    "target_lang": target_lang_name,
-                    "time": datetime.now().strftime("%Y-%m-%d %H:%M")
-                })
+                # حفظ في قاعدة البيانات
+                save_translation(input_text, translation_result, emotion, source_lang_name, target_lang_name)
             else:
                 st.error(f"❌ {translation_result}")
 
