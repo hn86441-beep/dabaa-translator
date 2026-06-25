@@ -9,8 +9,6 @@ pdfplumber
 python-docx
 openpyxl
 Pillow
-opencv-python
-pytesseract
+easyocr
 numpy
-openai-whisper
 deep-translator
