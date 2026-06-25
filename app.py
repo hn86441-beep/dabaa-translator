@@ -10,7 +10,6 @@ from transformers import pipeline
 from datetime import datetime
 import io
 import base64
-import re
 
 # ════════════════════════════════════════════════════════════
 #  تحليل المشاعر (متعدد اللغات)
@@ -41,18 +40,29 @@ def analyze_emotion(text):
         return "😐 محايد"
 
 # ════════════════════════════════════════════════════════════
-#  تحويل النص إلى صوت (TTS)
+#  تحويل النص إلى صوت (TTS) باستخدام gTTS فقط (بدون pygame)
 # ════════════════════════════════════════════════════════════
 from gtts import gTTS
 
 def get_tts_lang(lang_code):
+    """تحويل رمز اللغة إلى رمز gTTS"""
     lang_map = {
-        "ar": "ar", "en": "en", "ru": "ru", "zh": "zh-cn",
-        "de": "de", "es": "es", "pt": "pt", "ko": "ko",
+        "ar": "ar",   # العربية
+        "en": "en",   # الإنجليزية
+        "ru": "ru",   # الروسية
+        "zh": "zh-cn",# الصينية
+        "de": "de",   # الألمانية
+        "es": "es",   # الإسبانية
+        "pt": "pt",   # البرتغالية
+        "ko": "ko",   # الكورية
     }
     return lang_map.get(lang_code, "en")
 
 def generate_audio(text, lang_code="en"):
+    """
+    توليد ملف صوتي (MP3) من النص باستخدام gTTS.
+    يعيد كائن BytesIO يمكن استخدامه مع st.audio.
+    """
     if not text or not text.strip():
         return None
     try:
@@ -67,17 +77,6 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  دالة نسخ النص باستخدام JavaScript آمن
-# ════════════════════════════════════════════════════════════
-def copy_to_clipboard(text):
-    """نسخ النص إلى الحافظة باستخدام JavaScript."""
-    if not text:
-        return
-    # استخدام st.code مع زر نسخ مدمج (أفضل حل)
-    # لكننا نضيف زراً منفصلاً أيضاً
-    pass
-
-# ════════════════════════════════════════════════════════════
 #  إعدادات الصفحة
 # ════════════════════════════════════════════════════════════
 st.set_page_config(
@@ -87,7 +86,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (تم اختصاره قليلاً للطول لكنه كامل)
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -308,20 +307,6 @@ textarea::placeholder {
     gap: 8px;
     flex-wrap: wrap;
 }
-.copy-btn {
-    background: rgba(78,203,160,0.1) !important;
-    border: 1px solid rgba(78,203,160,0.2) !important;
-    border-radius: 20px !important;
-    padding: 2px 12px !important;
-    font-size: 11px !important;
-    color: #4ECBA0 !important;
-    cursor: pointer;
-    transition: 0.3s;
-}
-.copy-btn:hover {
-    background: rgba(78,203,160,0.2) !important;
-    border-color: #4ECBA0 !important;
-}
 .context {
     background: rgba(78,203,160,0.07);
     border-radius: 8px;
@@ -473,7 +458,7 @@ with st.sidebar:
         st.info("📭 لا توجد ترجمات محفوظة")
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION
+#  CONFIGURATION (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -595,7 +580,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  TRANSLATION & SPEECH FUNCTIONS
+#  دوال الترجمة والتعرف على الصوت (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -677,7 +662,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  SESSION STATE
+#  SESSION STATE (نفس الكود)
 # ════════════════════════════════════════════════════════════
 if "source_lang" not in st.session_state:
     st.session_state.source_lang = "Auto-Detect"
@@ -714,24 +699,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  دالة النسخ (باستخدام JavaScript آمن)
-# ════════════════════════════════════════════════════════════
-def copy_button(text, label="📋 نسخ"):
-    """إنشاء زر نسخ يعمل باستخدام JavaScript."""
-    # ترميز النص ليكون آمناً للاستخدام في JavaScript
-    safe_text = json.dumps(text)
-    js_code = f"""
-    <button onclick="navigator.clipboard.writeText({safe_text}).then(() => {{this.textContent = '✅ تم النسخ!'; setTimeout(() => {{this.textContent = '{label}';}}, 2000);}}).catch(() => {{alert('فشل النسخ');}})" 
-            style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;transition:0.3s;"
-            onmouseover="this.style.background='rgba(78,203,160,0.2)'" 
-            onmouseout="this.style.background='rgba(78,203,160,0.1)'">
-        {label}
-    </button>
-    """
-    return js_code
-
-# ════════════════════════════════════════════════════════════
-#  UI
+#  UI (الجزء الرئيسي)
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -803,28 +771,27 @@ if audio_value is not None:
                     emotion = analyze_emotion(recognized_text)
                     
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                    
-                    # عرض الترجمة مع زر نسخ مدمج (st.code يحتوي على زر نسخ)
                     st.markdown(f"""
                     <div class="result-box">
                         <span class="label">✦ Translation</span>
                         <div class="text">{translated_text}</div>
                         <div class="emotion">{emotion}</div>
                         <div class="actions">
-                            {copy_button(translated_text)}
+                            <button onclick="navigator.clipboard.writeText('{translated_text}')" 
+                                    style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;">
+                                📋 نسخ
+                            </button>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # st.code يحتوي على زر نسخ مدمج في Streamlit 1.28+
-                    st.code(translated_text, language=None)
-                    
-                    # زر تشغيل الصوت
+                    # زر تشغيل الصوت (يظهر مشغل صوت)
                     audio_bytes_tts = generate_audio(translated_text, target_lang)
                     if audio_bytes_tts:
                         st.audio(audio_bytes_tts, format="audio/mp3")
                     
-                    # حفظ في السجل
+                    st.code(translated_text, language=None)
+                    
                     st.session_state.history.append({
                         "original": recognized_text,
                         "translated": translated_text,
@@ -867,23 +834,26 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
             if translation_result:
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                 emotion = analyze_emotion(input_text)
-                
                 st.markdown(f"""
                 <div class="result-box">
                     <span class="label">✦ Translation</span>
                     <div class="text">{translation_result}</div>
                     <div class="emotion">{emotion}</div>
                     <div class="actions">
-                        {copy_button(translation_result)}
+                        <button onclick="navigator.clipboard.writeText('{translation_result}')" 
+                                style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;">
+                            📋 نسخ
+                        </button>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                st.code(translation_result, language=None)
-                
+                # زر تشغيل الصوت
                 audio_bytes_tts = generate_audio(translation_result, target_lang)
                 if audio_bytes_tts:
                     st.audio(audio_bytes_tts, format="audio/mp3")
+                
+                st.code(translation_result, language=None)
                 
                 st.session_state.history.append({
                     "original": input_text,
