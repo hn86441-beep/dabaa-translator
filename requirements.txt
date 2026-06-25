@@ -5,3 +5,6 @@ faster-whisper
 transformers
 torch
 gtts
+easyocr
+Pillow
+PyPDF2
