@@ -13,7 +13,7 @@ import base64
 import sqlite3
 
 # ════════════════════════════════════════════════════════════
-#  1. قاعدة بيانات SQLite (حفظ الترجمات)
+#  قاعدة بيانات SQLite
 # ════════════════════════════════════════════════════════════
 DB_PATH = "translations.db"
 
@@ -78,11 +78,10 @@ def export_history_json():
     history = get_history(limit=1000)
     return json.dumps(history, ensure_ascii=False, indent=2)
 
-# تهيئة قاعدة البيانات
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  2. تحليل المشاعر
+#  تحليل المشاعر
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
@@ -101,16 +100,16 @@ def analyze_emotion(text):
         result = emotion_classifier(text[:512])[0]
         label = result['label'].upper()
         if "POSITIVE" in label:
-            return "😊 فرح"
+            return "فرح"
         elif "NEGATIVE" in label:
-            return "😢 حزن"
+            return "حزن"
         else:
-            return "😐 محايد"
+            return "محايد"
     except Exception:
-        return "😐 محايد"
+        return "محايد"
 
 # ════════════════════════════════════════════════════════════
-#  3. تحويل النص إلى صوت (TTS)
+#  تحويل النص إلى صوت (TTS)
 # ════════════════════════════════════════════════════════════
 from gtts import gTTS
 
@@ -132,11 +131,10 @@ def generate_audio(text, lang_code="en"):
         audio_bytes.seek(0)
         return audio_bytes
     except Exception as e:
-        st.error(f"❌ فشل توليد الصوت: {str(e)}")
         return None
 
 # ════════════════════════════════════════════════════════════
-#  4. إعدادات الصفحة
+#  إعدادات الصفحة
 # ════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="HN TRANSLATOR",
@@ -144,363 +142,128 @@ st.set_page_config(
     layout="centered"
 )
 
-# ════════════════════════════════════════════════════════════
-#  5. تهيئة حالة الوضع (Light/Dark) في session_state
-# ════════════════════════════════════════════════════════════
 if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  6. CSS (مع حركات إبداعية محسّنة - بدون جملة تأكيد)
+#  CSS - ألوان فقط، بدون حركات
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
         return """
-        /* ====== الوضع الفاتح مع لمسات إبداعية ====== */
-        .stApp {
-            background: #f5f7fa !important;
-        }
-        
-        /* نبض الشعار - أكثر وضوحاً */
+        .stApp { background: #f5f7fa !important; }
+        .app-header { text-align: center; padding: 0.5rem 0; }
         .app-header h1 {
-            color: #1a1a2e !important;
-            animation: pulse 2s ease-in-out infinite;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin: 0;
         }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-        }
-        
-        .app-header h1 .accent {
-            color: #2a7a60 !important;
-            animation: glow 2.5s ease-in-out infinite;
-        }
-        
-        @keyframes glow {
-            0%, 100% { text-shadow: 0 0 0 rgba(42,122,96,0); }
-            50% { text-shadow: 0 0 20px rgba(42,122,96,0.15); }
-        }
-        
-        /* الأزرار - حركة انزلاق */
-        .stButton > button {
-            background: #2a7a60 !important;
-            color: white !important;
-            transition: all 0.3s ease !important;
-            position: relative !important;
-            overflow: hidden !important;
-        }
-        .stButton > button::after {
-            content: '' !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: -100% !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
-            transition: left 0.5s ease !important;
-        }
-        .stButton > button:hover::after {
-            left: 100% !important;
-        }
-        .stButton > button:hover {
-            background: #1a5a48 !important;
-            transform: translateY(-2px) !important;
-        }
-        
-        textarea {
-            background: white !important;
-            color: #1a1a2e !important;
-            border: 1px solid #ccc !important;
-            transition: border 0.3s ease, box-shadow 0.3s ease !important;
-        }
-        textarea:focus {
-            border-color: #2a7a60 !important;
-            box-shadow: 0 0 0 3px rgba(42,122,96,0.1) !important;
-        }
-        
-        .result-box {
-            background: rgba(42,122,96,0.06) !important;
-            border-color: rgba(42,122,96,0.2) !important;
-            transition: transform 0.3s ease, box-shadow 0.3s ease !important;
-        }
-        .result-box:hover {
-            transform: translateY(-3px) !important;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.06) !important;
-        }
-        .result-box .text {
-            color: #1a1a2e !important;
-        }
-        .result-box .emotion {
-            color: #2a7a60 !important;
-        }
-        
-        .glass-card {
-            background: rgba(255,255,255,0.7) !important;
-            border-color: rgba(0,0,0,0.08) !important;
-            transition: transform 0.3s ease !important;
-        }
-        .glass-card:hover {
-            transform: scale(1.01) !important;
-        }
-        
-        .section-heading {
-            color: #2a7a60 !important;
-        }
-        .section-heading::before {
-            background: #2a7a60 !important;
-            animation: slideDown 0.8s ease forwards;
-        }
-        
-        @keyframes slideDown {
-            from { transform: scaleY(0); }
-            to { transform: scaleY(1); }
-        }
-        
-        [data-testid="stSidebar"] {
-            background: rgba(255,255,255,0.98) !important;
-            border-right: 1px solid #ddd !important;
-        }
-        
-        .history-item {
-            background: rgba(42,122,96,0.06) !important;
-            border-left: 2px solid #2a7a60 !important;
-            transition: transform 0.3s ease !important;
-        }
-        .history-item:hover {
-            transform: translateX(5px) !important;
-        }
-        
-        div[data-testid="stAudioInput"] > div {
-            background: rgba(42,122,96,0.08) !important;
-            border-color: rgba(42,122,96,0.3) !important;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
-        }
-        div[data-testid="stAudioInput"] > div:hover {
-            border-color: #2a7a60 !important;
-            box-shadow: 0 0 30px rgba(42,122,96,0.15) !important;
-        }
-        div[data-testid="stAudioInput"] button {
-            color: #1a1a2e !important;
-        }
-        
-        .stCode, code, pre {
-            background: #f0f0f0 !important;
-            color: #1a1a2e !important;
-            border-radius: 8px !important;
-            border: 1px solid #ddd !important;
-        }
+        .app-header h1 .accent { color: #2a7a60; }
+        .stButton > button { background: #2a7a60 !important; color: white !important; }
+        .stButton > button:hover { background: #1a5a48 !important; }
+        textarea { background: white !important; color: #1a1a2e !important; border: 1px solid #ccc !important; }
+        .result-box { background: rgba(42,122,96,0.06); border: 1px solid rgba(42,122,96,0.2); border-radius: 12px; padding: 0.5rem 0.8rem; margin-top: 0.4rem; }
+        .result-box .label { font-size: 8px; font-weight: 700; text-transform: uppercase; color: rgba(42,122,96,0.7); letter-spacing: 0.15em; }
+        .result-box .text { font-size: 14px; color: #1a1a2e; }
+        .result-box .emotion { font-size: 13px; color: #2a7a60; font-weight: 500; margin-top: 4px; }
+        .stSelectbox > div > div { background: white !important; color: #1a1a2e !important; border-color: #ccc !important; }
+        .stSelectbox label { color: #2a7a60 !important; }
+        [data-testid="stSidebar"] { background: rgba(255,255,255,0.98) !important; border-right: 1px solid #ddd !important; }
+        .history-item { padding: 6px 10px; margin-bottom: 4px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .history-item .original { font-size: 12px; color: #1a1a2e; }
+        .history-item .translated { font-size: 12px; color: #2a7a60; }
+        div[data-testid="stAudioInput"] > div { background: rgba(42,122,96,0.08); border: 2px solid rgba(42,122,96,0.3); border-radius: 60px; }
+        div[data-testid="stAudioInput"] button { color: #1a1a2e !important; }
+        .stCode, code, pre { background: #f0f0f0 !important; color: #1a1a2e !important; border: 1px solid #ddd !important; border-radius: 8px !important; }
+        .section-heading { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #2a7a60; margin: 0.6rem 0 0.3rem; }
+        hr { margin: 0.5rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(42,122,96,0.2), transparent); }
         """
     else:
         return """
-        /* ====== الوضع الداكن مع لمسات إبداعية ====== */
-        .stApp {
-            background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important;
-        }
-        
-        /* نبض الشعار - أكثر وضوحاً */
+        .stApp { background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important; }
+        .app-header { text-align: center; padding: 0.5rem 0; }
         .app-header h1 {
-            color: #f0f4ff !important;
-            animation: pulse 2s ease-in-out infinite;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: #f0f4ff;
+            margin: 0;
         }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-        }
-        
-        .app-header h1 .accent {
-            color: #4ECBA0 !important;
-            animation: glow 2.5s ease-in-out infinite;
-        }
-        
-        @keyframes glow {
-            0%, 100% { text-shadow: 0 0 0 rgba(78,203,160,0); }
-            50% { text-shadow: 0 0 25px rgba(78,203,160,0.2); }
-        }
-        
-        /* الأزرار - حركة انزلاق */
-        .stButton > button {
-            background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
-            color: #0a1520 !important;
-            transition: all 0.3s ease !important;
-            position: relative !important;
-            overflow: hidden !important;
-        }
-        .stButton > button::after {
-            content: '' !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: -100% !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent) !important;
-            transition: left 0.5s ease !important;
-        }
-        .stButton > button:hover::after {
-            left: 100% !important;
-        }
-        .stButton > button:hover {
-            background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important;
-            transform: translateY(-2px) !important;
-        }
-        
-        textarea {
-            background: #1a1a2e !important;
-            color: #f0f4ff !important;
-            border-color: rgba(255,255,255,0.15) !important;
-            transition: border 0.3s ease, box-shadow 0.3s ease !important;
-        }
-        textarea:focus {
-            border-color: rgba(78,203,160,0.5) !important;
-            box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
-        }
-        
-        .result-box {
-            background: rgba(78,203,160,0.06) !important;
-            border-color: rgba(78,203,160,0.2) !important;
-            transition: transform 0.3s ease, box-shadow 0.3s ease !important;
-        }
-        .result-box:hover {
-            transform: translateY(-3px) !important;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important;
-        }
-        .result-box .text {
-            color: #e8f0ff !important;
-        }
-        .result-box .emotion {
-            color: #4ECBA0 !important;
-        }
-        
-        .glass-card {
-            background: rgba(255,255,255,0.04) !important;
-            border-color: rgba(255,255,255,0.09) !important;
-            transition: transform 0.3s ease !important;
-        }
-        .glass-card:hover {
-            transform: scale(1.01) !important;
-        }
-        
-        .section-heading {
-            color: rgba(150,185,230,0.5) !important;
-        }
-        .section-heading::before {
-            background: #4ECBA0 !important;
-            animation: slideDown 0.8s ease forwards;
-        }
-        
-        @keyframes slideDown {
-            from { transform: scaleY(0); }
-            to { transform: scaleY(1); }
-        }
-        
-        [data-testid="stSidebar"] {
-            background: rgba(10,10,26,0.98) !important;
-            border-right: 1px solid rgba(78,203,160,0.1) !important;
-        }
-        
-        .history-item {
-            background: rgba(78,203,160,0.06) !important;
-            border-left: 2px solid #4ECBA0 !important;
-            transition: transform 0.3s ease !important;
-        }
-        .history-item:hover {
-            transform: translateX(5px) !important;
-        }
-        
-        div[data-testid="stAudioInput"] > div {
-            background: rgba(78,203,160,0.08) !important;
-            border-color: rgba(78,203,160,0.3) !important;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
-        }
-        div[data-testid="stAudioInput"] > div:hover {
-            border-color: #4ECBA0 !important;
-            box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
-        }
-        div[data-testid="stAudioInput"] button {
-            color: #e8f0ff !important;
-        }
-        
-        .stCode, code, pre {
-            background: rgba(0,0,0,0.35) !important;
-            color: #a8f0d8 !important;
-            border-radius: 8px !important;
-            border: 1px solid rgba(255,255,255,0.08) !important;
-        }
+        .app-header h1 .accent { color: #4ECBA0; }
+        .stButton > button { background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important; color: #0a1520 !important; }
+        .stButton > button:hover { background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important; }
+        textarea { background: #1a1a2e !important; color: #f0f4ff !important; border: 1px solid rgba(255,255,255,0.15) !important; }
+        .result-box { background: rgba(78,203,160,0.06); border: 1px solid rgba(78,203,160,0.2); border-radius: 12px; padding: 0.5rem 0.8rem; margin-top: 0.4rem; }
+        .result-box .label { font-size: 8px; font-weight: 700; text-transform: uppercase; color: rgba(78,203,160,0.7); letter-spacing: 0.15em; }
+        .result-box .text { font-size: 14px; color: #e8f0ff; }
+        .result-box .emotion { font-size: 13px; color: #4ECBA0; font-weight: 500; margin-top: 4px; }
+        .stSelectbox > div > div { background: rgba(255,255,255,0.05) !important; color: #e8f0ff !important; border-color: rgba(255,255,255,0.12) !important; }
+        .stSelectbox label { color: rgba(78,203,160,0.75) !important; }
+        [data-testid="stSidebar"] { background: rgba(10,10,26,0.98) !important; border-right: 1px solid rgba(78,203,160,0.1) !important; }
+        .history-item { padding: 6px 10px; margin-bottom: 4px; border-bottom: 1px solid rgba(78,203,160,0.1); }
+        .history-item .original { font-size: 12px; color: #e8f0ff; }
+        .history-item .translated { font-size: 12px; color: #4ECBA0; }
+        div[data-testid="stAudioInput"] > div { background: rgba(78,203,160,0.08); border: 2px solid rgba(78,203,160,0.3); border-radius: 60px; }
+        div[data-testid="stAudioInput"] button { color: #e8f0ff !important; }
+        .stCode, code, pre { background: rgba(0,0,0,0.35) !important; color: #a8f0d8 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 8px !important; }
+        .section-heading { font-size: 9px; font-weight: 700; text-transform: uppercase; color: rgba(150,185,230,0.5); margin: 0.6rem 0 0.3rem; }
+        hr { margin: 0.5rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent); }
         """
 
-# تطبيق CSS
 st.markdown(f"<style>{get_css(st.session_state.theme)}</style>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  7. العنوان
+#  العنوان في المنتصف
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
-    <span class="brand">✦ Smart Voice Translator ✦</span>
     <h1>HN <span class="accent">TRANSLATOR</span></h1>
 </div>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  8. الشريط الجانبي (الميزات الجديدة)
+#  الشريط الجانبي - زر تبديل المظهر + السجل المبسط
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("## ✨ الميزات الجديدة")
-    st.markdown("---")
-    
-    st.markdown("### 🌓 تبديل المظهر")
-    st.markdown("**الوضع الحالي:** " + ("☀️ فاتح" if st.session_state.theme == "light" else "🌙 داكن"))
-    if st.button("🌓 تبديل المظهر", use_container_width=True):
+    # زر تبديل المظهر (أيقونة فقط)
+    if st.button("🌓", help="تبديل المظهر", use_container_width=True):
         st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
         st.rerun()
-    st.markdown("---")
     
-    st.markdown("### 📜 سجل الترجمات (محفوظ في قاعدة بيانات)")
-    st.caption("الترجمات محفوظة حتى بعد إعادة التشغيل")
     st.divider()
     
+    # السجل - بدون أي كلمات إضافية
     history = get_history(limit=100)
     
     if history:
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.write(f"**{len(history)}** ترجمة محفوظة")
-        with col2:
-            if st.button("🗑️ مسح الكل", use_container_width=True):
-                clear_history()
-                st.rerun()
-        st.divider()
+        # زر مسح السجل (أيقونة فقط)
+        if st.button("🗑️", help="مسح الكل", use_container_width=True):
+            clear_history()
+            st.rerun()
         
+        # عرض الترجمات بشكل مبسط جداً
         for item in history:
-            emotion_display = item.get('emotion', '')
             st.markdown(f"""
             <div class="history-item">
-                <div class="text">🔹 {item.get('original', '')[:50]}...</div>
-                <div class="text" style="color: #4ECBA0;">→ {item.get('translated', '')[:50]}...</div>
-                <div class="lang">
-                    {item.get('source_lang', '')} → {item.get('target_lang', '')} 
-                    · {emotion_display}
-                </div>
-                <div class="time">{item.get('time', '')}</div>
+                <div class="original">{item.get('original', '')}</div>
+                <div class="translated">{item.get('translated', '')}</div>
             </div>
             """, unsafe_allow_html=True)
         
-        if st.button("📤 تصدير السجل (JSON)", use_container_width=True):
+        # زر تصدير السجل (أيقونة فقط)
+        if st.button("📤", help="تصدير السجل (JSON)", use_container_width=True):
             json_str = export_history_json()
             b64 = base64.b64encode(json_str.encode()).decode()
             href = f'<a href="data:application/json;base64,{b64}" download="translation_history.json">📥 تحميل</a>'
             st.markdown(href, unsafe_allow_html=True)
     else:
-        st.info("📭 لا توجد ترجمات محفوظة بعد")
-        st.caption("💡 قم بترجمة أي نص وسيظهر هنا")
+        # أيقونة فقط عند عدم وجود ترجمات
+        st.markdown("<div style='text-align:center; color: rgba(150,175,220,0.3); font-size: 30px;'>📭</div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  9. تم إزالة رسالة "الميزات الجديدة مفعلة!" من هنا
-# ════════════════════════════════════════════════════════════
-
-# ════════════════════════════════════════════════════════════
-#  10. باقي الكود (الإعدادات، الترجمة، الصوت، إلخ)
+#  باقي الكود (الإعدادات، الترجمة، الصوت، إلخ)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
