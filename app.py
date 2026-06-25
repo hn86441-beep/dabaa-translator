@@ -11,8 +11,27 @@ from datetime import datetime
 import io
 import base64
 import sqlite3
-from PIL import Image
-import pdfplumber
+
+# ════════════════════════════════════════════════════════════
+#  استيراد مكتبات استخراج النص
+# ════════════════════════════════════════════════════════════
+try:
+    import pdfplumber
+    PDFPLUMBER_AVAILABLE = True
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
+
+try:
+    import docx
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
+try:
+    import openpyxl
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -83,7 +102,7 @@ def export_history_json():
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر (فرح، حزن، محايد)
+#  تحليل المشاعر
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
@@ -111,7 +130,7 @@ def analyze_emotion(text):
         return "محايد"
 
 # ════════════════════════════════════════════════════════════
-#  تحويل النص إلى صوت (TTS)
+#  تحويل النص إلى صوت
 # ════════════════════════════════════════════════════════════
 from gtts import gTTS
 
@@ -136,21 +155,74 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  استخراج النص من PDF
+#  استخراج النص من الملفات (PDF, DOCX, TXT, Excel)
 # ════════════════════════════════════════════════════════════
-def extract_text_from_pdf(file_bytes):
-    try:
-        text = ""
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
-        if text.strip():
-            return text.strip(), None
-        return None, "لم يتم العثور على نص في ملف PDF"
-    except Exception as e:
-        return None, str(e)
+def extract_text_from_file(file_bytes, filename):
+    ext = os.path.splitext(filename)[1].lower()
+    
+    if ext == '.pdf':
+        if not PDFPLUMBER_AVAILABLE:
+            return None, "مكتبة pdfplumber غير مثبتة"
+        try:
+            text = ""
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+            if text.strip():
+                return text.strip(), None
+            return None, "لم يتم العثور على نص في ملف PDF"
+        except Exception as e:
+            return None, str(e)
+    
+    elif ext == '.docx':
+        if not DOCX_AVAILABLE:
+            return None, "مكتبة python-docx غير مثبتة"
+        try:
+            doc = docx.Document(io.BytesIO(file_bytes))
+            text = "\n".join([para.text for para in doc.paragraphs])
+            if text.strip():
+                return text.strip(), None
+            return None, "لم يتم العثور على نص في ملف DOCX"
+        except Exception as e:
+            return None, str(e)
+    
+    elif ext in ['.xlsx', '.xls']:
+        if not EXCEL_AVAILABLE:
+            return None, "مكتبة openpyxl غير مثبتة"
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+            all_text = []
+            for sheet in wb.worksheets:
+                for row in sheet.iter_rows():
+                    for cell in row:
+                        if cell.value is not None:
+                            all_text.append(str(cell.value))
+            text = "\n".join(all_text)
+            if text.strip():
+                return text.strip(), None
+            return None, "لم يتم العثور على نص في ملف Excel"
+        except Exception as e:
+            return None, str(e)
+    
+    elif ext == '.txt':
+        try:
+            text = file_bytes.decode('utf-8')
+            if text.strip():
+                return text.strip(), None
+            return None, "الملف فارغ"
+        except UnicodeDecodeError:
+            try:
+                text = file_bytes.decode('windows-1256')
+                if text.strip():
+                    return text.strip(), None
+            except:
+                pass
+            return None, "تعذر قراءة الملف، تأكد من أنه نص عادي"
+    
+    else:
+        return None, f"نوع الملف غير مدعوم: {ext}"
 
 # ════════════════════════════════════════════════════════════
 #  إعدادات الصفحة
@@ -165,7 +237,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفس الكود السابق)
+#  CSS
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -511,7 +583,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI - Tabs (Voice, Text, PDF)
+#  UI - Tabs (Voice, Text, File)
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -555,8 +627,8 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== التبويبات (Voice, Text, PDF) ======
-tab1, tab2, tab3 = st.tabs(["🎤 Voice", "📝 Text", "📄 PDF"])
+# ====== التبويبات ======
+tab1, tab2, tab3 = st.tabs(["🎤 Voice", "📝 Text", "📄 File"])
 
 # ----- Tab 1: Voice -----
 with tab1:
@@ -657,25 +729,27 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: PDF Translation -----
+# ----- Tab 3: File Translation (PDF, DOCX, TXT, Excel) -----
 with tab3:
     st.markdown("---")
-    st.markdown('<div class="section-heading">📄 PDF Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع ملف PDF وسيتم استخراج النص وترجمته (يدعم جميع اللغات)")
+    st.markdown('<div class="section-heading">📄 File Translation</div>', unsafe_allow_html=True)
+    st.caption("PDF, DOCX, TXT, Excel (.xlsx, .xls)")
     
-    uploaded_pdf = st.file_uploader("اختر ملف PDF", type=["pdf"], key="pdf_uploader")
+    uploaded_file = st.file_uploader("اختر ملف", type=None, key="file_uploader")
     
-    if uploaded_pdf is not None:
-        pdf_bytes = uploaded_pdf.getvalue()
-        st.success(f"✅ تم رفع الملف: {uploaded_pdf.name} ({len(pdf_bytes)//1024} KB)")
+    if uploaded_file is not None:
+        file_bytes = uploaded_file.getvalue()
+        file_size = len(file_bytes) // 1024
+        st.success(f"✅ {uploaded_file.name} ({file_size} KB)")
         
-        if st.button("🔍 استخراج النص وترجمته", key="pdf_btn"):
-            with st.spinner("جاري استخراج النص من PDF..."):
-                extracted_text, err = extract_text_from_pdf(pdf_bytes)
+        if st.button("🔍 استخراج النص وترجمته", key="file_btn"):
+            with st.spinner("جاري استخراج النص..."):
+                extracted_text, err = extract_text_from_file(file_bytes, uploaded_file.name)
                 if extracted_text:
                     st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
-                    display_text = extracted_text[:1000] + ("..." if len(extracted_text) > 1000 else "")
+                    display_text = extracted_text[:1500] + ("..." if len(extracted_text) > 1500 else "")
                     st.code(display_text, language=None)
+                    st.caption(f"عدد الكلمات: {len(extracted_text.split())}")
                     
                     with st.spinner("جاري الترجمة..."):
                         translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
@@ -692,12 +766,12 @@ with tab3:
                             """, unsafe_allow_html=True)
                             st.code(translated_text, language=None)
                             
-                            save_translation(extracted_text[:500], translated_text, emotion, "PDF", target_lang_name)
+                            save_translation(extracted_text[:500], translated_text, emotion, "File", target_lang_name)
                             
                             st.download_button(
                                 label="📥 تحميل الترجمة (TXT)",
                                 data=translated_text,
-                                file_name="pdf_translation.txt",
+                                file_name="file_translation.txt",
                                 mime="text/plain"
                             )
                         else:
