@@ -11,6 +11,9 @@ from datetime import datetime
 import io
 import base64
 import sqlite3
+import easyocr
+from PIL import Image
+import PyPDF2
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -134,6 +137,40 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
+#  OCR (EasyOCR)
+# ════════════════════════════════════════════════════════════
+@st.cache_resource
+def load_ocr_reader():
+    try:
+        return easyocr.Reader(['ar', 'en', 'ru'], gpu=False)
+    except Exception as e:
+        st.error(f"فشل تحميل EasyOCR: {e}")
+        return None
+
+ocr_reader = load_ocr_reader()
+
+def extract_text_from_image(image_bytes):
+    if ocr_reader is None:
+        return None, "OCR غير متاح"
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        result = ocr_reader.readtext(image)
+        text = " ".join([item[1] for item in result])
+        return text.strip(), None
+    except Exception as e:
+        return None, str(e)
+
+def extract_text_from_pdf(file_bytes):
+    try:
+        reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+        return text.strip(), None
+    except Exception as e:
+        return None, str(e)
+
+# ════════════════════════════════════════════════════════════
 #  إعدادات الصفحة
 # ════════════════════════════════════════════════════════════
 st.set_page_config(
@@ -146,44 +183,17 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS - تصميم احترافي للرأس مع الحفاظ على البساطة
+#  CSS
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
         return """
         .stApp { background: #f5f7fa !important; }
-        .app-header { 
-            text-align: center; 
-            padding: 0.8rem 0 0.5rem 0; 
-            position: relative;
-        }
-        .app-header .brand {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.3em;
-            color: #2a7a60;
-            text-transform: uppercase;
-            display: block;
-            margin-bottom: 0.2rem;
-            opacity: 0.8;
-        }
-        .app-header h1 {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 32px;
-            font-weight: 700;
-            color: #1a1a2e;
-            margin: 0;
-            letter-spacing: -0.02em;
-        }
+        .app-header { text-align: center; padding: 0.8rem 0 0.5rem 0; position: relative; }
+        .app-header .brand { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.3em; color: #2a7a60; text-transform: uppercase; display: block; margin-bottom: 0.2rem; opacity: 0.8; }
+        .app-header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; color: #1a1a2e; margin: 0; letter-spacing: -0.02em; }
         .app-header h1 .accent { color: #2a7a60; }
-        .app-header .divider {
-            width: 60px;
-            height: 3px;
-            background: linear-gradient(90deg, #2a7a60, transparent);
-            margin: 0.3rem auto 0;
-            border-radius: 2px;
-        }
+        .app-header .divider { width: 60px; height: 3px; background: linear-gradient(90deg, #2a7a60, transparent); margin: 0.3rem auto 0; border-radius: 2px; }
         .stButton > button { background: #2a7a60 !important; color: white !important; }
         .stButton > button:hover { background: #1a5a48 !important; }
         textarea { background: white !important; color: #1a1a2e !important; border: 1px solid #ccc !important; }
@@ -206,38 +216,11 @@ def get_css(theme):
     else:
         return """
         .stApp { background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important; }
-        .app-header { 
-            text-align: center; 
-            padding: 0.8rem 0 0.5rem 0; 
-            position: relative;
-        }
-        .app-header .brand {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.3em;
-            color: #4ECBA0;
-            text-transform: uppercase;
-            display: block;
-            margin-bottom: 0.2rem;
-            opacity: 0.8;
-        }
-        .app-header h1 {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 32px;
-            font-weight: 700;
-            color: #f0f4ff;
-            margin: 0;
-            letter-spacing: -0.02em;
-        }
+        .app-header { text-align: center; padding: 0.8rem 0 0.5rem 0; position: relative; }
+        .app-header .brand { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.3em; color: #4ECBA0; text-transform: uppercase; display: block; margin-bottom: 0.2rem; opacity: 0.8; }
+        .app-header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; color: #f0f4ff; margin: 0; letter-spacing: -0.02em; }
         .app-header h1 .accent { color: #4ECBA0; }
-        .app-header .divider {
-            width: 60px;
-            height: 3px;
-            background: linear-gradient(90deg, #4ECBA0, transparent);
-            margin: 0.3rem auto 0;
-            border-radius: 2px;
-        }
+        .app-header .divider { width: 60px; height: 3px; background: linear-gradient(90deg, #4ECBA0, transparent); margin: 0.3rem auto 0; border-radius: 2px; }
         .stButton > button { background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important; color: #0a1520 !important; }
         .stButton > button:hover { background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important; }
         textarea { background: #1a1a2e !important; color: #f0f4ff !important; border: 1px solid rgba(255,255,255,0.15) !important; }
@@ -261,7 +244,7 @@ def get_css(theme):
 st.markdown(f"<style>{get_css(st.session_state.theme)}</style>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  العنوان الاحترافي (مع إعادة "✦ Smart Voice Translator ✦")
+#  العنوان
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
@@ -272,7 +255,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  الشريط الجانبي - مبسط جداً (أيقونات فقط)
+#  الشريط الجانبي
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
     if st.button("🌓", help="تبديل المظهر", use_container_width=True):
@@ -305,7 +288,7 @@ with st.sidebar:
         st.markdown("<div style='text-align:center; color: rgba(150,175,220,0.3); font-size: 30px;'>📭</div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  باقي الكود (الإعدادات، الترجمة، الصوت، إلخ)
+#  الإعدادات الأساسية
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -590,102 +573,205 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== الميكروفون ======
-st.markdown("---")
-st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
+# ====== التبويبات (Tabs) للميزات المختلفة ======
+tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "🖼️ Image", "📄 PDF"])
 
-col_mic, col_clear = st.columns([5, 1])
-with col_mic:
-    audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
-with col_clear:
-    if "mic_audio_main" in st.session_state and st.session_state.mic_audio_main is not None:
-        st.markdown('<div class="clear-btn-wrapper">', unsafe_allow_html=True)
-        if st.button("✖", key="clear_btn", help="حذف التسجيل", type="secondary"):
-            clear_audio()
-        st.markdown('</div>', unsafe_allow_html=True)
+# ----- Tab 1: Voice -----
+with tab1:
+    st.markdown("---")
+    st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
 
-if audio_value is not None:
-    with st.spinner("⏳ جاري التعرف..."):
-        audio_bytes = audio_value.getvalue()
-        recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
-        if recognized_text:
-            st.success(f"✅ {recognized_text}")
-            st.session_state.input_text = recognized_text
-            with st.spinner("⏳ جاري الترجمة..."):
-                translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
-                if translated_text:
-                    st.session_state.translated_text = translated_text
-                    emotion = analyze_emotion(recognized_text)
-                    
+    col_mic, col_clear = st.columns([5, 1])
+    with col_mic:
+        audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
+    with col_clear:
+        if "mic_audio_main" in st.session_state and st.session_state.mic_audio_main is not None:
+            st.markdown('<div class="clear-btn-wrapper">', unsafe_allow_html=True)
+            if st.button("✖", key="clear_btn", help="حذف التسجيل", type="secondary"):
+                clear_audio()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    if audio_value is not None:
+        with st.spinner("⏳ جاري التعرف..."):
+            audio_bytes = audio_value.getvalue()
+            recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
+            if recognized_text:
+                st.success(f"✅ {recognized_text}")
+                st.session_state.input_text = recognized_text
+                with st.spinner("⏳ جاري الترجمة..."):
+                    translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
+                    if translated_text:
+                        st.session_state.translated_text = translated_text
+                        emotion = analyze_emotion(recognized_text)
+                        
+                        st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="result-box">
+                            <span class="label">✦ Translation</span>
+                            <div class="text">{translated_text}</div>
+                            <div class="emotion">{emotion}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.code(translated_text, language=None)
+                        
+                        audio_bytes_tts = generate_audio(translated_text, target_lang)
+                        if audio_bytes_tts:
+                            st.audio(audio_bytes_tts, format="audio/mp3")
+                        
+                        save_translation(recognized_text, translated_text, emotion, source_lang_name, target_lang_name)
+                    else:
+                        st.error(f"❌ {engine}")
+            else:
+                st.error(f"❌ {engine_used}")
+
+# ----- Tab 2: Text -----
+with tab2:
+    st.markdown("---")
+    st.markdown('<div class="section-heading">📝 Text Input</div>', unsafe_allow_html=True)
+    
+    input_text = st.text_area("", height=70, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
+    if input_text != st.session_state.input_text:
+        st.session_state.input_text = input_text
+
+    if input_text.strip():
+        detected = detect_domains(input_text)
+        if detected:
+            badges = ""
+            for d in detected[:3]:
+                dn = DOMAINS[d]["name_en"]
+                emoji = DOMAINS[d]["emoji"]
+                css_class = f"tag-{d}" if d in DOMAINS else "tag-gen"
+                badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
+            st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
+
+    if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
+        if not st.session_state.deepl_api_key:
+            st.error("❌ API key missing.")
+        elif not input_text.strip():
+            st.warning("الرجاء إدخال نص للترجمة.")
+        else:
+            with st.spinner("جاري الترجمة..."):
+                translation_result, source_engine = fetch_ai_translation(input_text, target_lang)
+                if translation_result:
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                    emotion = analyze_emotion(input_text)
+                    
                     st.markdown(f"""
                     <div class="result-box">
                         <span class="label">✦ Translation</span>
-                        <div class="text">{translated_text}</div>
+                        <div class="text">{translation_result}</div>
                         <div class="emotion">{emotion}</div>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    st.code(translated_text, language=None)
+                    st.code(translation_result, language=None)
                     
-                    audio_bytes_tts = generate_audio(translated_text, target_lang)
+                    audio_bytes_tts = generate_audio(translation_result, target_lang)
                     if audio_bytes_tts:
                         st.audio(audio_bytes_tts, format="audio/mp3")
                     
-                    save_translation(recognized_text, translated_text, emotion, source_lang_name, target_lang_name)
+                    save_translation(input_text, translation_result, emotion, source_lang_name, target_lang_name)
                 else:
-                    st.error(f"❌ {engine}")
-        else:
-            st.error(f"❌ {engine_used}")
+                    st.error(f"❌ {translation_result}")
 
-# ====== النص المكتوب ======
-st.markdown("---")
-st.markdown('<div class="section-heading">Text Input</div>', unsafe_allow_html=True)
-input_text = st.text_area("", height=70, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
-if input_text != st.session_state.input_text:
-    st.session_state.input_text = input_text
+# ----- Tab 3: Image Translation (OCR) -----
+with tab3:
+    st.markdown("---")
+    st.markdown('<div class="section-heading">🖼️ Image Translation</div>', unsafe_allow_html=True)
+    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته")
+    
+    uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="image_uploader")
+    
+    if uploaded_image is not None:
+        image_bytes = uploaded_image.getvalue()
+        image = Image.open(io.BytesIO(image_bytes))
+        st.image(image, caption="الصورة المرفوعة", use_container_width=True)
+        
+        if st.button("🔍 استخراج النص وترجمته", key="ocr_btn"):
+            with st.spinner("جاري استخراج النص..."):
+                extracted_text, err = extract_text_from_image(image_bytes)
+                if extracted_text:
+                    st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
+                    st.code(extracted_text, language=None)
+                    
+                    with st.spinner("جاري الترجمة..."):
+                        translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
+                        if translated_text:
+                            emotion = analyze_emotion(extracted_text)
+                            st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                            st.markdown(f"""
+                            <div class="result-box">
+                                <span class="label">✦ Translation</span>
+                                <div class="text">{translated_text}</div>
+                                <div class="emotion">{emotion}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.code(translated_text, language=None)
+                            
+                            save_translation(extracted_text, translated_text, emotion, "Image (OCR)", target_lang_name)
+                            
+                            # زر تحميل الترجمة
+                            st.download_button(
+                                label="📥 تحميل الترجمة (TXT)",
+                                data=translated_text,
+                                file_name="translation.txt",
+                                mime="text/plain"
+                            )
+                        else:
+                            st.error("فشلت الترجمة")
+                else:
+                    st.error(f"فشل استخراج النص: {err}")
 
-if input_text.strip():
-    detected = detect_domains(input_text)
-    if detected:
-        badges = ""
-        for d in detected[:3]:
-            dn = DOMAINS[d]["name_en"]
-            emoji = DOMAINS[d]["emoji"]
-            css_class = f"tag-{d}" if d in DOMAINS else "tag-gen"
-            badges += f'<span class="tag {css_class}">{emoji} {dn}</span>'
-        st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
+# ----- Tab 4: PDF Translation -----
+with tab4:
+    st.markdown("---")
+    st.markdown('<div class="section-heading">📄 PDF Translation</div>', unsafe_allow_html=True)
+    st.caption("ارفع ملف PDF وسيتم استخراج النص وترجمته")
+    
+    uploaded_pdf = st.file_uploader("اختر ملف PDF", type=["pdf"], key="pdf_uploader")
+    
+    if uploaded_pdf is not None:
+        pdf_bytes = uploaded_pdf.getvalue()
+        st.success(f"✅ تم رفع الملف: {uploaded_pdf.name} ({len(pdf_bytes)//1024} KB)")
+        
+        if st.button("🔍 استخراج النص وترجمته", key="pdf_btn"):
+            with st.spinner("جاري استخراج النص من PDF..."):
+                extracted_text, err = extract_text_from_pdf(pdf_bytes)
+                if extracted_text:
+                    st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
+                    st.code(extracted_text[:1000] + ("..." if len(extracted_text) > 1000 else ""), language=None)
+                    
+                    with st.spinner("جاري الترجمة..."):
+                        translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
+                        if translated_text:
+                            emotion = analyze_emotion(extracted_text)
+                            st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                            st.markdown(f"""
+                            <div class="result-box">
+                                <span class="label">✦ Translation</span>
+                                <div class="text">{translated_text}</div>
+                                <div class="emotion">{emotion}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.code(translated_text, language=None)
+                            
+                            save_translation(extracted_text[:500], translated_text, emotion, "PDF", target_lang_name)
+                            
+                            st.download_button(
+                                label="📥 تحميل الترجمة (TXT)",
+                                data=translated_text,
+                                file_name="pdf_translation.txt",
+                                mime="text/plain"
+                            )
+                        else:
+                            st.error("فشلت الترجمة")
+                else:
+                    st.error(f"فشل استخراج النص: {err}")
 
-if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
-    if not st.session_state.deepl_api_key:
-        st.error("❌ API key missing.")
-    elif not input_text.strip():
-        st.warning("الرجاء إدخال نص للترجمة.")
-    else:
-        with st.spinner("جاري الترجمة..."):
-            translation_result, source_engine = fetch_ai_translation(input_text, target_lang)
-            if translation_result:
-                st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                emotion = analyze_emotion(input_text)
-                
-                st.markdown(f"""
-                <div class="result-box">
-                    <span class="label">✦ Translation</span>
-                    <div class="text">{translation_result}</div>
-                    <div class="emotion">{emotion}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.code(translation_result, language=None)
-                
-                audio_bytes_tts = generate_audio(translation_result, target_lang)
-                if audio_bytes_tts:
-                    st.audio(audio_bytes_tts, format="audio/mp3")
-                
-                save_translation(input_text, translation_result, emotion, source_lang_name, target_lang_name)
-            else:
-                st.error(f"❌ {translation_result}")
-
+# ════════════════════════════════════════════════════════════
+#  Footer
+# ════════════════════════════════════════════════════════════
 st.markdown("""
 <div style="text-align:center; padding: 1rem 0; color:rgba(100,130,170,0.3); font-size:9px; letter-spacing:0.12em; text-transform:uppercase;">
     HN TRANSLATOR · Voice Translation Suite
