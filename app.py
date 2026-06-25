@@ -13,7 +13,7 @@ import base64
 import sqlite3
 
 # ════════════════════════════════════════════════════════════
-#  استيراد مكتبات استخراج النص
+#  استيراد مكتبات الملفات (PDF, DOCX, Excel)
 # ════════════════════════════════════════════════════════════
 try:
     import pdfplumber
@@ -32,6 +32,34 @@ try:
     EXCEL_AVAILABLE = True
 except ImportError:
     EXCEL_AVAILABLE = False
+
+# ════════════════════════════════════════════════════════════
+#  استيراد مكتبات الكاميرا و OCR
+# ════════════════════════════════════════════════════════════
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+
+try:
+    import pytesseract
+    from PIL import Image
+    import numpy as np
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+
+# ════════════════════════════════════════════════════════════
+#  استيراد مكتبات الصوت والمحادثات
+# ════════════════════════════════════════════════════════════
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+
+from deep_translator import GoogleTranslator
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -225,6 +253,66 @@ def extract_text_from_file(file_bytes, filename):
         return None, f"نوع الملف غير مدعوم: {ext}"
 
 # ════════════════════════════════════════════════════════════
+#  دوال الكاميرا و OCR
+# ════════════════════════════════════════════════════════════
+def extract_text_from_image(image_bytes):
+    """استخراج النص من صورة باستخدام pytesseract."""
+    if not OCR_AVAILABLE:
+        return None, "مكتبات OCR غير مثبتة"
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        # تحسين الصورة
+        gray = image.convert('L')
+        # استخدام pytesseract
+        text = pytesseract.image_to_string(gray, lang='ara+eng')
+        if text.strip():
+            return text.strip(), None
+        return None, "لم يتم العثور على نص في الصورة"
+    except Exception as e:
+        return None, str(e)
+
+# ════════════════════════════════════════════════════════════
+#  دوال المحادثات الجماعية (Whisper)
+# ════════════════════════════════════════════════════════════
+@st.cache_resource
+def load_whisper_model():
+    if WHISPER_AVAILABLE:
+        try:
+            return whisper.load_model("base")
+        except Exception as e:
+            st.warning(f"⚠️ فشل تحميل Whisper: {e}")
+            return None
+    return None
+
+whisper_model = load_whisper_model()
+
+def transcribe_audio(audio_bytes):
+    """تحويل الصوت إلى نص باستخدام Whisper."""
+    if whisper_model is None:
+        return None, "نموذج Whisper غير متاح"
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+        result = whisper_model.transcribe(tmp_path)
+        os.unlink(tmp_path)
+        text = result["text"].strip()
+        if text:
+            return text, None
+        return None, "لم يتم التعرف على أي كلام"
+    except Exception as e:
+        return None, str(e)
+
+def translate_with_deepl(text, target_lang):
+    """ترجمة النص باستخدام deep-translator."""
+    try:
+        translator = GoogleTranslator(source='auto', target=target_lang)
+        translated = translator.translate(text)
+        return translated, None
+    except Exception as e:
+        return None, str(e)
+
+# ════════════════════════════════════════════════════════════
 #  إعدادات الصفحة
 # ════════════════════════════════════════════════════════════
 st.set_page_config(
@@ -237,7 +325,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (مع تحسين شكل التبويبات)
+#  CSS
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -266,8 +354,6 @@ def get_css(theme):
         .stCode, code, pre { background: #f0f0f0 !important; color: #1a1a2e !important; border: 1px solid #ddd !important; border-radius: 8px !important; }
         .section-heading { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #2a7a60; margin: 0.6rem 0 0.3rem; }
         hr { margin: 0.5rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(42,122,96,0.2), transparent); }
-
-        /* تنسيق التبويبات */
         button[data-baseweb="tab"] {
             font-family: 'Space Grotesk', sans-serif !important;
             font-size: 13px !important;
@@ -319,8 +405,6 @@ def get_css(theme):
         .stCode, code, pre { background: rgba(0,0,0,0.35) !important; color: #a8f0d8 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 8px !important; }
         .section-heading { font-size: 9px; font-weight: 700; text-transform: uppercase; color: rgba(150,185,230,0.5); margin: 0.6rem 0 0.3rem; }
         hr { margin: 0.5rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent); }
-
-        /* تنسيق التبويبات (الوضع الداكن) */
         button[data-baseweb="tab"] {
             font-family: 'Space Grotesk', sans-serif !important;
             font-size: 13px !important;
@@ -517,7 +601,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  دوال الترجمة والتعرف على الصوت
+#  دوال الترجمة والتعرف على الصوت (الموجودة سابقاً)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -562,7 +646,7 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
         return None, f"Error: {str(e)}"
 
 @st.cache_resource
-def load_whisper_model():
+def load_whisper_model_old():
     try:
         from faster_whisper import WhisperModel
         return WhisperModel("small", device="cpu", compute_type="int8")
@@ -570,7 +654,7 @@ def load_whisper_model():
         return None
 
 def speech_to_text_whisper(audio_bytes):
-    model = load_whisper_model()
+    model = load_whisper_model_old()
     if not model:
         return None, "Whisper unavailable"
     tmp_path = None
@@ -636,7 +720,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI - Tabs (Voice, Text, File) مع تحسين التصميم
+#  UI - Tabs
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -680,8 +764,8 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== التبويبات (مع تحسين الشكل) ======
-tab1, tab2, tab3 = st.tabs(["🎤 Voice", "📝 Text", "📄 File"])
+# ====== التبويبات ======
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "📷 Camera", "👥 Group"])
 
 # ----- Tab 1: Voice -----
 with tab1:
@@ -782,7 +866,7 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: File (بدون النص الزائد) -----
+# ----- Tab 3: File -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 File Translation</div>', unsafe_allow_html=True)
@@ -830,6 +914,108 @@ with tab3:
                             st.error("فشلت الترجمة")
                 else:
                     st.error(f"فشل استخراج النص: {err}")
+
+# ----- Tab 4: Camera -----
+with tab4:
+    st.markdown("---")
+    st.markdown('<div class="section-heading">📷 Camera Translation</div>', unsafe_allow_html=True)
+    st.caption("ارفع صورة وسيتم استخراج النص وترجمته")
+    
+    uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="camera_uploader")
+    
+    if uploaded_image is not None:
+        image_bytes = uploaded_image.getvalue()
+        image = Image.open(io.BytesIO(image_bytes))
+        st.image(image, caption="الصورة المرفوعة", use_container_width=True)
+        
+        if st.button("🔍 استخراج النص وترجمته", key="camera_btn"):
+            with st.spinner("جاري استخراج النص..."):
+                extracted_text, err = extract_text_from_image(image_bytes)
+                if extracted_text:
+                    st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
+                    st.code(extracted_text, language=None)
+                    
+                    with st.spinner("جاري الترجمة..."):
+                        translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
+                        if translated_text:
+                            emotion = analyze_emotion(extracted_text)
+                            
+                            st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                            st.markdown(f"""
+                            <div class="result-box">
+                                <span class="label">✦ Translation</span>
+                                <div class="text">{translated_text}</div>
+                                <div class="emotion">{emotion}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.code(translated_text, language=None)
+                            
+                            save_translation(extracted_text, translated_text, emotion, "Camera", target_lang_name)
+                            
+                            st.download_button(
+                                label="📥 تحميل الترجمة (TXT)",
+                                data=translated_text,
+                                file_name="camera_translation.txt",
+                                mime="text/plain"
+                            )
+                        else:
+                            st.error("فشلت الترجمة")
+                else:
+                    st.error(f"فشل استخراج النص: {err}")
+
+# ----- Tab 5: Group Chat -----
+with tab5:
+    st.markdown("---")
+    st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
+    st.caption("سجّل محادثة وسيتم تحويلها إلى نص وترجمتها")
+    
+    # اختيار اللغة الهدف
+    group_target = st.selectbox("ترجم إلى", tgt_options, key="group_target")
+    
+    # تسجيل الصوت
+    audio_value_group = st.audio_input("سجّل المحادثة", key="group_audio", label_visibility="collapsed")
+    
+    if audio_value_group is not None:
+        with st.spinner("⏳ جاري معالجة الصوت..."):
+            audio_bytes = audio_value_group.getvalue()
+            
+            # استخدام ترجمة DeepL مباشرة للنص (بدلاً من Cohere)
+            # أولاً: تحويل الصوت إلى نص باستخدام Whisper (المكتبة الجديدة)
+            transcript, err = transcribe_audio(audio_bytes)
+            
+            if transcript:
+                st.markdown('<div class="section-heading">النص المستخرج</div>', unsafe_allow_html=True)
+                st.code(transcript, language=None)
+                
+                # ترجمة النص
+                with st.spinner("⏳ جاري الترجمة..."):
+                    # استخدام deep-translator بدلاً من DeepL API
+                    translated, err2 = translate_with_deepl(transcript, target_lang)
+                    
+                    if translated:
+                        emotion = analyze_emotion(transcript)
+                        
+                        st.markdown('<div class="section-heading">الترجمة</div>', unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="result-box">
+                            <span class="label">✦ الترجمة</span>
+                            <div class="text">{translated}</div>
+                            <div class="emotion">{emotion}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.code(translated, language=None)
+                        
+                        # تشغيل الصوت المترجم
+                        audio_bytes_tts = generate_audio(translated, target_lang)
+                        if audio_bytes_tts:
+                            st.audio(audio_bytes_tts, format="audio/mp3")
+                        
+                        # حفظ في السجل
+                        save_translation(transcript, translated, emotion, "Group Chat", target_lang)
+                    else:
+                        st.error(f"❌ فشلت الترجمة: {err2}")
+            else:
+                st.error(f"❌ فشل التعرف: {err}")
 
 # ════════════════════════════════════════════════════════════
 #  Footer
