@@ -208,15 +208,22 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  OCR للصور (EasyOCR مع خيار احتياطي pytesseract)
+#  OCR للصور (مع إصلاح اللغات)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_ocr_reader():
     if EASYOCR_AVAILABLE:
         try:
-            return easyocr.Reader(['ar', 'en', 'ru', 'ch_sim', 'de', 'es', 'pt', 'ko'], gpu=False)
+            # ترتيب اللغات: نضع 'en' أولاً ثم باقي اللغات
+            # بالنسبة للصينية المبسطة، يجب أن تكون مع 'en'
+            return easyocr.Reader(['en', 'ar', 'ru', 'ch_sim', 'de', 'es', 'pt', 'ko'], gpu=False)
         except Exception as e:
             st.warning(f"⚠️ فشل تحميل EasyOCR: {e}")
+            # محاولة ثانية بدون ch_sim إذا فشلت بسبب ch_sim
+            try:
+                return easyocr.Reader(['en', 'ar', 'ru', 'de', 'es', 'pt', 'ko'], gpu=False)
+            except:
+                pass
             return None
     return None
 
@@ -236,7 +243,7 @@ def extract_text_from_image(image_bytes):
             except Exception as e:
                 st.warning(f"EasyOCR فشل: {e}")
         
-        # 2. pytesseract
+        # 2. pytesseract مع لغات متعددة
         if PYTESSERACT_AVAILABLE:
             try:
                 lang = 'ara+eng+rus+chi_sim+deu+spa+por+kor'
@@ -245,6 +252,7 @@ def extract_text_from_image(image_bytes):
                     return text.strip(), None
             except:
                 pass
+            # 3. pytesseract إنجليزي فقط
             try:
                 text = pytesseract.image_to_string(image, lang='eng')
                 if text.strip():
@@ -252,7 +260,7 @@ def extract_text_from_image(image_bytes):
             except:
                 pass
         
-        return None, "لم يتم العثور على نص في الصورة"
+        return None, "لم يتم العثور على نص في الصورة. تأكد من وضوح النص وجودة الصورة."
     except Exception as e:
         return None, str(e)
 
@@ -711,7 +719,6 @@ with tab1:
                         st.session_state.translated_text = translated_text
                         emotion = analyze_emotion(recognized_text)
                         
-                        # إضافة النبرة إذا كانت مفعّلة واللغة الهدف روسية
                         if enable_stress and target_lang == "ru":
                             translated_text = add_russian_stress(translated_text)
                         
@@ -767,7 +774,6 @@ with tab2:
                 if translation_result:
                     emotion = analyze_emotion(input_text)
                     
-                    # إضافة النبرة إذا كانت مفعّلة واللغة الهدف روسية
                     if enable_stress and target_lang == "ru":
                         translation_result = add_russian_stress(translation_result)
                     
@@ -815,7 +821,6 @@ with tab3:
                         if translated_text:
                             emotion = analyze_emotion(extracted_text)
                             
-                            # إضافة النبرة إذا كانت مفعّلة واللغة الهدف روسية
                             if enable_stress and target_lang == "ru":
                                 translated_text = add_russian_stress(translated_text)
                             
@@ -867,7 +872,6 @@ with tab4:
                         if translated_text:
                             emotion = analyze_emotion(extracted_text)
                             
-                            # إضافة النبرة إذا كانت مفعّلة واللغة الهدف روسية
                             if enable_stress and target_lang == "ru":
                                 translated_text = add_russian_stress(translated_text)
                             
