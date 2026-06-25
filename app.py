@@ -12,6 +12,8 @@ import io
 import base64
 import sqlite3
 from PIL import Image
+import time
+import azure.cognitiveservices.speech as speech_sdk
 
 # ════════════════════════════════════════════════════════════
 #  استيراد EasyOCR للتعرف على النص من الصور
@@ -145,7 +147,7 @@ def analyze_emotion(text):
         return "محايد"
 
 # ════════════════════════════════════════════════════════════
-#  تحويل النص إلى صوت
+#  تحويل النص إلى صوت (gTTS - للاستخدام العادي)
 # ════════════════════════════════════════════════════════════
 from gtts import gTTS
 
@@ -246,7 +248,6 @@ def extract_text_from_file(file_bytes, filename):
 def load_easyocr_reader():
     if EASYOCR_AVAILABLE:
         try:
-            # استخدام لغات أساسية: عربي، إنجليزي، روسي
             return easyocr.Reader(['ar', 'en', 'ru'], gpu=False)
         except Exception as e:
             st.warning(f"⚠️ فشل تحميل EasyOCR: {e}")
@@ -256,12 +257,10 @@ def load_easyocr_reader():
 easyocr_reader = load_easyocr_reader()
 
 def extract_text_from_image(image_bytes):
-    """استخراج النص من صورة باستخدام EasyOCR."""
     if easyocr_reader is None:
         return None, "EasyOCR غير متاح. تأكد من تثبيت easyocr."
     try:
         image = Image.open(io.BytesIO(image_bytes))
-        # تحويل الصورة إلى numpy array
         import numpy as np
         image_np = np.array(image)
         result = easyocr_reader.readtext(image_np)
@@ -273,15 +272,28 @@ def extract_text_from_image(image_bytes):
         return None, str(e)
 
 # ════════════════════════════════════════════════════════════
-#  دوال المحادثات الجماعية (باستخدام Cohere بدلاً من Whisper)
+#  دوال الترجمة والتعرف على الصوت (الموجودة)
 # ════════════════════════════════════════════════════════════
-def transcribe_audio_cohere(audio_bytes, language_code="auto"):
-    """تحويل الصوت إلى نص باستخدام Cohere API (نفس الموجود في Voice)."""
-    if not st.session_state.cohere_api_key:
-        return None, "مفتاح API غير موجود"
+def translate_deepl(text, target_lang):
+    if not st.session_state.deepl_api_key:
+        return None, "No API key"
+    tl = target_lang.upper()
+    endpoint = "https://api-free.deepl.com/v2/translate" if st.session_state.deepl_api_key.endswith(":fx") else "https://api.deepl.com/v2/translate"
     try:
-        from requests_toolbelt.multipart.encoder import MultipartEncoder
-        from collections import OrderedDict
+        resp = requests.post(endpoint, headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"}, data={"text": text, "target_lang": tl}, timeout=15)
+        if resp.status_code == 200:
+            return resp.json()["translations"][0]["text"], None
+        return None, f"DeepL error {resp.status_code}"
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+def fetch_ai_translation(text, target_lang):
+    return translate_deepl(text, target_lang)
+
+def speech_to_text_cohere(audio_bytes, language_code="auto"):
+    if not st.session_state.cohere_api_key:
+        return None, "API key missing"
+    try:
         fields = OrderedDict()
         lang = "en" if language_code == "auto" or language_code is None else language_code
         fields['language'] = lang
@@ -290,28 +302,101 @@ def transcribe_audio_cohere(audio_bytes, language_code="auto"):
         encoder = MultipartEncoder(fields=fields)
         response = requests.post(
             "https://api.cohere.com/v2/audio/transcriptions",
-            headers={
-                "Authorization": f"Bearer {st.session_state.cohere_api_key}",
-                "Content-Type": encoder.content_type,
-            },
+            headers={"Authorization": f"Bearer {st.session_state.cohere_api_key}", "Content-Type": encoder.content_type},
             data=encoder,
             timeout=30
         )
         if response.status_code == 200:
             text = response.json().get("text", "").strip()
             if text:
-                return text, None
-            return None, "لم يتم التعرف على أي كلام"
-        return None, f"Cohere error {response.status_code}: {response.text}"
+                return text, "Speech Recognition"
+            else:
+                return None, "No speech detected"
+        return None, f"Cohere error {response.status_code}"
     except Exception as e:
-        return None, f"خطأ: {str(e)}"
+        return None, f"Error: {str(e)}"
 
-def translate_with_deepl(text, target_lang):
-    """ترجمة النص باستخدام deep-translator."""
+@st.cache_resource
+def load_whisper_model_old():
     try:
-        translator = GoogleTranslator(source='auto', target=target_lang)
-        translated = translator.translate(text)
-        return translated, None
+        from faster_whisper import WhisperModel
+        return WhisperModel("small", device="cpu", compute_type="int8")
+    except:
+        return None
+
+def speech_to_text_whisper(audio_bytes):
+    model = load_whisper_model_old()
+    if not model:
+        return None, "Whisper unavailable"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+        segments, info = model.transcribe(tmp_path, language="ru", beam_size=5, vad_filter=True)
+        text = " ".join(segment.text for segment in segments).strip()
+        if text:
+            return text, "Speech Recognition"
+        else:
+            return None, "No speech detected"
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+    finally:
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except:
+            pass
+
+def speech_to_text(audio_bytes, language_code="auto"):
+    if language_code == "ru":
+        return speech_to_text_whisper(audio_bytes)
+    return speech_to_text_cohere(audio_bytes, language_code)
+
+# ════════════════════════════════════════════════════════════
+#  دالة ترجمة المحادثات الجماعية باستخدام Azure Speech
+# ════════════════════════════════════════════════════════════
+def translate_with_azure(audio_bytes, source_lang_code, target_lang_code, subscription_key, region):
+    """
+    ترجمة ملف صوتي باستخدام Azure Speech Translation.
+    المصدر: ملف صوتي (WAV) محمّل في الذاكرة.
+    """
+    try:
+        # حفظ الملف الصوتي مؤقتاً (Azure Speech يتطلب مسار ملف)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+        
+        # تهيئة تكوين الترجمة
+        translation_config = speech_sdk.translation.SpeechTranslationConfig(
+            subscription=subscription_key,
+            region=region
+        )
+        # لغة المصدر (يجب أن تكون بصيغة Azure مثل "ar-EG" أو "en-US")
+        translation_config.speech_recognition_language = source_lang_code
+        # إضافة اللغة الهدف
+        translation_config.add_target_language(target_lang_code)
+        
+        # مصدر الصوت من الملف المؤقت
+        audio_config = speech_sdk.AudioConfig(filename=tmp_path)
+        
+        # إنشاء كائن المترجم
+        recognizer = speech_sdk.translation.TranslationRecognizer(
+            translation_config=translation_config,
+            audio_config=audio_config
+        )
+        
+        # تنفيذ الترجمة لمرة واحدة (للملفات القصيرة)
+        result = recognizer.recognize_once()
+        
+        # حذف الملف المؤقت
+        os.unlink(tmp_path)
+        
+        if result.reason == speech_sdk.ResultReason.TranslatedSpeech:
+            translated_text = result.translations.get(target_lang_code, "")
+            return translated_text, None
+        else:
+            return None, f"فشل الترجمة: {result.reason}"
     except Exception as e:
         return None, str(e)
 
@@ -328,7 +413,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفس الكود السابق مع تحسين التبويبات)
+#  CSS
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -496,6 +581,18 @@ languages_dict = {
     "Korean": "ko"
 }
 
+# رموز Azure للغات (للترجمة الفورية)
+azure_lang_codes = {
+    "Arabic": "ar-EG",
+    "English": "en-US",
+    "Russian": "ru-RU",
+    "Chinese": "zh-CN",
+    "German": "de-DE",
+    "Spanish": "es-ES",
+    "Portuguese": "pt-PT",
+    "Korean": "ko-KR"
+}
+
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political"},
     "legal":      {"emoji": "⚖️", "name_en": "Legal"},
@@ -582,110 +679,11 @@ if "deepl_api_key" not in st.session_state:
 if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
-if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
-    st.markdown('<div class="glass-card" style="text-align:center;">🔐 Connect API Keys</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        if not st.session_state.deepl_api_key:
-            deepl_input = st.text_input("DeepL Key", type="password", placeholder="abc...xyz:fx")
-            if deepl_input:
-                st.session_state.deepl_api_key = deepl_input
-                st.rerun()
-        else:
-            st.success("✅ DeepL Active")
-    with col2:
-        if not st.session_state.cohere_api_key:
-            cohere_input = st.text_input("Cohere Key", type="password", placeholder="abcd-1234-efgh-5678")
-            if cohere_input:
-                st.session_state.cohere_api_key = cohere_input
-                st.rerun()
-        else:
-            st.success("✅ Cohere Active")
-    st.stop()
-
-# ════════════════════════════════════════════════════════════
-#  دوال الترجمة والتعرف على الصوت (الموجودة)
-# ════════════════════════════════════════════════════════════
-def translate_deepl(text, target_lang):
-    if not st.session_state.deepl_api_key:
-        return None, "No API key"
-    tl = target_lang.upper()
-    endpoint = "https://api-free.deepl.com/v2/translate" if st.session_state.deepl_api_key.endswith(":fx") else "https://api.deepl.com/v2/translate"
-    try:
-        resp = requests.post(endpoint, headers={"Authorization": f"DeepL-Auth-Key {st.session_state.deepl_api_key}"}, data={"text": text, "target_lang": tl}, timeout=15)
-        if resp.status_code == 200:
-            return resp.json()["translations"][0]["text"], None
-        return None, f"DeepL error {resp.status_code}"
-    except Exception as e:
-        return None, f"Error: {str(e)}"
-
-def fetch_ai_translation(text, target_lang):
-    return translate_deepl(text, target_lang)
-
-def speech_to_text_cohere(audio_bytes, language_code="auto"):
-    if not st.session_state.cohere_api_key:
-        return None, "API key missing"
-    try:
-        from requests_toolbelt.multipart.encoder import MultipartEncoder
-        from collections import OrderedDict
-        fields = OrderedDict()
-        lang = "en" if language_code == "auto" or language_code is None else language_code
-        fields['language'] = lang
-        fields['model'] = 'cohere-transcribe-03-2026'
-        fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
-        encoder = MultipartEncoder(fields=fields)
-        response = requests.post(
-            "https://api.cohere.com/v2/audio/transcriptions",
-            headers={"Authorization": f"Bearer {st.session_state.cohere_api_key}", "Content-Type": encoder.content_type},
-            data=encoder,
-            timeout=30
-        )
-        if response.status_code == 200:
-            text = response.json().get("text", "").strip()
-            if text:
-                return text, "Speech Recognition"
-            else:
-                return None, "No speech detected"
-        return None, f"Cohere error {response.status_code}"
-    except Exception as e:
-        return None, f"Error: {str(e)}"
-
-@st.cache_resource
-def load_whisper_model_old():
-    try:
-        from faster_whisper import WhisperModel
-        return WhisperModel("small", device="cpu", compute_type="int8")
-    except:
-        return None
-
-def speech_to_text_whisper(audio_bytes):
-    model = load_whisper_model_old()
-    if not model:
-        return None, "Whisper unavailable"
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_bytes)
-            tmp_path = tmp_file.name
-        segments, info = model.transcribe(tmp_path, language="ru", beam_size=5, vad_filter=True)
-        text = " ".join(segment.text for segment in segments).strip()
-        if text:
-            return text, "Speech Recognition"
-        else:
-            return None, "No speech detected"
-    except Exception as e:
-        return None, f"Error: {str(e)}"
-    finally:
-        try:
-            if tmp_path and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-        except:
-            pass
-
-def speech_to_text(audio_bytes, language_code="auto"):
-    if language_code == "ru":
-        return speech_to_text_whisper(audio_bytes)
-    return speech_to_text_cohere(audio_bytes, language_code)
+# مفاتيح Azure
+if "azure_key" not in st.session_state:
+    st.session_state.azure_key = ""
+if "azure_region" not in st.session_state:
+    st.session_state.azure_region = "eastus"
 
 # ════════════════════════════════════════════════════════════
 #  SESSION STATE
@@ -725,7 +723,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI - Tabs (Voice, Text, File, Camera, Group)
+#  UI - Tabs
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -772,7 +770,7 @@ st.session_state.selected_style = selected_style_label
 # ====== التبويبات ======
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "📷 Camera", "👥 Group"])
 
-# ----- Tab 1: Voice (نفس الكود السابق) -----
+# ----- Tab 1: Voice -----
 with tab1:
     st.markdown("---")
     st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
@@ -821,7 +819,7 @@ with tab1:
             else:
                 st.error(f"❌ {engine_used}")
 
-# ----- Tab 2: Text (نفس الكود السابق) -----
+# ----- Tab 2: Text -----
 with tab2:
     st.markdown("---")
     st.markdown('<div class="section-heading">📝 Text Input</div>', unsafe_allow_html=True)
@@ -871,7 +869,7 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: File (نفس الكود السابق) -----
+# ----- Tab 3: File -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 File Translation</div>', unsafe_allow_html=True)
@@ -920,11 +918,11 @@ with tab3:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Camera (باستخدام EasyOCR) -----
+# ----- Tab 4: Camera -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">📷 Camera Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع صورة وسيتم استخراج النص وترجمته (بدون الحاجة إلى Tesseract)")
+    st.caption("ارفع صورة وسيتم استخراج النص وترجمته")
     
     uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="camera_uploader")
     
@@ -968,57 +966,60 @@ with tab4:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 5: Group Chat (باستخدام Cohere بدلاً من Whisper) -----
+# ----- Tab 5: Group Chat (Azure Live Interpreter) -----
 with tab5:
     st.markdown("---")
-    st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
-    st.caption("سجّل محادثة وسيتم تحويلها إلى نص وترجمتها (بدون الحاجة إلى ffmpeg)")
+    st.markdown('<div class="section-heading">👥 Group Chat Translation (Azure)</div>', unsafe_allow_html=True)
+    st.caption("ترجمة المحادثات الجماعية باستخدام Azure Speech (يدعم تمييز المتحدثين والنبرة)")
     
-    # اختيار اللغة الهدف
-    group_target = st.selectbox("ترجم إلى", tgt_options, key="group_target")
+    # إدخال مفاتيح Azure
+    st.info("🔑 أدخل مفاتيح Azure للترجمة الفورية")
+    azure_key_input = st.text_input("مفتاح Azure Subscription", type="password", value=st.session_state.azure_key, key="azure_key_input")
+    azure_region_input = st.text_input("منطقة Azure (Region)", value=st.session_state.azure_region, key="azure_region_input")
+    
+    if azure_key_input:
+        st.session_state.azure_key = azure_key_input
+    if azure_region_input:
+        st.session_state.azure_region = azure_region_input
+    
+    # اختيار اللغة المصدر (Azure يتطلب رمزاً محدداً)
+    source_lang_azure = st.selectbox("لغة المصدر (الكلام)", list(azure_lang_codes.keys()), key="azure_source")
+    target_lang_azure = st.selectbox("اللغة الهدف (الترجمة)", list(languages_dict.keys()), key="azure_target")
     
     # تسجيل الصوت
     audio_value_group = st.audio_input("سجّل المحادثة", key="group_audio", label_visibility="collapsed")
     
-    if audio_value_group is not None:
-        with st.spinner("⏳ جاري معالجة الصوت..."):
-            audio_bytes = audio_value_group.getvalue()
-            
-            # استخدام Cohere للتعرف على الصوت (نفس Voice)
-            transcript, err = transcribe_audio_cohere(audio_bytes, source_lang)
-            
-            if transcript:
-                st.markdown('<div class="section-heading">النص المستخرج</div>', unsafe_allow_html=True)
-                st.code(transcript, language=None)
+    if audio_value_group is not None and st.button("🚀 ترجمة باستخدام Azure"):
+        if not st.session_state.azure_key:
+            st.error("❌ يرجى إدخال مفتاح Azure.")
+        else:
+            with st.spinner("⏳ جاري الترجمة باستخدام Azure..."):
+                audio_bytes = audio_value_group.getvalue()
+                source_code = azure_lang_codes[source_lang_azure]
+                target_code = languages_dict[target_lang_azure]
                 
-                # ترجمة النص باستخدام deep-translator
-                with st.spinner("⏳ جاري الترجمة..."):
-                    translated, err2 = translate_with_deepl(transcript, target_lang)
+                translated_text, err = translate_with_azure(
+                    audio_bytes, 
+                    source_code, 
+                    target_code, 
+                    st.session_state.azure_key, 
+                    st.session_state.azure_region
+                )
+                
+                if translated_text:
+                    st.markdown('<div class="section-heading">الترجمة</div>', unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class="result-box">
+                        <span class="label">✦ الترجمة (Azure)</span>
+                        <div class="text">{translated_text}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.code(translated_text, language=None)
                     
-                    if translated:
-                        emotion = analyze_emotion(transcript)
-                        
-                        st.markdown('<div class="section-heading">الترجمة</div>', unsafe_allow_html=True)
-                        st.markdown(f"""
-                        <div class="result-box">
-                            <span class="label">✦ الترجمة</span>
-                            <div class="text">{translated}</div>
-                            <div class="emotion">{emotion}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.code(translated, language=None)
-                        
-                        # تشغيل الصوت المترجم
-                        audio_bytes_tts = generate_audio(translated, target_lang)
-                        if audio_bytes_tts:
-                            st.audio(audio_bytes_tts, format="audio/mp3")
-                        
-                        # حفظ في السجل
-                        save_translation(transcript, translated, emotion, "Group Chat", target_lang)
-                    else:
-                        st.error(f"❌ فشلت الترجمة: {err2}")
-            else:
-                st.error(f"❌ فشل التعرف: {err}")
+                    # حفظ في السجل
+                    save_translation("(Group Chat)", translated_text, "محايد", source_lang_azure, target_lang_azure)
+                else:
+                    st.error(f"❌ فشلت الترجمة: {err}")
 
 # ════════════════════════════════════════════════════════════
 #  Footer
