@@ -237,7 +237,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (مع تحسين شكل التبويبات)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -266,6 +266,32 @@ def get_css(theme):
         .stCode, code, pre { background: #f0f0f0 !important; color: #1a1a2e !important; border: 1px solid #ddd !important; border-radius: 8px !important; }
         .section-heading { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #2a7a60; margin: 0.6rem 0 0.3rem; }
         hr { margin: 0.5rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(42,122,96,0.2), transparent); }
+
+        /* تنسيق التبويبات */
+        button[data-baseweb="tab"] {
+            font-family: 'Space Grotesk', sans-serif !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: #1a1a2e !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 0.5rem 1.2rem !important;
+            border-radius: 8px 8px 0 0 !important;
+            transition: all 0.3s ease !important;
+        }
+        button[data-baseweb="tab"]:hover {
+            background: rgba(42,122,96,0.08) !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] {
+            background: rgba(42,122,96,0.12) !important;
+            color: #2a7a60 !important;
+            border-bottom: 2px solid #2a7a60 !important;
+        }
+        div[data-baseweb="tab-list"] {
+            gap: 4px !important;
+            border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+            padding-bottom: 0 !important;
+        }
         """
     else:
         return """
@@ -293,6 +319,33 @@ def get_css(theme):
         .stCode, code, pre { background: rgba(0,0,0,0.35) !important; color: #a8f0d8 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 8px !important; }
         .section-heading { font-size: 9px; font-weight: 700; text-transform: uppercase; color: rgba(150,185,230,0.5); margin: 0.6rem 0 0.3rem; }
         hr { margin: 0.5rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent); }
+
+        /* تنسيق التبويبات (الوضع الداكن) */
+        button[data-baseweb="tab"] {
+            font-family: 'Space Grotesk', sans-serif !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: #b0c4de !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 0.5rem 1.2rem !important;
+            border-radius: 8px 8px 0 0 !important;
+            transition: all 0.3s ease !important;
+        }
+        button[data-baseweb="tab"]:hover {
+            background: rgba(78,203,160,0.06) !important;
+            color: #e8f0ff !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] {
+            background: rgba(78,203,160,0.1) !important;
+            color: #4ECBA0 !important;
+            border-bottom: 2px solid #4ECBA0 !important;
+        }
+        div[data-baseweb="tab-list"] {
+            gap: 4px !important;
+            border-bottom: 1px solid rgba(78,203,160,0.1) !important;
+            padding-bottom: 0 !important;
+        }
         """
 
 st.markdown(f"<style>{get_css(st.session_state.theme)}</style>", unsafe_allow_html=True)
@@ -583,7 +636,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI - Tabs (Voice, Text, File)
+#  UI - Tabs (Voice, Text, File) مع تحسين التصميم
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -627,7 +680,7 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== التبويبات ======
+# ====== التبويبات (مع تحسين الشكل) ======
 tab1, tab2, tab3 = st.tabs(["🎤 Voice", "📝 Text", "📄 File"])
 
 # ----- Tab 1: Voice -----
@@ -729,11 +782,10 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: File Translation (PDF, DOCX, TXT, Excel) -----
+# ----- Tab 3: File (بدون النص الزائد) -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 File Translation</div>', unsafe_allow_html=True)
-    st.caption("PDF, DOCX, TXT, Excel (.xlsx, .xls)")
     
     uploaded_file = st.file_uploader("اختر ملف", type=None, key="file_uploader")
     
