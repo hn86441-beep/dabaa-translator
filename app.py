@@ -13,15 +13,35 @@ import base64
 import sqlite3
 from PIL import Image, ImageEnhance, ImageFilter
 import numpy as np
+import subprocess
+import sys
 
 # ════════════════════════════════════════════════════════════
-#  محاولة استيراد easyocr فقط (تم إزالة pytesseract)
+#  تثبيت Tesseract تلقائياً (لـ pytesseract)
+# ════════════════════════════════════════════════════════════
+try:
+    subprocess.run(['apt-get', 'update', '-qq'], check=False, capture_output=True)
+    subprocess.run(['apt-get', 'install', '-y', 'tesseract-ocr', 'tesseract-ocr-ara', 
+                    'tesseract-ocr-rus', 'tesseract-ocr-chi-sim', 'tesseract-ocr-deu',
+                    'tesseract-ocr-spa', 'tesseract-ocr-por', 'tesseract-ocr-kor'], 
+                   check=False, capture_output=True)
+except:
+    pass
+
+# ════════════════════════════════════════════════════════════
+#  استيراد المكتبات
 # ════════════════════════════════════════════════════════════
 try:
     import easyocr
     EASYOCR_AVAILABLE = True
 except ImportError:
     EASYOCR_AVAILABLE = False
+
+try:
+    import pytesseract
+    PYTESSERACT_AVAILABLE = True
+except ImportError:
+    PYTESSERACT_AVAILABLE = False
 
 try:
     import pdfplumber
@@ -98,7 +118,7 @@ def export_history_json():
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر (فرح، حزن، محايد)
+#  تحليل المشاعر
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
@@ -151,43 +171,47 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  OCR للصور (EasyOCR فقط مع معالجة مسبقة قوية)
+#  OCR للصور (مزيج من EasyOCR + pytesseract)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
-def load_ocr_reader():
-    if not EASYOCR_AVAILABLE:
-        return None
-    # محاولة تحميل EasyOCR مع جميع اللغات
-    try:
-        # الطريقة الصحيحة لـ ch_sim: يجب أن تكون مع 'en' في قائمة منفصلة
-        # لكن EasyOCR يقبل قائمة واحدة تحتوي على كل اللغات، بشرط ترتيبها بشكل صحيح
-        # الأكثر أماناً: استخدام ['ch_sim','en'] ومن ثم إضافة باقي اللغات بعدها
-        # جرب هذه القائمة
-        lang_list = ['ch_sim', 'en', 'ar', 'ru', 'de', 'es', 'pt', 'ko']
-        return easyocr.Reader(lang_list, gpu=False)
-    except Exception as e:
-        st.warning(f"⚠️ فشل تحميل EasyOCR مع جميع اللغات: {e}")
-        # محاولة ثانية: إزالة ch_sim
+def load_ocr_readers():
+    readers = []
+    
+    if EASYOCR_AVAILABLE:
+        lang_lists = [
+            ['ch_sim', 'en', 'ko', 'ar', 'ru', 'de', 'es', 'pt'],
+            ['en', 'ch_sim', 'ko', 'ar', 'ru', 'de', 'es', 'pt'],
+            ['en', 'ar', 'ru', 'de', 'es', 'pt'],
+            ['ch_sim', 'en'],
+            ['ko', 'en'],
+        ]
+        for lang_list in lang_lists:
+            try:
+                reader = easyocr.Reader(lang_list, gpu=False)
+                readers.append(('easyocr', lang_list, reader))
+                st.success(f"✅ EasyOCR جاهز مع: {lang_list}")
+                break  # نجح تحميل واحد فقط يكفي
+            except Exception as e:
+                st.warning(f"⚠️ فشل EasyOCR مع {lang_list}: {e}")
+    
+    if PYTESSERACT_AVAILABLE:
         try:
-            lang_list = ['en', 'ar', 'ru', 'de', 'es', 'pt', 'ko']
-            return easyocr.Reader(lang_list, gpu=False)
-        except Exception as e2:
-            st.warning(f"⚠️ فشل تحميل EasyOCR حتى بدون ch_sim: {e2}")
-            return None
+            pytesseract.get_tesseract_version()
+            readers.append(('tesseract', None, None))
+            st.success("✅ pytesseract جاهز (Tesseract مثبت)")
+        except:
+            st.warning("⚠️ Tesseract غير مثبت، pytesseract غير متاح")
+    
+    return readers
 
-ocr_reader = load_ocr_reader()
+ocr_readers = load_ocr_readers()
 
 def preprocess_image(image):
-    """معالجة الصورة لتحسين التعرف على النص."""
-    # تحويل إلى تدرج رمادي
     if image.mode != 'L':
         image = image.convert('L')
-    # تحسين التباين
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(2.5)
-    # زيادة الحدة
     image = image.filter(ImageFilter.SHARPEN)
-    # تطبيق عتبة (Threshold) لتوحيد الخلفية
     try:
         img_array = np.array(image)
         threshold = 128
@@ -199,26 +223,29 @@ def preprocess_image(image):
 
 def extract_text_from_image(image_bytes):
     try:
-        # فتح الصورة
         image = Image.open(io.BytesIO(image_bytes))
-        # معالجة مسبقة
         processed_image = preprocess_image(image)
         
-        # EasyOCR
-        if ocr_reader is not None:
+        for reader_type, lang_list, reader in ocr_readers:
             try:
-                # تحويل PIL إلى numpy array
-                image_np = np.array(processed_image)
-                result = ocr_reader.readtext(image_np)
-                text = " ".join([item[1] for item in result])
-                if text.strip():
-                    return text.strip(), None
-            except Exception as e:
-                st.warning(f"EasyOCR فشل: {e}")
-        else:
-            st.warning("EasyOCR غير متاح. تأكد من تثبيت easyocr.")
+                if reader_type == 'easyocr' and reader is not None:
+                    image_np = np.array(processed_image)
+                    result = reader.readtext(image_np)
+                    text = " ".join([item[1] for item in result])
+                    if text.strip():
+                        return text.strip(), None
+                elif reader_type == 'tesseract':
+                    lang = 'ara+eng+rus+chi_sim+deu+spa+por+kor'
+                    text = pytesseract.image_to_string(processed_image, lang=lang)
+                    if text.strip():
+                        return text.strip(), None
+                    text = pytesseract.image_to_string(processed_image, lang='eng')
+                    if text.strip():
+                        return text.strip(), None
+            except:
+                continue
         
-        return None, "لم يتم العثور على نص في الصورة. تأكد من وضوح النص، وجودة الصورة، وأن النص مكتوب بخط واضح."
+        return None, "لم يتم العثور على نص في الصورة. حاول استخدام صورة أوضح، أو تأكد من أن النص مكتوب بخط واضح."
     except Exception as e:
         return None, str(e)
 
@@ -251,7 +278,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفس الكود السابق، حُذف للاختصار)
+#  CSS
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -743,12 +770,11 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: Image Translation (مع إصلاحات OCR) -----
+# ----- Tab 3: Image Translation (OCR المحسّن) -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">🖼️ Image Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم جميع اللغات: العربية، الإنجليزية، الروسية، الصينية، الألمانية، الإسبانية، البرتغالية، الكورية)")
-    st.info("💡 تأكد من أن النص واضح، ومكتوب بخط كبير، والخلفية موحدة.")
+    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم جميع اللغات)")
     
     uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="image_uploader")
     
