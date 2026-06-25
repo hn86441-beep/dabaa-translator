@@ -9,4 +9,3 @@ easyocr
 pytesseract
 Pillow
 pdfplumber
-numpy
