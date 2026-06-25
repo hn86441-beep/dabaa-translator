@@ -9,3 +9,8 @@ pdfplumber
 python-docx
 openpyxl
 Pillow
+opencv-python
+pytesseract
+numpy
+openai-whisper
+deep-translator
