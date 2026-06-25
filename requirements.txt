@@ -4,3 +4,5 @@ requests-toolbelt
 faster-whisper
 transformers
 torch
+gtts
+pygame
