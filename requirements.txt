@@ -12,3 +12,4 @@ Pillow
 easyocr
 numpy
 deep-translator
+azure-cognitiveservices-speech
