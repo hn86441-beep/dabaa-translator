@@ -6,7 +6,6 @@ transformers
 torch
 gtts
 easyocr
-pytesseract
 Pillow
 pdfplumber
 numpy
