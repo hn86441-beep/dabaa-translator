@@ -151,70 +151,210 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  6. CSS (ديناميكي حسب الوضع)
+#  6. CSS (مع حركات خفيفة فقط - بدون ظلال متحركة أو تغيير أبعاد)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
         return """
-        .stApp { background: #f5f7fa !important; }
-        .app-header h1 { color: #1a1a2e !important; }
-        .app-header h1 .accent { color: #2a7a60 !important; }
-        .stButton > button { background: #2a7a60 !important; color: white !important; }
-        .stButton > button:hover { background: #1a5a48 !important; }
-        textarea { background: white !important; color: #1a1a2e !important; border: 1px solid #ccc !important; }
-        .result-box { background: rgba(42,122,96,0.06) !important; border-color: rgba(42,122,96,0.2) !important; }
-        .result-box .text { color: #1a1a2e !important; }
-        .result-box .emotion { color: #2a7a60 !important; }
-        .stSelectbox > div > div { background: white !important; color: #1a1a2e !important; border-color: #ccc !important; }
-        .stSelectbox label { color: #2a7a60 !important; }
-        .stSuccess { background: #e8f5e9 !important; color: #1a5a48 !important; }
-        .stError { background: #ffebee !important; color: #c0392b !important; }
-        .stWarning { background: #fff8e1 !important; color: #b89020 !important; }
-        .context { background: rgba(42,122,96,0.07) !important; color: #2a7a60 !important; border-color: rgba(42,122,96,0.15) !important; }
-        .section-heading { color: #2a7a60 !important; }
-        .section-heading::before { background: #2a7a60 !important; }
-        hr { background: linear-gradient(90deg, transparent, rgba(42,122,96,0.2), transparent) !important; }
-        [data-testid="stSidebar"] { background: rgba(255,255,255,0.98) !important; border-right: 1px solid #ddd !important; }
-        [data-testid="stSidebar"] .stMarkdown { color: #1a1a2e !important; }
-        .history-item { background: rgba(42,122,96,0.06) !important; border-left: 2px solid #2a7a60 !important; }
-        .history-item .text { color: #1a1a2e !important; }
-        .history-item .lang { color: #2a7a60 !important; }
-        .history-item .time { color: #888 !important; }
-        div[data-testid="stAudioInput"] > div { background: rgba(42,122,96,0.08) !important; border-color: rgba(42,122,96,0.3) !important; }
-        div[data-testid="stAudioInput"] button { color: #1a1a2e !important; }
-        .glass-card { background: rgba(255,255,255,0.7) !important; border-color: rgba(0,0,0,0.08) !important; }
-        .stCode, code, pre { background: #f0f0f0 !important; color: #1a1a2e !important; }
+        /* ====== الوضع الفاتح ====== */
+        .stApp {
+            background: #f5f7fa !important;
+        }
+        
+        .app-header h1 {
+            color: #1a1a2e !important;
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        .app-header h1 .accent {
+            color: #2a7a60 !important;
+        }
+        
+        .stButton > button {
+            background: #2a7a60 !important;
+            color: white !important;
+            transition: all 0.3s ease !important;
+        }
+        .stButton > button:hover {
+            background: #1a5a48 !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        textarea {
+            background: white !important;
+            color: #1a1a2e !important;
+            border: 1px solid #ccc !important;
+            transition: border 0.3s ease !important;
+        }
+        textarea:focus {
+            border-color: #2a7a60 !important;
+        }
+        
+        .result-box {
+            background: rgba(42,122,96,0.06) !important;
+            border-color: rgba(42,122,96,0.2) !important;
+            transition: transform 0.3s ease !important;
+        }
+        .result-box:hover {
+            transform: translateY(-2px) !important;
+        }
+        .result-box .text {
+            color: #1a1a2e !important;
+        }
+        .result-box .emotion {
+            color: #2a7a60 !important;
+        }
+        
+        .glass-card {
+            background: rgba(255,255,255,0.7) !important;
+            border-color: rgba(0,0,0,0.08) !important;
+        }
+        
+        .section-heading {
+            color: #2a7a60 !important;
+        }
+        .section-heading::before {
+            background: #2a7a60 !important;
+        }
+        
+        [data-testid="stSidebar"] {
+            background: rgba(255,255,255,0.98) !important;
+            border-right: 1px solid #ddd !important;
+        }
+        
+        .history-item {
+            background: rgba(42,122,96,0.06) !important;
+            border-left: 2px solid #2a7a60 !important;
+            transition: transform 0.3s ease !important;
+        }
+        .history-item:hover {
+            transform: translateX(4px) !important;
+        }
+        
+        div[data-testid="stAudioInput"] > div {
+            background: rgba(42,122,96,0.08) !important;
+            border-color: rgba(42,122,96,0.3) !important;
+            transition: border-color 0.3s ease !important;
+        }
+        div[data-testid="stAudioInput"] > div:hover {
+            border-color: #2a7a60 !important;
+        }
+        div[data-testid="stAudioInput"] button {
+            color: #1a1a2e !important;
+        }
+        
+        .stCode, code, pre {
+            background: #f0f0f0 !important;
+            color: #1a1a2e !important;
+            border-radius: 8px !important;
+            border: 1px solid #ddd !important;
+        }
         """
     else:
         return """
-        .stApp { background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important; }
-        .app-header h1 { color: #f0f4ff !important; }
-        .app-header h1 .accent { color: #4ECBA0 !important; }
-        .stButton > button { background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important; color: #0a1520 !important; }
-        .stButton > button:hover { background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important; }
-        textarea { background: #1a1a2e !important; color: #f0f4ff !important; border-color: rgba(255,255,255,0.15) !important; }
-        .result-box { background: rgba(78,203,160,0.06) !important; border-color: rgba(78,203,160,0.2) !important; }
-        .result-box .text { color: #e8f0ff !important; }
-        .result-box .emotion { color: #4ECBA0 !important; }
-        .stSelectbox > div > div { background: rgba(255,255,255,0.05) !important; color: #e8f0ff !important; border-color: rgba(255,255,255,0.12) !important; }
-        .stSelectbox label { color: rgba(78,203,160,0.75) !important; }
-        .stSuccess { background: rgba(78,203,160,0.08) !important; color: #a8f0d8 !important; }
-        .stError { background: rgba(239,68,68,0.08) !important; color: #f87171 !important; }
-        .stWarning { background: rgba(245,158,11,0.08) !important; color: #fbbf24 !important; }
-        .context { background: rgba(78,203,160,0.07) !important; color: rgba(78,203,160,0.9) !important; border-color: rgba(78,203,160,0.15) !important; }
-        .section-heading { color: rgba(150,185,230,0.5) !important; }
-        .section-heading::before { background: #4ECBA0 !important; }
-        hr { background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent) !important; }
-        [data-testid="stSidebar"] { background: rgba(10,10,26,0.98) !important; border-right: 1px solid rgba(78,203,160,0.1) !important; }
-        [data-testid="stSidebar"] .stMarkdown { color: #e8f0ff !important; }
-        .history-item { background: rgba(78,203,160,0.06) !important; border-left: 2px solid #4ECBA0 !important; }
-        .history-item .text { color: #e8f0ff !important; }
-        .history-item .lang { color: rgba(78,203,160,0.6) !important; }
-        .history-item .time { color: rgba(180,200,230,0.4) !important; }
-        div[data-testid="stAudioInput"] > div { background: rgba(78,203,160,0.08) !important; border-color: rgba(78,203,160,0.3) !important; }
-        div[data-testid="stAudioInput"] button { color: #e8f0ff !important; }
-        .glass-card { background: rgba(255,255,255,0.04) !important; border-color: rgba(255,255,255,0.09) !important; }
-        .stCode, code, pre { background: rgba(0,0,0,0.35) !important; color: #a8f0d8 !important; }
+        /* ====== الوضع الداكن ====== */
+        .stApp {
+            background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important;
+        }
+        
+        .app-header h1 {
+            color: #f0f4ff !important;
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        .app-header h1 .accent {
+            color: #4ECBA0 !important;
+        }
+        
+        .stButton > button {
+            background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
+            color: #0a1520 !important;
+            transition: all 0.3s ease !important;
+        }
+        .stButton > button:hover {
+            background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        textarea {
+            background: #1a1a2e !important;
+            color: #f0f4ff !important;
+            border-color: rgba(255,255,255,0.15) !important;
+            transition: border 0.3s ease !important;
+        }
+        textarea:focus {
+            border-color: rgba(78,203,160,0.5) !important;
+        }
+        
+        .result-box {
+            background: rgba(78,203,160,0.06) !important;
+            border-color: rgba(78,203,160,0.2) !important;
+            transition: transform 0.3s ease !important;
+        }
+        .result-box:hover {
+            transform: translateY(-2px) !important;
+        }
+        .result-box .text {
+            color: #e8f0ff !important;
+        }
+        .result-box .emotion {
+            color: #4ECBA0 !important;
+        }
+        
+        .glass-card {
+            background: rgba(255,255,255,0.04) !important;
+            border-color: rgba(255,255,255,0.09) !important;
+        }
+        
+        .section-heading {
+            color: rgba(150,185,230,0.5) !important;
+        }
+        .section-heading::before {
+            background: #4ECBA0 !important;
+        }
+        
+        [data-testid="stSidebar"] {
+            background: rgba(10,10,26,0.98) !important;
+            border-right: 1px solid rgba(78,203,160,0.1) !important;
+        }
+        
+        .history-item {
+            background: rgba(78,203,160,0.06) !important;
+            border-left: 2px solid #4ECBA0 !important;
+            transition: transform 0.3s ease !important;
+        }
+        .history-item:hover {
+            transform: translateX(4px) !important;
+        }
+        
+        div[data-testid="stAudioInput"] > div {
+            background: rgba(78,203,160,0.08) !important;
+            border-color: rgba(78,203,160,0.3) !important;
+            transition: border-color 0.3s ease !important;
+        }
+        div[data-testid="stAudioInput"] > div:hover {
+            border-color: #4ECBA0 !important;
+        }
+        div[data-testid="stAudioInput"] button {
+            color: #e8f0ff !important;
+        }
+        
+        .stCode, code, pre {
+            background: rgba(0,0,0,0.35) !important;
+            color: #a8f0d8 !important;
+            border-radius: 8px !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+        }
         """
 
 # تطبيق CSS
@@ -231,14 +371,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  8. الشريط الجانبي (الميزات الجديدة هنا - واضحة جداً)
+#  8. الشريط الجانبي
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
-    # عنوان بارز للميزات الجديدة
     st.markdown("## ✨ الميزات الجديدة")
     st.markdown("---")
     
-    # --- الميزة 1: تبديل المظهر ---
     st.markdown("### 🌓 تبديل المظهر")
     st.markdown("**الوضع الحالي:** " + ("☀️ فاتح" if st.session_state.theme == "light" else "🌙 داكن"))
     if st.button("🌓 تبديل المظهر", use_container_width=True):
@@ -246,7 +384,6 @@ with st.sidebar:
         st.rerun()
     st.markdown("---")
     
-    # --- الميزة 2: سجل الترجمات (من قاعدة البيانات) ---
     st.markdown("### 📜 سجل الترجمات (محفوظ في قاعدة بيانات)")
     st.caption("الترجمات محفوظة حتى بعد إعادة التشغيل")
     st.divider()
@@ -619,7 +756,6 @@ if audio_value is not None:
                     if audio_bytes_tts:
                         st.audio(audio_bytes_tts, format="audio/mp3")
                     
-                    # حفظ في قاعدة البيانات
                     save_translation(recognized_text, translated_text, emotion, source_lang_name, target_lang_name)
                 else:
                     st.error(f"❌ {engine}")
