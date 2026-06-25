@@ -156,10 +156,7 @@ if "theme" not in st.session_state:
 def get_css(theme):
     if theme == "light":
         return """
-        /* ====== الوضع الفاتح ====== */
-        .stApp {
-            background: #f5f7fa !important;
-        }
+        .stApp { background: #f5f7fa !important; }
         .app-header h1 { color: #1a1a2e !important; }
         .app-header h1 .accent { color: #2a7a60 !important; }
         .stButton > button { background: #2a7a60 !important; color: white !important; }
@@ -177,7 +174,7 @@ def get_css(theme):
         .section-heading { color: #2a7a60 !important; }
         .section-heading::before { background: #2a7a60 !important; }
         hr { background: linear-gradient(90deg, transparent, rgba(42,122,96,0.2), transparent) !important; }
-        [data-testid="stSidebar"] { background: rgba(255,255,255,0.95) !important; border-right: 1px solid #ddd !important; }
+        [data-testid="stSidebar"] { background: rgba(255,255,255,0.98) !important; border-right: 1px solid #ddd !important; }
         [data-testid="stSidebar"] .stMarkdown { color: #1a1a2e !important; }
         .history-item { background: rgba(42,122,96,0.06) !important; border-left: 2px solid #2a7a60 !important; }
         .history-item .text { color: #1a1a2e !important; }
@@ -190,10 +187,7 @@ def get_css(theme):
         """
     else:
         return """
-        /* ====== الوضع الداكن ====== */
-        .stApp {
-            background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important;
-        }
+        .stApp { background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important; }
         .app-header h1 { color: #f0f4ff !important; }
         .app-header h1 .accent { color: #4ECBA0 !important; }
         .stButton > button { background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important; color: #0a1520 !important; }
@@ -211,7 +205,7 @@ def get_css(theme):
         .section-heading { color: rgba(150,185,230,0.5) !important; }
         .section-heading::before { background: #4ECBA0 !important; }
         hr { background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent) !important; }
-        [data-testid="stSidebar"] { background: rgba(10,10,26,0.95) !important; border-right: 1px solid rgba(78,203,160,0.1) !important; }
+        [data-testid="stSidebar"] { background: rgba(10,10,26,0.98) !important; border-right: 1px solid rgba(78,203,160,0.1) !important; }
         [data-testid="stSidebar"] .stMarkdown { color: #e8f0ff !important; }
         .history-item { background: rgba(78,203,160,0.06) !important; border-left: 2px solid #4ECBA0 !important; }
         .history-item .text { color: #e8f0ff !important; }
@@ -237,24 +231,32 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  8. الشريط الجانبي (الميزات الجديدة هنا)
+#  8. الشريط الجانبي (الميزات الجديدة هنا - واضحة جداً)
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
+    # عنوان بارز للميزات الجديدة
+    st.markdown("## ✨ الميزات الجديدة")
+    st.markdown("---")
+    
     # --- الميزة 1: تبديل المظهر ---
-    st.markdown("## 🌓 المظهر")
+    st.markdown("### 🌓 تبديل المظهر")
+    st.markdown("**الوضع الحالي:** " + ("☀️ فاتح" if st.session_state.theme == "light" else "🌙 داكن"))
     if st.button("🌓 تبديل المظهر", use_container_width=True):
         st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
         st.rerun()
-    st.divider()
+    st.markdown("---")
     
     # --- الميزة 2: سجل الترجمات (من قاعدة البيانات) ---
-    st.markdown("## 📜 سجل الترجمات")
+    st.markdown("### 📜 سجل الترجمات (محفوظ في قاعدة بيانات)")
+    st.caption("الترجمات محفوظة حتى بعد إعادة التشغيل")
+    st.divider()
+    
     history = get_history(limit=100)
     
     if history:
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.write(f"**{len(history)}** ترجمة")
+            st.write(f"**{len(history)}** ترجمة محفوظة")
         with col2:
             if st.button("🗑️ مسح الكل", use_container_width=True):
                 clear_history()
@@ -281,10 +283,16 @@ with st.sidebar:
             href = f'<a href="data:application/json;base64,{b64}" download="translation_history.json">📥 تحميل</a>'
             st.markdown(href, unsafe_allow_html=True)
     else:
-        st.info("📭 لا توجد ترجمات محفوظة")
+        st.info("📭 لا توجد ترجمات محفوظة بعد")
+        st.caption("💡 قم بترجمة أي نص وسيظهر هنا")
 
 # ════════════════════════════════════════════════════════════
-#  9. باقي الكود (الإعدادات، الترجمة، الصوت، إلخ)
+#  9. عرض رسالة تأكيد في الصفحة الرئيسية
+# ════════════════════════════════════════════════════════════
+st.success("✅ **الميزات الجديدة مفعلة!** انظر إلى الشريط الجانبي →")
+
+# ════════════════════════════════════════════════════════════
+#  10. باقي الكود (الإعدادات، الترجمة، الصوت، إلخ)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
