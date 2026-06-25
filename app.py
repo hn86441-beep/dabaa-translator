@@ -11,6 +11,8 @@ from datetime import datetime
 import io
 import base64
 import sqlite3
+from PIL import Image, ImageEnhance, ImageFilter
+import numpy as np
 
 # ════════════════════════════════════════════════════════════
 #  محاولة استيراد easyocr و pytesseract و pdfplumber
@@ -23,7 +25,6 @@ except ImportError:
 
 try:
     import pytesseract
-    from PIL import Image
     PYTESSERACT_AVAILABLE = True
 except ImportError:
     PYTESSERACT_AVAILABLE = False
@@ -33,58 +34,6 @@ try:
     PDFPLUMBER_AVAILABLE = True
 except ImportError:
     PDFPLUMBER_AVAILABLE = False
-
-# ════════════════════════════════════════════════════════════
-#  دالة النبرة للغة الروسية (قاموس مدمج)
-# ════════════════════════════════════════════════════════════
-RUSSIAN_STRESS_DICT = {
-    "привет": "приве́т", "мир": "ми́р", "как": "ка́к", "дела": "дела́",
-    "спасибо": "спаси́бо", "пожалуйста": "пожа́луйста", "хорошо": "хорошо́",
-    "пока": "пока́", "да": "да", "нет": "нет", "извините": "извини́те",
-    "здравствуйте": "здра́вствуйте", "до свидания": "до свида́ния",
-    "город": "го́род", "молоко": "молоко́", "машина": "маши́на",
-    "работа": "рабо́та", "день": "де́нь", "ночь": "ночь", "утро": "у́тро",
-    "вечер": "ве́чер", "зима": "зима́", "лето": "ле́то", "весна": "весна́",
-    "осень": "о́сень", "человек": "челове́к", "имя": "и́мя", "время": "вре́мя",
-    "жизнь": "жи́знь", "любовь": "любо́вь", "счастье": "сча́стье",
-    "семья": "семья́", "друг": "друг", "подруга": "подру́га",
-    "мама": "ма́ма", "папа": "па́па", "брат": "брат", "сестра": "сестра́",
-    "сын": "сын", "дочь": "дочь",
-    "говорить": "говори́ть", "сказать": "сказа́ть", "делать": "де́лать",
-    "сделать": "сде́лать", "идти": "идти́", "ходить": "ходи́ть",
-    "ехать": "е́хать", "лететь": "лете́ть", "смотреть": "смотре́ть",
-    "видеть": "ви́деть", "знать": "знать", "понимать": "понима́ть",
-    "думать": "ду́мать", "хотеть": "хоте́ть", "мочь": "мочь",
-    "быть": "быть", "иметь": "име́ть", "жить": "жить",
-    "работать": "рабо́тать", "учиться": "учи́ться",
-    "хороший": "хоро́ший", "плохой": "плохо́й", "большой": "большо́й",
-    "маленький": "ма́ленький", "новый": "но́вый", "старый": "ста́рый",
-    "красивый": "краси́вый", "умный": "у́мный", "глупый": "глу́пый",
-    "добрый": "до́брый", "злой": "злой", "молодой": "молодо́й",
-    "быстро": "бы́стро", "медленно": "ме́дленно", "всегда": "всегда́",
-    "никогда": "никогда́", "сегодня": "сего́дня", "завтра": "за́втра",
-    "вчера": "вчера́", "сейчас": "сейча́с",
-}
-
-def add_russian_stress(text):
-    if not text:
-        return text
-    words = text.split()
-    stressed = []
-    for word in words:
-        punct = ""
-        clean = word
-        if word and not word[-1].isalpha():
-            punct = word[-1]
-            clean = word[:-1]
-        if clean.lower() in RUSSIAN_STRESS_DICT:
-            new_word = RUSSIAN_STRESS_DICT[clean.lower()]
-            if clean[0].isupper():
-                new_word = new_word.capitalize()
-            stressed.append(new_word + punct)
-        else:
-            stressed.append(word)
-    return " ".join(stressed)
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -208,59 +157,92 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  OCR للصور (مع إصلاح اللغات)
+#  OCR للصور (مع دعم جميع اللغات وتحسين قوي)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_ocr_reader():
     if EASYOCR_AVAILABLE:
         try:
-            # ترتيب اللغات: نضع 'en' أولاً ثم باقي اللغات
-            # بالنسبة للصينية المبسطة، يجب أن تكون مع 'en'
-            return easyocr.Reader(['en', 'ar', 'ru', 'ch_sim', 'de', 'es', 'pt', 'ko'], gpu=False)
+            # جميع اللغات المدعومة بما فيها الصينية (بترتيب صحيح)
+            # EasyOCR يتطلب أن تكون 'ch_sim' و 'en' معاً في قائمة منفصلة
+            lang_list = ['en', 'ar', 'ru', 'de', 'es', 'pt', 'ko']
+            # إضافة الصينية بشكل منفصل (يمكن إضافتها مع 'en' في قائمة فرعية)
+            # لكن الطريقة الأكثر أماناً: استخدام قائمة واحدة تحتوي على 'ch_sim' و 'en'
+            # الحل: نضع 'ch_sim' في القائمة مع 'en'، والباقي بشكل منفصل
+            # الأسهل: استخدام قائمة تحتوي على كل اللغات مع ترتيب صحيح
+            # جرب: ['ch_sim','en','ar','ru','de','es','pt','ko']
+            return easyocr.Reader(['ch_sim','en','ar','ru','de','es','pt','ko'], gpu=False)
         except Exception as e:
             st.warning(f"⚠️ فشل تحميل EasyOCR: {e}")
-            # محاولة ثانية بدون ch_sim إذا فشلت بسبب ch_sim
+            # محاولة ثانية: فصل ch_sim
             try:
-                return easyocr.Reader(['en', 'ar', 'ru', 'de', 'es', 'pt', 'ko'], gpu=False)
+                return easyocr.Reader(['en','ar','ru','de','es','pt','ko'], gpu=False)
             except:
-                pass
-            return None
+                return None
     return None
 
 ocr_reader = load_ocr_reader()
 
+def preprocess_image(image):
+    """معالجة الصورة لتحسين التعرف على النص."""
+    # تحويل إلى تدرج رمادي
+    if image.mode != 'L':
+        image = image.convert('L')
+    # تحسين التباين
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2.5)
+    # زيادة الحدة
+    image = image.filter(ImageFilter.SHARPEN)
+    # تطبيق عتبة (Threshold) لتوحيد الخلفية
+    # نستخدم numpy لتحويل الصورة إلى مصفوفة وتطبيق عتبة
+    try:
+        img_array = np.array(image)
+        # عتبة بسيطة: جعل الألوان الداكنة أكثر وضوحاً
+        threshold = 128
+        img_array = np.where(img_array > threshold, 255, 0).astype(np.uint8)
+        image = Image.fromarray(img_array)
+    except:
+        pass
+    return image
+
 def extract_text_from_image(image_bytes):
     try:
+        # فتح الصورة
         image = Image.open(io.BytesIO(image_bytes))
+        # معالجة مسبقة
+        processed_image = preprocess_image(image)
         
         # 1. EasyOCR
         if ocr_reader is not None:
             try:
-                result = ocr_reader.readtext(image)
+                # EasyOCR يتعامل مع الصور كـ numpy array أو PIL
+                image_np = np.array(processed_image)
+                result = ocr_reader.readtext(image_np)
                 text = " ".join([item[1] for item in result])
                 if text.strip():
                     return text.strip(), None
             except Exception as e:
                 st.warning(f"EasyOCR فشل: {e}")
         
-        # 2. pytesseract مع لغات متعددة
+        # 2. pytesseract (إذا كان متوفراً)
         if PYTESSERACT_AVAILABLE:
             try:
+                # تحديد جميع اللغات المدعومة
                 lang = 'ara+eng+rus+chi_sim+deu+spa+por+kor'
-                text = pytesseract.image_to_string(image, lang=lang)
+                text = pytesseract.image_to_string(processed_image, lang=lang)
                 if text.strip():
                     return text.strip(), None
-            except:
-                pass
-            # 3. pytesseract إنجليزي فقط
+            except Exception as e:
+                st.warning(f"pytesseract فشل: {e}")
             try:
-                text = pytesseract.image_to_string(image, lang='eng')
+                # محاولة بالإنجليزية فقط
+                text = pytesseract.image_to_string(processed_image, lang='eng')
                 if text.strip():
                     return text.strip(), None
             except:
                 pass
         
-        return None, "لم يتم العثور على نص في الصورة. تأكد من وضوح النص وجودة الصورة."
+        return None, "لم يتم العثور على نص في الصورة. حاول استخدام صورة أوضح، أو تأكد من أن النص مكتوب بخط واضح."
     except Exception as e:
         return None, str(e)
 
@@ -276,7 +258,7 @@ def extract_text_from_pdf(file_bytes):
                     text += page_text + "\n"
         if text.strip():
             return text.strip(), None
-        return None, "لم يتم العثور على نص في PDF"
+        return None, "لم يتم العثور على نص في ملف PDF"
     except Exception as e:
         return None, str(e)
 
@@ -639,7 +621,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI - Tabs مع جميع الميزات
+#  الواجهة الرئيسية (UI) - Tabs
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -683,11 +665,6 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== خيار إضافة النبرة الروسية ======
-st.markdown("---")
-enable_stress = st.checkbox("🔊 إضافة علامات النبر للغة الروسية (تشكيل)", value=True)
-st.markdown("---")
-
 # ====== التبويبات ======
 tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "🖼️ Image", "📄 PDF"])
 
@@ -718,9 +695,6 @@ with tab1:
                     if translated_text:
                         st.session_state.translated_text = translated_text
                         emotion = analyze_emotion(recognized_text)
-                        
-                        if enable_stress and target_lang == "ru":
-                            translated_text = add_russian_stress(translated_text)
                         
                         st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                         st.markdown(f"""
@@ -774,9 +748,6 @@ with tab2:
                 if translation_result:
                     emotion = analyze_emotion(input_text)
                     
-                    if enable_stress and target_lang == "ru":
-                        translation_result = add_russian_stress(translation_result)
-                    
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                     st.markdown(f"""
                     <div class="result-box">
@@ -796,11 +767,11 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: Image Translation -----
+# ----- Tab 3: Image Translation (دعم جميع اللغات + تحسين OCR) -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">🖼️ Image Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم جميع اللغات)")
+    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم جميع اللغات: العربية، الإنجليزية، الروسية، الصينية، الألمانية، الإسبانية، البرتغالية، الكورية)")
     
     uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="image_uploader")
     
@@ -820,9 +791,6 @@ with tab3:
                         translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
                         if translated_text:
                             emotion = analyze_emotion(extracted_text)
-                            
-                            if enable_stress and target_lang == "ru":
-                                translated_text = add_russian_stress(translated_text)
                             
                             st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                             st.markdown(f"""
@@ -871,9 +839,6 @@ with tab4:
                         translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
                         if translated_text:
                             emotion = analyze_emotion(extracted_text)
-                            
-                            if enable_stress and target_lang == "ru":
-                                translated_text = add_russian_stress(translated_text)
                             
                             st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                             st.markdown(f"""
