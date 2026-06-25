@@ -40,29 +40,18 @@ def analyze_emotion(text):
         return "😐 محايد"
 
 # ════════════════════════════════════════════════════════════
-#  تحويل النص إلى صوت (TTS) باستخدام gTTS فقط (بدون pygame)
+#  تحويل النص إلى صوت (TTS)
 # ════════════════════════════════════════════════════════════
 from gtts import gTTS
 
 def get_tts_lang(lang_code):
-    """تحويل رمز اللغة إلى رمز gTTS"""
     lang_map = {
-        "ar": "ar",   # العربية
-        "en": "en",   # الإنجليزية
-        "ru": "ru",   # الروسية
-        "zh": "zh-cn",# الصينية
-        "de": "de",   # الألمانية
-        "es": "es",   # الإسبانية
-        "pt": "pt",   # البرتغالية
-        "ko": "ko",   # الكورية
+        "ar": "ar", "en": "en", "ru": "ru", "zh": "zh-cn",
+        "de": "de", "es": "es", "pt": "pt", "ko": "ko",
     }
     return lang_map.get(lang_code, "en")
 
 def generate_audio(text, lang_code="en"):
-    """
-    توليد ملف صوتي (MP3) من النص باستخدام gTTS.
-    يعيد كائن BytesIO يمكن استخدامه مع st.audio.
-    """
     if not text or not text.strip():
         return None
     try:
@@ -86,7 +75,7 @@ st.set_page_config(
 )
 
 # ════════════════════════════════════════════════════════════
-#  CSS (تم اختصاره قليلاً للطول لكنه كامل)
+#  CSS
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -301,12 +290,6 @@ textarea::placeholder {
     color: #4ECBA0;
     font-weight: 500;
 }
-.result-box .actions {
-    margin-top: 8px;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
 .context {
     background: rgba(78,203,160,0.07);
     border-radius: 8px;
@@ -458,7 +441,7 @@ with st.sidebar:
         st.info("📭 لا توجد ترجمات محفوظة")
 
 # ════════════════════════════════════════════════════════════
-#  CONFIGURATION (نفس الكود السابق)
+#  CONFIGURATION
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -580,7 +563,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  دوال الترجمة والتعرف على الصوت (نفس الكود السابق)
+#  TRANSLATION & SPEECH FUNCTIONS
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -662,7 +645,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  SESSION STATE (نفس الكود)
+#  SESSION STATE
 # ════════════════════════════════════════════════════════════
 if "source_lang" not in st.session_state:
     st.session_state.source_lang = "Auto-Detect"
@@ -699,7 +682,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI (الجزء الرئيسي)
+#  UI
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -771,26 +754,20 @@ if audio_value is not None:
                     emotion = analyze_emotion(recognized_text)
                     
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
+                    
                     st.markdown(f"""
                     <div class="result-box">
                         <span class="label">✦ Translation</span>
                         <div class="text">{translated_text}</div>
                         <div class="emotion">{emotion}</div>
-                        <div class="actions">
-                            <button onclick="navigator.clipboard.writeText('{translated_text}')" 
-                                    style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;">
-                                📋 نسخ
-                            </button>
-                        </div>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # زر تشغيل الصوت (يظهر مشغل صوت)
+                    st.code(translated_text, language=None)
+                    
                     audio_bytes_tts = generate_audio(translated_text, target_lang)
                     if audio_bytes_tts:
                         st.audio(audio_bytes_tts, format="audio/mp3")
-                    
-                    st.code(translated_text, language=None)
                     
                     st.session_state.history.append({
                         "original": recognized_text,
@@ -834,26 +811,20 @@ if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
             if translation_result:
                 st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                 emotion = analyze_emotion(input_text)
+                
                 st.markdown(f"""
                 <div class="result-box">
                     <span class="label">✦ Translation</span>
                     <div class="text">{translation_result}</div>
                     <div class="emotion">{emotion}</div>
-                    <div class="actions">
-                        <button onclick="navigator.clipboard.writeText('{translation_result}')" 
-                                style="background:rgba(78,203,160,0.1);border:1px solid rgba(78,203,160,0.2);border-radius:20px;padding:2px 12px;font-size:11px;color:#4ECBA0;cursor:pointer;">
-                            📋 نسخ
-                        </button>
-                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # زر تشغيل الصوت
+                st.code(translation_result, language=None)
+                
                 audio_bytes_tts = generate_audio(translation_result, target_lang)
                 if audio_bytes_tts:
                     st.audio(audio_bytes_tts, format="audio/mp3")
-                
-                st.code(translation_result, language=None)
                 
                 st.session_state.history.append({
                     "original": input_text,
