@@ -11,80 +11,8 @@ from datetime import datetime
 import io
 import base64
 import sqlite3
-
-# ════════════════════════════════════════════════════════════
-#  محاولة استيراد easyocr و pytesseract و pdfplumber
-# ════════════════════════════════════════════════════════════
-try:
-    import easyocr
-    EASYOCR_AVAILABLE = True
-except ImportError:
-    EASYOCR_AVAILABLE = False
-
-try:
-    import pytesseract
-    from PIL import Image
-    PYTESSERACT_AVAILABLE = True
-except ImportError:
-    PYTESSERACT_AVAILABLE = False
-
-try:
-    import pdfplumber
-    PDFPLUMBER_AVAILABLE = True
-except ImportError:
-    PDFPLUMBER_AVAILABLE = False
-
-# ════════════════════════════════════════════════════════════
-#  دالة النبرة للغة الروسية (قاموس مدمج)
-# ════════════════════════════════════════════════════════════
-RUSSIAN_STRESS_DICT = {
-    "привет": "приве́т", "мир": "ми́р", "как": "ка́к", "дела": "дела́",
-    "спасибо": "спаси́бо", "пожалуйста": "пожа́луйста", "хорошо": "хорошо́",
-    "пока": "пока́", "да": "да", "нет": "нет", "извините": "извини́те",
-    "здравствуйте": "здра́вствуйте", "до свидания": "до свида́ния",
-    "город": "го́род", "молоко": "молоко́", "машина": "маши́на",
-    "работа": "рабо́та", "день": "де́нь", "ночь": "ночь", "утро": "у́тро",
-    "вечер": "ве́чер", "зима": "зима́", "лето": "ле́то", "весна": "весна́",
-    "осень": "о́сень", "человек": "челове́к", "имя": "и́мя", "время": "вре́мя",
-    "жизнь": "жи́знь", "любовь": "любо́вь", "счастье": "сча́стье",
-    "семья": "семья́", "друг": "друг", "подруга": "подру́га",
-    "мама": "ма́ма", "папа": "па́па", "брат": "брат", "сестра": "сестра́",
-    "сын": "сын", "дочь": "дочь",
-    "говорить": "говори́ть", "сказать": "сказа́ть", "делать": "де́лать",
-    "сделать": "сде́лать", "идти": "идти́", "ходить": "ходи́ть",
-    "ехать": "е́хать", "лететь": "лете́ть", "смотреть": "смотре́ть",
-    "видеть": "ви́деть", "знать": "знать", "понимать": "понима́ть",
-    "думать": "ду́мать", "хотеть": "хоте́ть", "мочь": "мочь",
-    "быть": "быть", "иметь": "име́ть", "жить": "жить",
-    "работать": "рабо́тать", "учиться": "учи́ться",
-    "хороший": "хоро́ший", "плохой": "плохо́й", "большой": "большо́й",
-    "маленький": "ма́ленький", "новый": "но́вый", "старый": "ста́рый",
-    "красивый": "краси́вый", "умный": "у́мный", "глупый": "глу́пый",
-    "добрый": "до́брый", "злой": "злой", "молодой": "молодо́й",
-    "быстро": "бы́стро", "медленно": "ме́дленно", "всегда": "всегда́",
-    "никогда": "никогда́", "сегодня": "сего́дня", "завтра": "за́втра",
-    "вчера": "вчера́", "сейчас": "сейча́с",
-}
-
-def add_russian_stress(text):
-    if not text:
-        return text
-    words = text.split()
-    stressed = []
-    for word in words:
-        punct = ""
-        clean = word
-        if word and not word[-1].isalpha():
-            punct = word[-1]
-            clean = word[:-1]
-        if clean.lower() in RUSSIAN_STRESS_DICT:
-            new_word = RUSSIAN_STRESS_DICT[clean.lower()]
-            if clean[0].isupper():
-                new_word = new_word.capitalize()
-            stressed.append(new_word + punct)
-        else:
-            stressed.append(word)
-    return " ".join(stressed)
+from PIL import Image
+import pdfplumber
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -208,57 +136,9 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  OCR للصور (EasyOCR مع خيار احتياطي pytesseract)
+#  استخراج النص من PDF
 # ════════════════════════════════════════════════════════════
-@st.cache_resource
-def load_ocr_reader():
-    if EASYOCR_AVAILABLE:
-        try:
-            return easyocr.Reader(['ar', 'en', 'ru', 'ch_sim', 'de', 'es', 'pt', 'ko'], gpu=False)
-        except Exception as e:
-            st.warning(f"⚠️ فشل تحميل EasyOCR: {e}")
-            return None
-    return None
-
-ocr_reader = load_ocr_reader()
-
-def extract_text_from_image(image_bytes):
-    try:
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # 1. EasyOCR
-        if ocr_reader is not None:
-            try:
-                result = ocr_reader.readtext(image)
-                text = " ".join([item[1] for item in result])
-                if text.strip():
-                    return text.strip(), None
-            except Exception as e:
-                st.warning(f"EasyOCR فشل: {e}")
-        
-        # 2. pytesseract
-        if PYTESSERACT_AVAILABLE:
-            try:
-                lang = 'ara+eng+rus+chi_sim+deu+spa+por+kor'
-                text = pytesseract.image_to_string(image, lang=lang)
-                if text.strip():
-                    return text.strip(), None
-            except:
-                pass
-            try:
-                text = pytesseract.image_to_string(image, lang='eng')
-                if text.strip():
-                    return text.strip(), None
-            except:
-                pass
-        
-        return None, "لم يتم العثور على نص في الصورة"
-    except Exception as e:
-        return None, str(e)
-
 def extract_text_from_pdf(file_bytes):
-    if not PDFPLUMBER_AVAILABLE:
-        return None, "pdfplumber غير مثبت"
     try:
         text = ""
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
@@ -268,7 +148,7 @@ def extract_text_from_pdf(file_bytes):
                     text += page_text + "\n"
         if text.strip():
             return text.strip(), None
-        return None, "لم يتم العثور على نص في PDF"
+        return None, "لم يتم العثور على نص في ملف PDF"
     except Exception as e:
         return None, str(e)
 
@@ -285,7 +165,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -631,7 +511,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI - Tabs مع جميع الميزات
+#  UI - Tabs (Voice, Text, PDF)
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -675,13 +555,8 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== خيار إضافة النبرة الروسية ======
-st.markdown("---")
-enable_stress = st.checkbox("🔊 إضافة علامات النبر للغة الروسية (تشكيل)", value=True)
-st.markdown("---")
-
-# ====== التبويبات ======
-tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "🖼️ Image", "📄 PDF"])
+# ====== التبويبات (Voice, Text, PDF) ======
+tab1, tab2, tab3 = st.tabs(["🎤 Voice", "📝 Text", "📄 PDF"])
 
 # ----- Tab 1: Voice -----
 with tab1:
@@ -710,10 +585,6 @@ with tab1:
                     if translated_text:
                         st.session_state.translated_text = translated_text
                         emotion = analyze_emotion(recognized_text)
-                        
-                        # إضافة النبرة إذا كانت مفعّلة واللغة الهدف روسية
-                        if enable_stress and target_lang == "ru":
-                            translated_text = add_russian_stress(translated_text)
                         
                         st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                         st.markdown(f"""
@@ -767,10 +638,6 @@ with tab2:
                 if translation_result:
                     emotion = analyze_emotion(input_text)
                     
-                    # إضافة النبرة إذا كانت مفعّلة واللغة الهدف روسية
-                    if enable_stress and target_lang == "ru":
-                        translation_result = add_russian_stress(translation_result)
-                    
                     st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                     st.markdown(f"""
                     <div class="result-box">
@@ -790,60 +657,8 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: Image Translation -----
+# ----- Tab 3: PDF Translation -----
 with tab3:
-    st.markdown("---")
-    st.markdown('<div class="section-heading">🖼️ Image Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم جميع اللغات)")
-    
-    uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="image_uploader")
-    
-    if uploaded_image is not None:
-        image_bytes = uploaded_image.getvalue()
-        image = Image.open(io.BytesIO(image_bytes))
-        st.image(image, caption="الصورة المرفوعة", use_container_width=True)
-        
-        if st.button("🔍 استخراج النص وترجمته", key="ocr_btn"):
-            with st.spinner("جاري استخراج النص..."):
-                extracted_text, err = extract_text_from_image(image_bytes)
-                if extracted_text:
-                    st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
-                    st.code(extracted_text, language=None)
-                    
-                    with st.spinner("جاري الترجمة..."):
-                        translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
-                        if translated_text:
-                            emotion = analyze_emotion(extracted_text)
-                            
-                            # إضافة النبرة إذا كانت مفعّلة واللغة الهدف روسية
-                            if enable_stress and target_lang == "ru":
-                                translated_text = add_russian_stress(translated_text)
-                            
-                            st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                            st.markdown(f"""
-                            <div class="result-box">
-                                <span class="label">✦ Translation</span>
-                                <div class="text">{translated_text}</div>
-                                <div class="emotion">{emotion}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            st.code(translated_text, language=None)
-                            
-                            save_translation(extracted_text, translated_text, emotion, "Image (OCR)", target_lang_name)
-                            
-                            st.download_button(
-                                label="📥 تحميل الترجمة (TXT)",
-                                data=translated_text,
-                                file_name="translation.txt",
-                                mime="text/plain"
-                            )
-                        else:
-                            st.error("فشلت الترجمة")
-                else:
-                    st.error(f"فشل استخراج النص: {err}")
-
-# ----- Tab 4: PDF Translation -----
-with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 PDF Translation</div>', unsafe_allow_html=True)
     st.caption("ارفع ملف PDF وسيتم استخراج النص وترجمته (يدعم جميع اللغات)")
@@ -866,10 +681,6 @@ with tab4:
                         translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
                         if translated_text:
                             emotion = analyze_emotion(extracted_text)
-                            
-                            # إضافة النبرة إذا كانت مفعّلة واللغة الهدف روسية
-                            if enable_stress and target_lang == "ru":
-                                translated_text = add_russian_stress(translated_text)
                             
                             st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
                             st.markdown(f"""
