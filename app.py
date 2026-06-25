@@ -151,34 +151,57 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  6. CSS (مع حركات خفيفة فقط - بدون ظلال متحركة أو تغيير أبعاد)
+#  6. CSS (مع حركات إبداعية محسّنة - بدون جملة تأكيد)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
         return """
-        /* ====== الوضع الفاتح ====== */
+        /* ====== الوضع الفاتح مع لمسات إبداعية ====== */
         .stApp {
             background: #f5f7fa !important;
         }
         
+        /* نبض الشعار - أكثر وضوحاً */
         .app-header h1 {
             color: #1a1a2e !important;
-            animation: pulse 2.5s ease-in-out infinite;
+            animation: pulse 2s ease-in-out infinite;
         }
         
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
+            50% { transform: scale(1.03); }
         }
         
         .app-header h1 .accent {
             color: #2a7a60 !important;
+            animation: glow 2.5s ease-in-out infinite;
         }
         
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 0 rgba(42,122,96,0); }
+            50% { text-shadow: 0 0 20px rgba(42,122,96,0.15); }
+        }
+        
+        /* الأزرار - حركة انزلاق */
         .stButton > button {
             background: #2a7a60 !important;
             color: white !important;
             transition: all 0.3s ease !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
+        .stButton > button::after {
+            content: '' !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: -100% !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
+            transition: left 0.5s ease !important;
+        }
+        .stButton > button:hover::after {
+            left: 100% !important;
         }
         .stButton > button:hover {
             background: #1a5a48 !important;
@@ -189,19 +212,21 @@ def get_css(theme):
             background: white !important;
             color: #1a1a2e !important;
             border: 1px solid #ccc !important;
-            transition: border 0.3s ease !important;
+            transition: border 0.3s ease, box-shadow 0.3s ease !important;
         }
         textarea:focus {
             border-color: #2a7a60 !important;
+            box-shadow: 0 0 0 3px rgba(42,122,96,0.1) !important;
         }
         
         .result-box {
             background: rgba(42,122,96,0.06) !important;
             border-color: rgba(42,122,96,0.2) !important;
-            transition: transform 0.3s ease !important;
+            transition: transform 0.3s ease, box-shadow 0.3s ease !important;
         }
         .result-box:hover {
-            transform: translateY(-2px) !important;
+            transform: translateY(-3px) !important;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.06) !important;
         }
         .result-box .text {
             color: #1a1a2e !important;
@@ -213,6 +238,10 @@ def get_css(theme):
         .glass-card {
             background: rgba(255,255,255,0.7) !important;
             border-color: rgba(0,0,0,0.08) !important;
+            transition: transform 0.3s ease !important;
+        }
+        .glass-card:hover {
+            transform: scale(1.01) !important;
         }
         
         .section-heading {
@@ -220,6 +249,12 @@ def get_css(theme):
         }
         .section-heading::before {
             background: #2a7a60 !important;
+            animation: slideDown 0.8s ease forwards;
+        }
+        
+        @keyframes slideDown {
+            from { transform: scaleY(0); }
+            to { transform: scaleY(1); }
         }
         
         [data-testid="stSidebar"] {
@@ -233,16 +268,17 @@ def get_css(theme):
             transition: transform 0.3s ease !important;
         }
         .history-item:hover {
-            transform: translateX(4px) !important;
+            transform: translateX(5px) !important;
         }
         
         div[data-testid="stAudioInput"] > div {
             background: rgba(42,122,96,0.08) !important;
             border-color: rgba(42,122,96,0.3) !important;
-            transition: border-color 0.3s ease !important;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
         }
         div[data-testid="stAudioInput"] > div:hover {
             border-color: #2a7a60 !important;
+            box-shadow: 0 0 30px rgba(42,122,96,0.15) !important;
         }
         div[data-testid="stAudioInput"] button {
             color: #1a1a2e !important;
@@ -257,29 +293,52 @@ def get_css(theme):
         """
     else:
         return """
-        /* ====== الوضع الداكن ====== */
+        /* ====== الوضع الداكن مع لمسات إبداعية ====== */
         .stApp {
             background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important;
         }
         
+        /* نبض الشعار - أكثر وضوحاً */
         .app-header h1 {
             color: #f0f4ff !important;
-            animation: pulse 2.5s ease-in-out infinite;
+            animation: pulse 2s ease-in-out infinite;
         }
         
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
+            50% { transform: scale(1.03); }
         }
         
         .app-header h1 .accent {
             color: #4ECBA0 !important;
+            animation: glow 2.5s ease-in-out infinite;
         }
         
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 0 rgba(78,203,160,0); }
+            50% { text-shadow: 0 0 25px rgba(78,203,160,0.2); }
+        }
+        
+        /* الأزرار - حركة انزلاق */
         .stButton > button {
             background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important;
             color: #0a1520 !important;
             transition: all 0.3s ease !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
+        .stButton > button::after {
+            content: '' !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: -100% !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent) !important;
+            transition: left 0.5s ease !important;
+        }
+        .stButton > button:hover::after {
+            left: 100% !important;
         }
         .stButton > button:hover {
             background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important;
@@ -290,19 +349,21 @@ def get_css(theme):
             background: #1a1a2e !important;
             color: #f0f4ff !important;
             border-color: rgba(255,255,255,0.15) !important;
-            transition: border 0.3s ease !important;
+            transition: border 0.3s ease, box-shadow 0.3s ease !important;
         }
         textarea:focus {
             border-color: rgba(78,203,160,0.5) !important;
+            box-shadow: 0 0 0 3px rgba(78,203,160,0.1) !important;
         }
         
         .result-box {
             background: rgba(78,203,160,0.06) !important;
             border-color: rgba(78,203,160,0.2) !important;
-            transition: transform 0.3s ease !important;
+            transition: transform 0.3s ease, box-shadow 0.3s ease !important;
         }
         .result-box:hover {
-            transform: translateY(-2px) !important;
+            transform: translateY(-3px) !important;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2) !important;
         }
         .result-box .text {
             color: #e8f0ff !important;
@@ -314,6 +375,10 @@ def get_css(theme):
         .glass-card {
             background: rgba(255,255,255,0.04) !important;
             border-color: rgba(255,255,255,0.09) !important;
+            transition: transform 0.3s ease !important;
+        }
+        .glass-card:hover {
+            transform: scale(1.01) !important;
         }
         
         .section-heading {
@@ -321,6 +386,12 @@ def get_css(theme):
         }
         .section-heading::before {
             background: #4ECBA0 !important;
+            animation: slideDown 0.8s ease forwards;
+        }
+        
+        @keyframes slideDown {
+            from { transform: scaleY(0); }
+            to { transform: scaleY(1); }
         }
         
         [data-testid="stSidebar"] {
@@ -334,16 +405,17 @@ def get_css(theme):
             transition: transform 0.3s ease !important;
         }
         .history-item:hover {
-            transform: translateX(4px) !important;
+            transform: translateX(5px) !important;
         }
         
         div[data-testid="stAudioInput"] > div {
             background: rgba(78,203,160,0.08) !important;
             border-color: rgba(78,203,160,0.3) !important;
-            transition: border-color 0.3s ease !important;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
         }
         div[data-testid="stAudioInput"] > div:hover {
             border-color: #4ECBA0 !important;
+            box-shadow: 0 0 30px rgba(78,203,160,0.15) !important;
         }
         div[data-testid="stAudioInput"] button {
             color: #e8f0ff !important;
@@ -371,7 +443,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  8. الشريط الجانبي
+#  8. الشريط الجانبي (الميزات الجديدة)
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown("## ✨ الميزات الجديدة")
@@ -424,9 +496,8 @@ with st.sidebar:
         st.caption("💡 قم بترجمة أي نص وسيظهر هنا")
 
 # ════════════════════════════════════════════════════════════
-#  9. عرض رسالة تأكيد في الصفحة الرئيسية
+#  9. تم إزالة رسالة "الميزات الجديدة مفعلة!" من هنا
 # ════════════════════════════════════════════════════════════
-st.success("✅ **الميزات الجديدة مفعلة!** انظر إلى الشريط الجانبي →")
 
 # ════════════════════════════════════════════════════════════
 #  10. باقي الكود (الإعدادات، الترجمة، الصوت، إلخ)
