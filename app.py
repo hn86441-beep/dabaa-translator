@@ -11,6 +11,16 @@ from datetime import datetime
 import io
 import base64
 import sqlite3
+from PIL import Image
+
+# ════════════════════════════════════════════════════════════
+#  استيراد EasyOCR للتعرف على النص من الصور
+# ════════════════════════════════════════════════════════════
+try:
+    import easyocr
+    EASYOCR_AVAILABLE = True
+except ImportError:
+    EASYOCR_AVAILABLE = False
 
 # ════════════════════════════════════════════════════════════
 #  استيراد مكتبات الملفات (PDF, DOCX, Excel)
@@ -34,31 +44,8 @@ except ImportError:
     EXCEL_AVAILABLE = False
 
 # ════════════════════════════════════════════════════════════
-#  استيراد مكتبات الكاميرا و OCR
+#  استيراد deep-translator للترجمة (بدلاً من googletrans)
 # ════════════════════════════════════════════════════════════
-try:
-    import cv2
-    CV2_AVAILABLE = True
-except ImportError:
-    CV2_AVAILABLE = False
-
-try:
-    import pytesseract
-    from PIL import Image
-    import numpy as np
-    OCR_AVAILABLE = True
-except ImportError:
-    OCR_AVAILABLE = False
-
-# ════════════════════════════════════════════════════════════
-#  استيراد مكتبات الصوت والمحادثات
-# ════════════════════════════════════════════════════════════
-try:
-    import whisper
-    WHISPER_AVAILABLE = True
-except ImportError:
-    WHISPER_AVAILABLE = False
-
 from deep_translator import GoogleTranslator
 
 # ════════════════════════════════════════════════════════════
@@ -253,18 +240,32 @@ def extract_text_from_file(file_bytes, filename):
         return None, f"نوع الملف غير مدعوم: {ext}"
 
 # ════════════════════════════════════════════════════════════
-#  دوال الكاميرا و OCR
+#  EasyOCR للتعرف على النص من الصور (بدون Tesseract)
 # ════════════════════════════════════════════════════════════
+@st.cache_resource
+def load_easyocr_reader():
+    if EASYOCR_AVAILABLE:
+        try:
+            # استخدام لغات أساسية: عربي، إنجليزي، روسي
+            return easyocr.Reader(['ar', 'en', 'ru'], gpu=False)
+        except Exception as e:
+            st.warning(f"⚠️ فشل تحميل EasyOCR: {e}")
+            return None
+    return None
+
+easyocr_reader = load_easyocr_reader()
+
 def extract_text_from_image(image_bytes):
-    """استخراج النص من صورة باستخدام pytesseract."""
-    if not OCR_AVAILABLE:
-        return None, "مكتبات OCR غير مثبتة"
+    """استخراج النص من صورة باستخدام EasyOCR."""
+    if easyocr_reader is None:
+        return None, "EasyOCR غير متاح. تأكد من تثبيت easyocr."
     try:
         image = Image.open(io.BytesIO(image_bytes))
-        # تحسين الصورة
-        gray = image.convert('L')
-        # استخدام pytesseract
-        text = pytesseract.image_to_string(gray, lang='ara+eng')
+        # تحويل الصورة إلى numpy array
+        import numpy as np
+        image_np = np.array(image)
+        result = easyocr_reader.readtext(image_np)
+        text = " ".join([item[1] for item in result])
         if text.strip():
             return text.strip(), None
         return None, "لم يتم العثور على نص في الصورة"
@@ -272,36 +273,38 @@ def extract_text_from_image(image_bytes):
         return None, str(e)
 
 # ════════════════════════════════════════════════════════════
-#  دوال المحادثات الجماعية (Whisper)
+#  دوال المحادثات الجماعية (باستخدام Cohere بدلاً من Whisper)
 # ════════════════════════════════════════════════════════════
-@st.cache_resource
-def load_whisper_model():
-    if WHISPER_AVAILABLE:
-        try:
-            return whisper.load_model("base")
-        except Exception as e:
-            st.warning(f"⚠️ فشل تحميل Whisper: {e}")
-            return None
-    return None
-
-whisper_model = load_whisper_model()
-
-def transcribe_audio(audio_bytes):
-    """تحويل الصوت إلى نص باستخدام Whisper."""
-    if whisper_model is None:
-        return None, "نموذج Whisper غير متاح"
+def transcribe_audio_cohere(audio_bytes, language_code="auto"):
+    """تحويل الصوت إلى نص باستخدام Cohere API (نفس الموجود في Voice)."""
+    if not st.session_state.cohere_api_key:
+        return None, "مفتاح API غير موجود"
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_bytes)
-            tmp_path = tmp_file.name
-        result = whisper_model.transcribe(tmp_path)
-        os.unlink(tmp_path)
-        text = result["text"].strip()
-        if text:
-            return text, None
-        return None, "لم يتم التعرف على أي كلام"
+        from requests_toolbelt.multipart.encoder import MultipartEncoder
+        from collections import OrderedDict
+        fields = OrderedDict()
+        lang = "en" if language_code == "auto" or language_code is None else language_code
+        fields['language'] = lang
+        fields['model'] = 'cohere-transcribe-03-2026'
+        fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
+        encoder = MultipartEncoder(fields=fields)
+        response = requests.post(
+            "https://api.cohere.com/v2/audio/transcriptions",
+            headers={
+                "Authorization": f"Bearer {st.session_state.cohere_api_key}",
+                "Content-Type": encoder.content_type,
+            },
+            data=encoder,
+            timeout=30
+        )
+        if response.status_code == 200:
+            text = response.json().get("text", "").strip()
+            if text:
+                return text, None
+            return None, "لم يتم التعرف على أي كلام"
+        return None, f"Cohere error {response.status_code}: {response.text}"
     except Exception as e:
-        return None, str(e)
+        return None, f"خطأ: {str(e)}"
 
 def translate_with_deepl(text, target_lang):
     """ترجمة النص باستخدام deep-translator."""
@@ -325,7 +328,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفس الكود السابق مع تحسين التبويبات)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -601,7 +604,7 @@ if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
     st.stop()
 
 # ════════════════════════════════════════════════════════════
-#  دوال الترجمة والتعرف على الصوت (الموجودة سابقاً)
+#  دوال الترجمة والتعرف على الصوت (الموجودة)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -623,6 +626,8 @@ def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
         return None, "API key missing"
     try:
+        from requests_toolbelt.multipart.encoder import MultipartEncoder
+        from collections import OrderedDict
         fields = OrderedDict()
         lang = "en" if language_code == "auto" or language_code is None else language_code
         fields['language'] = lang
@@ -720,7 +725,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI - Tabs
+#  UI - Tabs (Voice, Text, File, Camera, Group)
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -767,7 +772,7 @@ st.session_state.selected_style = selected_style_label
 # ====== التبويبات ======
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "📷 Camera", "👥 Group"])
 
-# ----- Tab 1: Voice -----
+# ----- Tab 1: Voice (نفس الكود السابق) -----
 with tab1:
     st.markdown("---")
     st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
@@ -816,7 +821,7 @@ with tab1:
             else:
                 st.error(f"❌ {engine_used}")
 
-# ----- Tab 2: Text -----
+# ----- Tab 2: Text (نفس الكود السابق) -----
 with tab2:
     st.markdown("---")
     st.markdown('<div class="section-heading">📝 Text Input</div>', unsafe_allow_html=True)
@@ -866,7 +871,7 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: File -----
+# ----- Tab 3: File (نفس الكود السابق) -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 File Translation</div>', unsafe_allow_html=True)
@@ -915,11 +920,11 @@ with tab3:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Camera -----
+# ----- Tab 4: Camera (باستخدام EasyOCR) -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">📷 Camera Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع صورة وسيتم استخراج النص وترجمته")
+    st.caption("ارفع صورة وسيتم استخراج النص وترجمته (بدون الحاجة إلى Tesseract)")
     
     uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="camera_uploader")
     
@@ -963,11 +968,11 @@ with tab4:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 5: Group Chat -----
+# ----- Tab 5: Group Chat (باستخدام Cohere بدلاً من Whisper) -----
 with tab5:
     st.markdown("---")
     st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
-    st.caption("سجّل محادثة وسيتم تحويلها إلى نص وترجمتها")
+    st.caption("سجّل محادثة وسيتم تحويلها إلى نص وترجمتها (بدون الحاجة إلى ffmpeg)")
     
     # اختيار اللغة الهدف
     group_target = st.selectbox("ترجم إلى", tgt_options, key="group_target")
@@ -979,17 +984,15 @@ with tab5:
         with st.spinner("⏳ جاري معالجة الصوت..."):
             audio_bytes = audio_value_group.getvalue()
             
-            # استخدام ترجمة DeepL مباشرة للنص (بدلاً من Cohere)
-            # أولاً: تحويل الصوت إلى نص باستخدام Whisper (المكتبة الجديدة)
-            transcript, err = transcribe_audio(audio_bytes)
+            # استخدام Cohere للتعرف على الصوت (نفس Voice)
+            transcript, err = transcribe_audio_cohere(audio_bytes, source_lang)
             
             if transcript:
                 st.markdown('<div class="section-heading">النص المستخرج</div>', unsafe_allow_html=True)
                 st.code(transcript, language=None)
                 
-                # ترجمة النص
+                # ترجمة النص باستخدام deep-translator
                 with st.spinner("⏳ جاري الترجمة..."):
-                    # استخدام deep-translator بدلاً من DeepL API
                     translated, err2 = translate_with_deepl(transcript, target_lang)
                     
                     if translated:
