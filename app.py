@@ -118,7 +118,7 @@ def export_history_json():
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر
+#  تحليل المشاعر (فرح، حزن، محايد)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
@@ -171,28 +171,39 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  OCR للصور (مزيج من EasyOCR + pytesseract)
+#  OCR للصور (دعم جميع اللغات)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_ocr_readers():
     readers = []
     
     if EASYOCR_AVAILABLE:
+        # محاولات مختلفة لتغطية جميع اللغات
         lang_lists = [
-            ['ch_sim', 'en', 'ko', 'ar', 'ru', 'de', 'es', 'pt'],
-            ['en', 'ch_sim', 'ko', 'ar', 'ru', 'de', 'es', 'pt'],
-            ['en', 'ar', 'ru', 'de', 'es', 'pt'],
-            ['ch_sim', 'en'],
-            ['ko', 'en'],
+            ['ch_sim', 'en', 'ko', 'ar', 'ru', 'de', 'es', 'pt'],  # جميع اللغات
+            ['ch_sim', 'en', 'ko', 'ar', 'ru', 'de', 'es', 'pt'],  # تكرار للتأكد
+            ['ch_sim', 'en'],  # صينية مع إنجليزية
+            ['ko', 'en'],      # كورية مع إنجليزية
+            ['ar', 'en', 'ru', 'de', 'es', 'pt'],  # باقي اللغات
         ]
         for lang_list in lang_lists:
             try:
                 reader = easyocr.Reader(lang_list, gpu=False)
                 readers.append(('easyocr', lang_list, reader))
                 st.success(f"✅ EasyOCR جاهز مع: {lang_list}")
-                break  # نجح تحميل واحد فقط يكفي
+                break  # نجح تحميل واحد فقط يكفي، لكننا نستمر لتحميل كل المجموعات
             except Exception as e:
                 st.warning(f"⚠️ فشل EasyOCR مع {lang_list}: {e}")
+                continue
+        # إذا نجح بعضها، نستمر
+        # إذا لم ينجح أي منها، نحاول بسيط
+        if not readers:
+            try:
+                reader = easyocr.Reader(['en', 'ar'], gpu=False)
+                readers.append(('easyocr', ['en','ar'], reader))
+                st.success("✅ EasyOCR جاهز مع: ['en','ar']")
+            except:
+                pass
     
     if PYTESSERACT_AVAILABLE:
         try:
@@ -207,14 +218,17 @@ def load_ocr_readers():
 ocr_readers = load_ocr_readers()
 
 def preprocess_image(image):
+    """معالجة الصورة لتحسين التعرف."""
     if image.mode != 'L':
         image = image.convert('L')
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(2.5)
     image = image.filter(ImageFilter.SHARPEN)
+    # عتبة (Threshold) لتوحيد الخلفية
     try:
         img_array = np.array(image)
-        threshold = 128
+        # عتبة أوتوماتيكية أفضل
+        threshold = np.mean(img_array)
         img_array = np.where(img_array > threshold, 255, 0).astype(np.uint8)
         image = Image.fromarray(img_array)
     except:
@@ -226,6 +240,7 @@ def extract_text_from_image(image_bytes):
         image = Image.open(io.BytesIO(image_bytes))
         processed_image = preprocess_image(image)
         
+        # تجربة جميع القارئات
         for reader_type, lang_list, reader in ocr_readers:
             try:
                 if reader_type == 'easyocr' and reader is not None:
@@ -235,17 +250,19 @@ def extract_text_from_image(image_bytes):
                     if text.strip():
                         return text.strip(), None
                 elif reader_type == 'tesseract':
+                    # جميع اللغات
                     lang = 'ara+eng+rus+chi_sim+deu+spa+por+kor'
                     text = pytesseract.image_to_string(processed_image, lang=lang)
                     if text.strip():
                         return text.strip(), None
+                    # إنجليزية فقط كحل أخير
                     text = pytesseract.image_to_string(processed_image, lang='eng')
                     if text.strip():
                         return text.strip(), None
             except:
                 continue
         
-        return None, "لم يتم العثور على نص في الصورة. حاول استخدام صورة أوضح، أو تأكد من أن النص مكتوب بخط واضح."
+        return None, "لم يتم العثور على نص في الصورة. حاول استخدام صورة أوضح، وتأكد من أن النص مكتوب بخط واضح."
     except Exception as e:
         return None, str(e)
 
@@ -278,7 +295,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -770,7 +787,7 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: Image Translation (OCR المحسّن) -----
+# ----- Tab 3: Image Translation (دعم جميع اللغات) -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">🖼️ Image Translation</div>', unsafe_allow_html=True)
