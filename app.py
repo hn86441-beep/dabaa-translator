@@ -146,21 +146,44 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS - ألوان فقط، بدون حركات
+#  CSS - تصميم احترافي للرأس مع الحفاظ على البساطة
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
         return """
         .stApp { background: #f5f7fa !important; }
-        .app-header { text-align: center; padding: 0.5rem 0; }
+        .app-header { 
+            text-align: center; 
+            padding: 0.8rem 0 0.5rem 0; 
+            position: relative;
+        }
+        .app-header .brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3em;
+            color: #2a7a60;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 0.2rem;
+            opacity: 0.8;
+        }
         .app-header h1 {
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 700;
             color: #1a1a2e;
             margin: 0;
+            letter-spacing: -0.02em;
         }
         .app-header h1 .accent { color: #2a7a60; }
+        .app-header .divider {
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #2a7a60, transparent);
+            margin: 0.3rem auto 0;
+            border-radius: 2px;
+        }
         .stButton > button { background: #2a7a60 !important; color: white !important; }
         .stButton > button:hover { background: #1a5a48 !important; }
         textarea { background: white !important; color: #1a1a2e !important; border: 1px solid #ccc !important; }
@@ -183,15 +206,38 @@ def get_css(theme):
     else:
         return """
         .stApp { background: linear-gradient(135deg, #0a0a1a 0%, #0f1728 40%, #0a1520 100%) !important; }
-        .app-header { text-align: center; padding: 0.5rem 0; }
+        .app-header { 
+            text-align: center; 
+            padding: 0.8rem 0 0.5rem 0; 
+            position: relative;
+        }
+        .app-header .brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3em;
+            color: #4ECBA0;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 0.2rem;
+            opacity: 0.8;
+        }
         .app-header h1 {
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 700;
             color: #f0f4ff;
             margin: 0;
+            letter-spacing: -0.02em;
         }
         .app-header h1 .accent { color: #4ECBA0; }
+        .app-header .divider {
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #4ECBA0, transparent);
+            margin: 0.3rem auto 0;
+            border-radius: 2px;
+        }
         .stButton > button { background: linear-gradient(135deg, #4ECBA0 0%, #2fa87a 100%) !important; color: #0a1520 !important; }
         .stButton > button:hover { background: linear-gradient(135deg, #5ed9b0 0%, #3dbf8a 100%) !important; }
         textarea { background: #1a1a2e !important; color: #f0f4ff !important; border: 1px solid rgba(255,255,255,0.15) !important; }
@@ -215,35 +261,33 @@ def get_css(theme):
 st.markdown(f"<style>{get_css(st.session_state.theme)}</style>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  العنوان في المنتصف
+#  العنوان الاحترافي (مع إعادة "✦ Smart Voice Translator ✦")
 # ════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="app-header">
+    <span class="brand">✦ Smart Voice Translator ✦</span>
     <h1>HN <span class="accent">TRANSLATOR</span></h1>
+    <div class="divider"></div>
 </div>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  الشريط الجانبي - زر تبديل المظهر + السجل المبسط
+#  الشريط الجانبي - مبسط جداً (أيقونات فقط)
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
-    # زر تبديل المظهر (أيقونة فقط)
     if st.button("🌓", help="تبديل المظهر", use_container_width=True):
         st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
         st.rerun()
     
     st.divider()
     
-    # السجل - بدون أي كلمات إضافية
     history = get_history(limit=100)
     
     if history:
-        # زر مسح السجل (أيقونة فقط)
         if st.button("🗑️", help="مسح الكل", use_container_width=True):
             clear_history()
             st.rerun()
         
-        # عرض الترجمات بشكل مبسط جداً
         for item in history:
             st.markdown(f"""
             <div class="history-item">
@@ -252,14 +296,12 @@ with st.sidebar:
             </div>
             """, unsafe_allow_html=True)
         
-        # زر تصدير السجل (أيقونة فقط)
         if st.button("📤", help="تصدير السجل (JSON)", use_container_width=True):
             json_str = export_history_json()
             b64 = base64.b64encode(json_str.encode()).decode()
             href = f'<a href="data:application/json;base64,{b64}" download="translation_history.json">📥 تحميل</a>'
             st.markdown(href, unsafe_allow_html=True)
     else:
-        # أيقونة فقط عند عدم وجود ترجمات
         st.markdown("<div style='text-align:center; color: rgba(150,175,220,0.3); font-size: 30px;'>📭</div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
