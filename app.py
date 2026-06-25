@@ -15,19 +15,13 @@ from PIL import Image, ImageEnhance, ImageFilter
 import numpy as np
 
 # ════════════════════════════════════════════════════════════
-#  محاولة استيراد easyocr و pytesseract و pdfplumber
+#  محاولة استيراد easyocr فقط (تم إزالة pytesseract)
 # ════════════════════════════════════════════════════════════
 try:
     import easyocr
     EASYOCR_AVAILABLE = True
 except ImportError:
     EASYOCR_AVAILABLE = False
-
-try:
-    import pytesseract
-    PYTESSERACT_AVAILABLE = True
-except ImportError:
-    PYTESSERACT_AVAILABLE = False
 
 try:
     import pdfplumber
@@ -157,29 +151,29 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  OCR للصور (مع دعم جميع اللغات وتحسين قوي)
+#  OCR للصور (EasyOCR فقط مع معالجة مسبقة قوية)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_ocr_reader():
-    if EASYOCR_AVAILABLE:
+    if not EASYOCR_AVAILABLE:
+        return None
+    # محاولة تحميل EasyOCR مع جميع اللغات
+    try:
+        # الطريقة الصحيحة لـ ch_sim: يجب أن تكون مع 'en' في قائمة منفصلة
+        # لكن EasyOCR يقبل قائمة واحدة تحتوي على كل اللغات، بشرط ترتيبها بشكل صحيح
+        # الأكثر أماناً: استخدام ['ch_sim','en'] ومن ثم إضافة باقي اللغات بعدها
+        # جرب هذه القائمة
+        lang_list = ['ch_sim', 'en', 'ar', 'ru', 'de', 'es', 'pt', 'ko']
+        return easyocr.Reader(lang_list, gpu=False)
+    except Exception as e:
+        st.warning(f"⚠️ فشل تحميل EasyOCR مع جميع اللغات: {e}")
+        # محاولة ثانية: إزالة ch_sim
         try:
-            # جميع اللغات المدعومة بما فيها الصينية (بترتيب صحيح)
-            # EasyOCR يتطلب أن تكون 'ch_sim' و 'en' معاً في قائمة منفصلة
             lang_list = ['en', 'ar', 'ru', 'de', 'es', 'pt', 'ko']
-            # إضافة الصينية بشكل منفصل (يمكن إضافتها مع 'en' في قائمة فرعية)
-            # لكن الطريقة الأكثر أماناً: استخدام قائمة واحدة تحتوي على 'ch_sim' و 'en'
-            # الحل: نضع 'ch_sim' في القائمة مع 'en'، والباقي بشكل منفصل
-            # الأسهل: استخدام قائمة تحتوي على كل اللغات مع ترتيب صحيح
-            # جرب: ['ch_sim','en','ar','ru','de','es','pt','ko']
-            return easyocr.Reader(['ch_sim','en','ar','ru','de','es','pt','ko'], gpu=False)
-        except Exception as e:
-            st.warning(f"⚠️ فشل تحميل EasyOCR: {e}")
-            # محاولة ثانية: فصل ch_sim
-            try:
-                return easyocr.Reader(['en','ar','ru','de','es','pt','ko'], gpu=False)
-            except:
-                return None
-    return None
+            return easyocr.Reader(lang_list, gpu=False)
+        except Exception as e2:
+            st.warning(f"⚠️ فشل تحميل EasyOCR حتى بدون ch_sim: {e2}")
+            return None
 
 ocr_reader = load_ocr_reader()
 
@@ -194,10 +188,8 @@ def preprocess_image(image):
     # زيادة الحدة
     image = image.filter(ImageFilter.SHARPEN)
     # تطبيق عتبة (Threshold) لتوحيد الخلفية
-    # نستخدم numpy لتحويل الصورة إلى مصفوفة وتطبيق عتبة
     try:
         img_array = np.array(image)
-        # عتبة بسيطة: جعل الألوان الداكنة أكثر وضوحاً
         threshold = 128
         img_array = np.where(img_array > threshold, 255, 0).astype(np.uint8)
         image = Image.fromarray(img_array)
@@ -212,10 +204,10 @@ def extract_text_from_image(image_bytes):
         # معالجة مسبقة
         processed_image = preprocess_image(image)
         
-        # 1. EasyOCR
+        # EasyOCR
         if ocr_reader is not None:
             try:
-                # EasyOCR يتعامل مع الصور كـ numpy array أو PIL
+                # تحويل PIL إلى numpy array
                 image_np = np.array(processed_image)
                 result = ocr_reader.readtext(image_np)
                 text = " ".join([item[1] for item in result])
@@ -223,26 +215,10 @@ def extract_text_from_image(image_bytes):
                     return text.strip(), None
             except Exception as e:
                 st.warning(f"EasyOCR فشل: {e}")
+        else:
+            st.warning("EasyOCR غير متاح. تأكد من تثبيت easyocr.")
         
-        # 2. pytesseract (إذا كان متوفراً)
-        if PYTESSERACT_AVAILABLE:
-            try:
-                # تحديد جميع اللغات المدعومة
-                lang = 'ara+eng+rus+chi_sim+deu+spa+por+kor'
-                text = pytesseract.image_to_string(processed_image, lang=lang)
-                if text.strip():
-                    return text.strip(), None
-            except Exception as e:
-                st.warning(f"pytesseract فشل: {e}")
-            try:
-                # محاولة بالإنجليزية فقط
-                text = pytesseract.image_to_string(processed_image, lang='eng')
-                if text.strip():
-                    return text.strip(), None
-            except:
-                pass
-        
-        return None, "لم يتم العثور على نص في الصورة. حاول استخدام صورة أوضح، أو تأكد من أن النص مكتوب بخط واضح."
+        return None, "لم يتم العثور على نص في الصورة. تأكد من وضوح النص، وجودة الصورة، وأن النص مكتوب بخط واضح."
     except Exception as e:
         return None, str(e)
 
@@ -275,7 +251,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفس الكود السابق، حُذف للاختصار)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -767,11 +743,12 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: Image Translation (دعم جميع اللغات + تحسين OCR) -----
+# ----- Tab 3: Image Translation (مع إصلاحات OCR) -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">🖼️ Image Translation</div>', unsafe_allow_html=True)
     st.caption("ارفع صورة تحتوي على نص وسيتم استخراجه وترجمته (يدعم جميع اللغات: العربية، الإنجليزية، الروسية، الصينية، الألمانية، الإسبانية، البرتغالية، الكورية)")
+    st.info("💡 تأكد من أن النص واضح، ومكتوب بخط كبير، والخلفية موحدة.")
     
     uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="image_uploader")
     
