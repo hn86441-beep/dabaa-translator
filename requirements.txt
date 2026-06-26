@@ -1,7 +1,6 @@
 streamlit
 requests
 requests-toolbelt
-faster-whisper
 transformers
 torch
 gtts
@@ -12,4 +11,6 @@ Pillow
 easyocr
 numpy
 deep-translator
-azure-cognitiveservices-speech
+SpeechRecognition
+pyaudio
+faster-whisper
