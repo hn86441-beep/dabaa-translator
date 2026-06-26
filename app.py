@@ -15,11 +15,13 @@ from PIL import Image
 import time
 
 # ════════════════════════════════════════════════════════════
-#  استيراد مكتبات الصوت والترجمة (بدون Azure)
+#  محاولة استيراد speech_recognition (مع خيار احتياطي)
 # ════════════════════════════════════════════════════════════
-import speech_recognition as sr
-from deep_translator import GoogleTranslator
-from gtts import gTTS
+try:
+    import speech_recognition as sr
+    SPEECH_RECOGNITION_AVAILABLE = True
+except ImportError:
+    SPEECH_RECOGNITION_AVAILABLE = False
 
 # ════════════════════════════════════════════════════════════
 #  استيراد EasyOCR للتعرف على النص من الصور
@@ -50,6 +52,12 @@ try:
     EXCEL_AVAILABLE = True
 except ImportError:
     EXCEL_AVAILABLE = False
+
+# ════════════════════════════════════════════════════════════
+#  استيراد deep-translator للترجمة
+# ════════════════════════════════════════════════════════════
+from deep_translator import GoogleTranslator
+from gtts import gTTS
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -353,27 +361,38 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  دوال الترجمة الصوتية الفورية (بدون Azure)
+#  دوال التعرف على الصوت والترجمة (للـ Group Chat)
 # ════════════════════════════════════════════════════════════
 def recognize_speech_from_mic(language_code="en-US"):
-    """التعرف على الصوت من الميكروفون باستخدام Google Speech Recognition."""
-    r = sr.Recognizer()
-    with sr.Microphone() as source:
-        st.info("🎤 تحدث الآن...")
-        try:
+    """التعرف على الصوت من الميكروفون باستخدام speech_recognition."""
+    if not SPEECH_RECOGNITION_AVAILABLE:
+        return None, "مكتبة speech_recognition غير مثبتة. يرجى تثبيتها أو استخدام Cohere."
+    try:
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            st.info("🎤 تحدث الآن...")
             audio = r.listen(source, timeout=5, phrase_time_limit=10)
             st.success("✅ تم التسجيل، جاري التعرف...")
-            # التعرف باستخدام Google
             text = r.recognize_google(audio, language=language_code)
             return text, None
-        except sr.WaitTimeoutError:
-            return None, "لم يتم سماع أي صوت. حاول مرة أخرى."
-        except sr.UnknownValueError:
-            return None, "لم يتم التعرف على الصوت. تحدث بوضوح."
-        except sr.RequestError as e:
-            return None, f"خطأ في الاتصال بـ Google: {e}"
-        except Exception as e:
-            return None, str(e)
+    except sr.WaitTimeoutError:
+        return None, "لم يتم سماع أي صوت. حاول مرة أخرى."
+    except sr.UnknownValueError:
+        return None, "لم يتم التعرف على الصوت. تحدث بوضوح."
+    except sr.RequestError as e:
+        return None, f"خطأ في الاتصال بـ Google: {e}"
+    except Exception as e:
+        return None, str(e)
+
+def recognize_speech_with_cohere(audio_bytes, language_code="auto"):
+    """التعرف على الصوت باستخدام Cohere API (احتياطي)."""
+    if not st.session_state.cohere_api_key:
+        return None, "مفتاح Cohere غير موجود"
+    try:
+        result, _ = speech_to_text_cohere(audio_bytes, language_code)
+        return result, None
+    except Exception as e:
+        return None, str(e)
 
 def translate_with_google(text, source_lang, target_lang):
     """ترجمة النص باستخدام deep-translator."""
@@ -397,7 +416,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفس الكود السابق)
+#  CSS
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -953,62 +972,114 @@ with tab4:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 5: Group Chat (بدون Azure - باستخدام speech_recognition) -----
+# ----- Tab 5: Group Chat (مع خيارين: speech_recognition أو Cohere) -----
 with tab5:
     st.markdown("---")
-    st.markdown('<div class="section-heading">👥 Group Chat Translation (Live)</div>', unsafe_allow_html=True)
-    st.caption("ترجمة المحادثات الجماعية باستخدام الميكروفون (مجاني، بدون Azure)")
+    st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
+    
+    # عرض حالة المكتبة
+    if SPEECH_RECOGNITION_AVAILABLE:
+        st.success("✅ وضع الميكروفون المباشر (Google Speech) متاح")
+    else:
+        st.warning("⚠️ وضع الميكروفون المباشر غير متاح. سيتم استخدام Cohere API لرفع ملف صوتي.")
     
     # اختيار اللغة المصدر والهدف
     col1, col2 = st.columns(2)
     with col1:
-        source_lang_group = st.selectbox("لغة المصدر (تحدث بها)", list(languages_dict.keys()), key="group_source")
+        source_lang_group = st.selectbox("لغة المصدر", list(languages_dict.keys()), key="group_source")
     with col2:
-        target_lang_group = st.selectbox("اللغة الهدف (الترجمة)", list(languages_dict.keys()), key="group_target")
+        target_lang_group = st.selectbox("اللغة الهدف", list(languages_dict.keys()), key="group_target")
     
-    # زر بدء الترجمة
-    if st.button("🎤 بدء الترجمة الفورية", key="group_start_btn"):
-        source_code = languages_dict[source_lang_group]
-        target_code = languages_dict[target_lang_group]
-        
-        # التعرف على الصوت من الميكروفون
-        recognized_text, err = recognize_speech_from_mic(source_code)
-        
-        if recognized_text:
-            st.success(f"✅ النص المتعرف عليه: {recognized_text}")
+    source_code = languages_dict[source_lang_group]
+    target_code = languages_dict[target_lang_group]
+    
+    if SPEECH_RECOGNITION_AVAILABLE:
+        # الوضع 1: ميكروفون مباشر (Google Speech)
+        if st.button("🎤 ترجمة فورية (ميكروفون)", key="group_start_btn"):
+            recognized_text, err = recognize_speech_from_mic(source_code)
             
-            # ترجمة النص
-            with st.spinner("⏳ جاري الترجمة..."):
-                translated_text, err2 = translate_with_google(recognized_text, source_code, target_code)
+            if recognized_text:
+                st.success(f"✅ النص المتعرف عليه: {recognized_text}")
                 
-                if translated_text:
-                    emotion = analyze_emotion(recognized_text)
+                with st.spinner("⏳ جاري الترجمة..."):
+                    translated_text, err2 = translate_with_google(recognized_text, source_code, target_code)
                     
-                    st.markdown('<div class="section-heading">النتيجة</div>', unsafe_allow_html=True)
-                    st.markdown(f"""
-                    <div class="result-box">
-                        <span class="label">✦ النص الأصلي</span>
-                        <div class="text">{recognized_text}</div>
-                    </div>
-                    <div class="result-box" style="margin-top: 0.5rem;">
-                        <span class="label">✦ الترجمة</span>
-                        <div class="text" style="color: #4ECBA0;">{translated_text}</div>
-                        <div class="emotion">{emotion}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    st.code(translated_text, language=None)
+                    if translated_text:
+                        emotion = analyze_emotion(recognized_text)
+                        
+                        st.markdown('<div class="section-heading">النتيجة</div>', unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="result-box">
+                            <span class="label">✦ النص الأصلي</span>
+                            <div class="text">{recognized_text}</div>
+                        </div>
+                        <div class="result-box" style="margin-top: 0.5rem;">
+                            <span class="label">✦ الترجمة</span>
+                            <div class="text" style="color: #4ECBA0;">{translated_text}</div>
+                            <div class="emotion">{emotion}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.code(translated_text, language=None)
+                        
+                        audio_bytes_tts = generate_audio(translated_text, target_code)
+                        if audio_bytes_tts:
+                            st.audio(audio_bytes_tts, format="audio/mp3")
+                        
+                        save_translation(recognized_text, translated_text, emotion, source_lang_group, target_lang_group)
+                    else:
+                        st.error(f"❌ فشلت الترجمة: {err2}")
+            else:
+                st.error(f"❌ فشل التعرف: {err}")
+        
+        st.caption("💡 تحدث بوضوح في مكان هادئ للحصول على أفضل النتائج.")
+    
+    else:
+        # الوضع 2: رفع ملف صوتي (Cohere)
+        st.info("📤 قم برفع ملف صوتي (WAV) للترجمة عبر Cohere API")
+        audio_file = st.file_uploader("اختر ملف صوتي (WAV)", type=["wav"], key="group_audio_upload")
+        
+        if audio_file is not None:
+            if st.button("🚀 ترجمة الملف", key="group_file_btn"):
+                with st.spinner("⏳ جاري التعرف والترجمة..."):
+                    audio_bytes = audio_file.getvalue()
                     
-                    # تشغيل الصوت المترجم
-                    audio_bytes_tts = generate_audio(translated_text, target_code)
-                    if audio_bytes_tts:
-                        st.audio(audio_bytes_tts, format="audio/mp3")
+                    # التعرف باستخدام Cohere
+                    recognized_text, err = recognize_speech_with_cohere(audio_bytes, source_code)
                     
-                    # حفظ في السجل
-                    save_translation(recognized_text, translated_text, emotion, source_lang_group, target_lang_group)
-                else:
-                    st.error(f"❌ فشلت الترجمة: {err2}")
-        else:
-            st.error(f"❌ فشل التعرف: {err}")
+                    if recognized_text:
+                        st.success(f"✅ النص المتعرف عليه: {recognized_text}")
+                        
+                        with st.spinner("⏳ جاري الترجمة..."):
+                            translated_text, err2 = translate_with_google(recognized_text, source_code, target_code)
+                            
+                            if translated_text:
+                                emotion = analyze_emotion(recognized_text)
+                                
+                                st.markdown('<div class="section-heading">النتيجة</div>', unsafe_allow_html=True)
+                                st.markdown(f"""
+                                <div class="result-box">
+                                    <span class="label">✦ النص الأصلي</span>
+                                    <div class="text">{recognized_text}</div>
+                                </div>
+                                <div class="result-box" style="margin-top: 0.5rem;">
+                                    <span class="label">✦ الترجمة</span>
+                                    <div class="text" style="color: #4ECBA0;">{translated_text}</div>
+                                    <div class="emotion">{emotion}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                st.code(translated_text, language=None)
+                                
+                                audio_bytes_tts = generate_audio(translated_text, target_code)
+                                if audio_bytes_tts:
+                                    st.audio(audio_bytes_tts, format="audio/mp3")
+                                
+                                save_translation(recognized_text, translated_text, emotion, source_lang_group, target_lang_group)
+                            else:
+                                st.error(f"❌ فشلت الترجمة: {err2}")
+                    else:
+                        st.error(f"❌ فشل التعرف: {err}")
+        
+        st.caption("💡 يمكنك رفع ملف WAV، أو تثبيت مكتبة speech_recognition لاستخدام الميكروفون المباشر.")
 
 # ════════════════════════════════════════════════════════════
 #  Footer
