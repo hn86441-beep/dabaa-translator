@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 # ════════════════════════════════════════════════════════════
-#  محاولة استيراد مكتبات الترجمة الجماعية
+#  استيراد مكتبات الترجمة الجماعية
 # ════════════════════════════════════════════════════════════
 try:
     from faster_whisper import WhisperModel
@@ -32,7 +32,7 @@ except ImportError:
     PYANNOTE_AVAILABLE = False
 
 # ════════════════════════════════════════════════════════════
-#  استيراد EasyOCR للتعرف على النص من الصور
+#  استيراد EasyOCR للتعرف على النص من الصور (للملفات فقط)
 # ════════════════════════════════════════════════════════════
 try:
     import easyocr
@@ -136,12 +136,13 @@ def export_history_json():
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر
+#  تحليل المشاعر (تم إصلاحه باستخدام نموذج بديل)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
     try:
-        return pipeline("text-classification", model="tabularisai/multilingual-sentiment-analysis")
+        # استخدام نموذج بديل متعدد اللغات لا يحتاج إلى مصادقة
+        return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
     except Exception as e:
         st.warning(f"⚠️ فشل تحميل النموذج: {e}")
         return None
@@ -153,10 +154,10 @@ def analyze_emotion(text):
         return "محايد"
     try:
         result = emotion_classifier(text[:512])[0]
-        label = result['label'].upper()
-        if "POSITIVE" in label:
+        label = int(result['label'].split()[0])
+        if label >= 4:
             return "فرح"
-        elif "NEGATIVE" in label:
+        elif label <= 2:
             return "حزن"
         else:
             return "محايد"
@@ -257,37 +258,7 @@ def extract_text_from_file(file_bytes, filename):
         return None, f"نوع الملف غير مدعوم: {ext}"
 
 # ════════════════════════════════════════════════════════════
-#  EasyOCR للتعرف على النص من الصور
-# ════════════════════════════════════════════════════════════
-@st.cache_resource
-def load_easyocr_reader():
-    if EASYOCR_AVAILABLE:
-        try:
-            return easyocr.Reader(['ar', 'en', 'ru'], gpu=False)
-        except Exception as e:
-            st.warning(f"⚠️ فشل تحميل EasyOCR: {e}")
-            return None
-    return None
-
-easyocr_reader = load_easyocr_reader()
-
-def extract_text_from_image(image_bytes):
-    if easyocr_reader is None:
-        return None, "EasyOCR غير متاح. تأكد من تثبيت easyocr."
-    try:
-        image = Image.open(io.BytesIO(image_bytes))
-        import numpy as np
-        image_np = np.array(image)
-        result = easyocr_reader.readtext(image_np)
-        text = " ".join([item[1] for item in result])
-        if text.strip():
-            return text.strip(), None
-        return None, "لم يتم العثور على نص في الصورة"
-    except Exception as e:
-        return None, str(e)
-
-# ════════════════════════════════════════════════════════════
-#  دوال الترجمة والتعرف على الصوت (الموجودة للـ Voice)
+#  دوال الترجمة والتعرف على الصوت (للـ Voice)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     if not st.session_state.deepl_api_key:
@@ -384,14 +355,14 @@ def load_whisper_model():
 def load_pyannote_pipeline():
     if PYANNOTE_AVAILABLE:
         try:
-            # استخدام المفتاح من secrets
             hf_token = st.secrets.get("HF_TOKEN", None)
             if hf_token is None:
-                st.warning("⚠️ لم يتم العثور على مفتاح Hugging Face في secrets. يرجى إضافة HF_TOKEN.")
+                st.warning("⚠️ لم يتم العثور على مفتاح Hugging Face في secrets.")
                 return None
+            # استخدام token بدلاً من use_auth_token (للإصدارات الجديدة)
             return Pipeline.from_pretrained(
                 "pyannote/speaker-diarization-3.1",
-                use_auth_token=hf_token
+                token=hf_token
             )
         except Exception as e:
             st.error(f"فشل تحميل pyannote: {e}")
@@ -404,20 +375,16 @@ diarization_pipeline = load_pyannote_pipeline()
 def transcribe_with_speakers(audio_bytes, source_lang="auto"):
     """تحويل الصوت إلى نص مع تمييز المتحدثين."""
     if whisper_model is None or diarization_pipeline is None:
-        return None, "النماذج غير متاحة. تأكد من تثبيت faster-whisper و pyannote.audio، ومفتاح Hugging Face."
+        return None, "النماذج غير متاحة. تأكد من تثبيت المكتبات ومفتاح Hugging Face."
     
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
         
-        # 1. تمييز المتحدثين
         diarization = diarization_pipeline(tmp_path)
-        
-        # 2. التعرف على النص
         segments, info = whisper_model.transcribe(tmp_path, language=source_lang if source_lang != "auto" else None)
         
-        # 3. دمج البيانات
         speaker_segments = []
         for turn, _, speaker in diarization.itertracks(yield_label=True):
             speaker_segments.append({
@@ -469,7 +436,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -707,7 +674,7 @@ def detect_domains(text):
     return sorted(scores, key=scores.get, reverse=True) if scores else []
 
 # ════════════════════════════════════════════════════════════
-#  API KEYS (DeepL, Cohere)
+#  API KEYS
 # ════════════════════════════════════════════════════════════
 try:
     deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
@@ -782,7 +749,7 @@ def clear_audio():
     st.rerun()
 
 # ════════════════════════════════════════════════════════════
-#  UI - Tabs
+#  UI - Tabs (بدون تبويب الكاميرا)
 # ════════════════════════════════════════════════════════════
 lang_list = list(languages_dict.keys())
 style_list = list(STYLE_OPTIONS.keys())
@@ -826,8 +793,8 @@ selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_
 selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
-# ====== التبويبات ======
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "📷 Camera", "👥 Group"])
+# ====== التبويبات (بدون كاميرا) ======
+tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "👥 Group"])
 
 # ----- Tab 1: Voice (نفس الكود السابق) -----
 with tab1:
@@ -977,56 +944,8 @@ with tab3:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Camera (نفس الكود السابق) -----
+# ----- Tab 4: Group Chat (مجاني مع تمييز المتحدثين) -----
 with tab4:
-    st.markdown("---")
-    st.markdown('<div class="section-heading">📷 Camera Translation</div>', unsafe_allow_html=True)
-    st.caption("ارفع صورة وسيتم استخراج النص وترجمته")
-    
-    uploaded_image = st.file_uploader("اختر صورة", type=["png", "jpg", "jpeg", "webp"], key="camera_uploader")
-    
-    if uploaded_image is not None:
-        image_bytes = uploaded_image.getvalue()
-        image = Image.open(io.BytesIO(image_bytes))
-        st.image(image, caption="الصورة المرفوعة", use_container_width=True)
-        
-        if st.button("🔍 استخراج النص وترجمته", key="camera_btn"):
-            with st.spinner("جاري استخراج النص..."):
-                extracted_text, err = extract_text_from_image(image_bytes)
-                if extracted_text:
-                    st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
-                    st.code(extracted_text, language=None)
-                    
-                    with st.spinner("جاري الترجمة..."):
-                        translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
-                        if translated_text:
-                            emotion = analyze_emotion(extracted_text)
-                            
-                            st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                            st.markdown(f"""
-                            <div class="result-box">
-                                <span class="label">✦ Translation</span>
-                                <div class="text">{translated_text}</div>
-                                <div class="emotion">{emotion}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            st.code(translated_text, language=None)
-                            
-                            save_translation(extracted_text, translated_text, emotion, "Camera", target_lang_name)
-                            
-                            st.download_button(
-                                label="📥 تحميل الترجمة (TXT)",
-                                data=translated_text,
-                                file_name="camera_translation.txt",
-                                mime="text/plain"
-                            )
-                        else:
-                            st.error("فشلت الترجمة")
-                else:
-                    st.error(f"فشل استخراج النص: {err}")
-
-# ----- Tab 5: Group Chat (مجاني مع تمييز المتحدثين) -----
-with tab5:
     st.markdown("---")
     st.markdown('<div class="section-heading">👥 Group Chat Translation (مجاني)</div>', unsafe_allow_html=True)
     st.caption("ترجمة المحادثات الجماعية مع تمييز المتحدثين (faster-whisper + pyannote.audio + GoogleTranslator)")
@@ -1036,7 +955,7 @@ with tab5:
         st.error("❌ النماذج غير متاحة. تأكد من:")
         st.code("""
         1. تثبيت faster-whisper و pyannote.audio
-        2. إضافة HF_TOKEN في secrets
+        2. إضافة HF_TOKEN في secrets (رمز جديد غير منتهي الصلاحية)
         3. قبول شروط نموذج pyannote/speaker-diarization-3.1
         """, language="text")
     else:
