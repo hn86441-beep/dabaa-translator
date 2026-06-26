@@ -12,4 +12,4 @@ easyocr
 numpy
 deep-translator
 faster-whisper
-whisperlivekit
+pyannote.audio
