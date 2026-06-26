@@ -11,6 +11,5 @@ Pillow
 easyocr
 numpy
 deep-translator
-SpeechRecognition
-pyaudio
 faster-whisper
+whisperlivekit
