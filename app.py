@@ -13,7 +13,13 @@ import base64
 import sqlite3
 from PIL import Image
 import time
-import azure.cognitiveservices.speech as speech_sdk
+
+# ════════════════════════════════════════════════════════════
+#  استيراد مكتبات الصوت والترجمة (بدون Azure)
+# ════════════════════════════════════════════════════════════
+import speech_recognition as sr
+from deep_translator import GoogleTranslator
+from gtts import gTTS
 
 # ════════════════════════════════════════════════════════════
 #  استيراد EasyOCR للتعرف على النص من الصور
@@ -44,11 +50,6 @@ try:
     EXCEL_AVAILABLE = True
 except ImportError:
     EXCEL_AVAILABLE = False
-
-# ════════════════════════════════════════════════════════════
-#  استيراد deep-translator للترجمة (بدلاً من googletrans)
-# ════════════════════════════════════════════════════════════
-from deep_translator import GoogleTranslator
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -147,10 +148,8 @@ def analyze_emotion(text):
         return "محايد"
 
 # ════════════════════════════════════════════════════════════
-#  تحويل النص إلى صوت (gTTS - للاستخدام العادي)
+#  تحويل النص إلى صوت (gTTS)
 # ════════════════════════════════════════════════════════════
-from gtts import gTTS
-
 def get_tts_lang(lang_code):
     lang_map = {
         "ar": "ar", "en": "en", "ru": "ru", "zh": "zh-cn",
@@ -242,7 +241,7 @@ def extract_text_from_file(file_bytes, filename):
         return None, f"نوع الملف غير مدعوم: {ext}"
 
 # ════════════════════════════════════════════════════════════
-#  EasyOCR للتعرف على النص من الصور (بدون Tesseract)
+#  EasyOCR للتعرف على النص من الصور
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_easyocr_reader():
@@ -354,49 +353,34 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  دالة ترجمة المحادثات الجماعية باستخدام Azure Speech
+#  دوال الترجمة الصوتية الفورية (بدون Azure)
 # ════════════════════════════════════════════════════════════
-def translate_with_azure(audio_bytes, source_lang_code, target_lang_code, subscription_key, region):
-    """
-    ترجمة ملف صوتي باستخدام Azure Speech Translation.
-    المصدر: ملف صوتي (WAV) محمّل في الذاكرة.
-    """
+def recognize_speech_from_mic(language_code="en-US"):
+    """التعرف على الصوت من الميكروفون باستخدام Google Speech Recognition."""
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        st.info("🎤 تحدث الآن...")
+        try:
+            audio = r.listen(source, timeout=5, phrase_time_limit=10)
+            st.success("✅ تم التسجيل، جاري التعرف...")
+            # التعرف باستخدام Google
+            text = r.recognize_google(audio, language=language_code)
+            return text, None
+        except sr.WaitTimeoutError:
+            return None, "لم يتم سماع أي صوت. حاول مرة أخرى."
+        except sr.UnknownValueError:
+            return None, "لم يتم التعرف على الصوت. تحدث بوضوح."
+        except sr.RequestError as e:
+            return None, f"خطأ في الاتصال بـ Google: {e}"
+        except Exception as e:
+            return None, str(e)
+
+def translate_with_google(text, source_lang, target_lang):
+    """ترجمة النص باستخدام deep-translator."""
     try:
-        # حفظ الملف الصوتي مؤقتاً (Azure Speech يتطلب مسار ملف)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_bytes)
-            tmp_path = tmp_file.name
-        
-        # تهيئة تكوين الترجمة
-        translation_config = speech_sdk.translation.SpeechTranslationConfig(
-            subscription=subscription_key,
-            region=region
-        )
-        # لغة المصدر (يجب أن تكون بصيغة Azure مثل "ar-EG" أو "en-US")
-        translation_config.speech_recognition_language = source_lang_code
-        # إضافة اللغة الهدف
-        translation_config.add_target_language(target_lang_code)
-        
-        # مصدر الصوت من الملف المؤقت
-        audio_config = speech_sdk.AudioConfig(filename=tmp_path)
-        
-        # إنشاء كائن المترجم
-        recognizer = speech_sdk.translation.TranslationRecognizer(
-            translation_config=translation_config,
-            audio_config=audio_config
-        )
-        
-        # تنفيذ الترجمة لمرة واحدة (للملفات القصيرة)
-        result = recognizer.recognize_once()
-        
-        # حذف الملف المؤقت
-        os.unlink(tmp_path)
-        
-        if result.reason == speech_sdk.ResultReason.TranslatedSpeech:
-            translated_text = result.translations.get(target_lang_code, "")
-            return translated_text, None
-        else:
-            return None, f"فشل الترجمة: {result.reason}"
+        translator = GoogleTranslator(source=source_lang, target=target_lang)
+        translated = translator.translate(text)
+        return translated, None
     except Exception as e:
         return None, str(e)
 
@@ -413,7 +397,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (نفس الكود السابق)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -581,18 +565,6 @@ languages_dict = {
     "Korean": "ko"
 }
 
-# رموز Azure للغات (للترجمة الفورية)
-azure_lang_codes = {
-    "Arabic": "ar-EG",
-    "English": "en-US",
-    "Russian": "ru-RU",
-    "Chinese": "zh-CN",
-    "German": "de-DE",
-    "Spanish": "es-ES",
-    "Portuguese": "pt-PT",
-    "Korean": "ko-KR"
-}
-
 DOMAINS = {
     "political":  {"emoji": "🏛️", "name_en": "Political"},
     "legal":      {"emoji": "⚖️", "name_en": "Legal"},
@@ -679,11 +651,26 @@ if "deepl_api_key" not in st.session_state:
 if "cohere_api_key" not in st.session_state:
     st.session_state.cohere_api_key = cohere_from_secrets
 
-# مفاتيح Azure
-if "azure_key" not in st.session_state:
-    st.session_state.azure_key = ""
-if "azure_region" not in st.session_state:
-    st.session_state.azure_region = "eastus"
+if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
+    st.markdown('<div class="glass-card" style="text-align:center;">🔐 Connect API Keys</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        if not st.session_state.deepl_api_key:
+            deepl_input = st.text_input("DeepL Key", type="password", placeholder="abc...xyz:fx")
+            if deepl_input:
+                st.session_state.deepl_api_key = deepl_input
+                st.rerun()
+        else:
+            st.success("✅ DeepL Active")
+    with col2:
+        if not st.session_state.cohere_api_key:
+            cohere_input = st.text_input("Cohere Key", type="password", placeholder="abcd-1234-efgh-5678")
+            if cohere_input:
+                st.session_state.cohere_api_key = cohere_input
+                st.rerun()
+        else:
+            st.success("✅ Cohere Active")
+    st.stop()
 
 # ════════════════════════════════════════════════════════════
 #  SESSION STATE
@@ -770,7 +757,7 @@ st.session_state.selected_style = selected_style_label
 # ====== التبويبات ======
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "📷 Camera", "👥 Group"])
 
-# ----- Tab 1: Voice -----
+# ----- Tab 1: Voice (نفس الكود السابق) -----
 with tab1:
     st.markdown("---")
     st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
@@ -819,7 +806,7 @@ with tab1:
             else:
                 st.error(f"❌ {engine_used}")
 
-# ----- Tab 2: Text -----
+# ----- Tab 2: Text (نفس الكود السابق) -----
 with tab2:
     st.markdown("---")
     st.markdown('<div class="section-heading">📝 Text Input</div>', unsafe_allow_html=True)
@@ -869,7 +856,7 @@ with tab2:
                 else:
                     st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: File -----
+# ----- Tab 3: File (نفس الكود السابق) -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 File Translation</div>', unsafe_allow_html=True)
@@ -918,7 +905,7 @@ with tab3:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Camera -----
+# ----- Tab 4: Camera (نفس الكود السابق) -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">📷 Camera Translation</div>', unsafe_allow_html=True)
@@ -966,60 +953,62 @@ with tab4:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 5: Group Chat (Azure Live Interpreter) -----
+# ----- Tab 5: Group Chat (بدون Azure - باستخدام speech_recognition) -----
 with tab5:
     st.markdown("---")
-    st.markdown('<div class="section-heading">👥 Group Chat Translation (Azure)</div>', unsafe_allow_html=True)
-    st.caption("ترجمة المحادثات الجماعية باستخدام Azure Speech (يدعم تمييز المتحدثين والنبرة)")
+    st.markdown('<div class="section-heading">👥 Group Chat Translation (Live)</div>', unsafe_allow_html=True)
+    st.caption("ترجمة المحادثات الجماعية باستخدام الميكروفون (مجاني، بدون Azure)")
     
-    # إدخال مفاتيح Azure
-    st.info("🔑 أدخل مفاتيح Azure للترجمة الفورية")
-    azure_key_input = st.text_input("مفتاح Azure Subscription", type="password", value=st.session_state.azure_key, key="azure_key_input")
-    azure_region_input = st.text_input("منطقة Azure (Region)", value=st.session_state.azure_region, key="azure_region_input")
+    # اختيار اللغة المصدر والهدف
+    col1, col2 = st.columns(2)
+    with col1:
+        source_lang_group = st.selectbox("لغة المصدر (تحدث بها)", list(languages_dict.keys()), key="group_source")
+    with col2:
+        target_lang_group = st.selectbox("اللغة الهدف (الترجمة)", list(languages_dict.keys()), key="group_target")
     
-    if azure_key_input:
-        st.session_state.azure_key = azure_key_input
-    if azure_region_input:
-        st.session_state.azure_region = azure_region_input
-    
-    # اختيار اللغة المصدر (Azure يتطلب رمزاً محدداً)
-    source_lang_azure = st.selectbox("لغة المصدر (الكلام)", list(azure_lang_codes.keys()), key="azure_source")
-    target_lang_azure = st.selectbox("اللغة الهدف (الترجمة)", list(languages_dict.keys()), key="azure_target")
-    
-    # تسجيل الصوت
-    audio_value_group = st.audio_input("سجّل المحادثة", key="group_audio", label_visibility="collapsed")
-    
-    if audio_value_group is not None and st.button("🚀 ترجمة باستخدام Azure"):
-        if not st.session_state.azure_key:
-            st.error("❌ يرجى إدخال مفتاح Azure.")
-        else:
-            with st.spinner("⏳ جاري الترجمة باستخدام Azure..."):
-                audio_bytes = audio_value_group.getvalue()
-                source_code = azure_lang_codes[source_lang_azure]
-                target_code = languages_dict[target_lang_azure]
-                
-                translated_text, err = translate_with_azure(
-                    audio_bytes, 
-                    source_code, 
-                    target_code, 
-                    st.session_state.azure_key, 
-                    st.session_state.azure_region
-                )
+    # زر بدء الترجمة
+    if st.button("🎤 بدء الترجمة الفورية", key="group_start_btn"):
+        source_code = languages_dict[source_lang_group]
+        target_code = languages_dict[target_lang_group]
+        
+        # التعرف على الصوت من الميكروفون
+        recognized_text, err = recognize_speech_from_mic(source_code)
+        
+        if recognized_text:
+            st.success(f"✅ النص المتعرف عليه: {recognized_text}")
+            
+            # ترجمة النص
+            with st.spinner("⏳ جاري الترجمة..."):
+                translated_text, err2 = translate_with_google(recognized_text, source_code, target_code)
                 
                 if translated_text:
-                    st.markdown('<div class="section-heading">الترجمة</div>', unsafe_allow_html=True)
+                    emotion = analyze_emotion(recognized_text)
+                    
+                    st.markdown('<div class="section-heading">النتيجة</div>', unsafe_allow_html=True)
                     st.markdown(f"""
                     <div class="result-box">
-                        <span class="label">✦ الترجمة (Azure)</span>
-                        <div class="text">{translated_text}</div>
+                        <span class="label">✦ النص الأصلي</span>
+                        <div class="text">{recognized_text}</div>
+                    </div>
+                    <div class="result-box" style="margin-top: 0.5rem;">
+                        <span class="label">✦ الترجمة</span>
+                        <div class="text" style="color: #4ECBA0;">{translated_text}</div>
+                        <div class="emotion">{emotion}</div>
                     </div>
                     """, unsafe_allow_html=True)
                     st.code(translated_text, language=None)
                     
+                    # تشغيل الصوت المترجم
+                    audio_bytes_tts = generate_audio(translated_text, target_code)
+                    if audio_bytes_tts:
+                        st.audio(audio_bytes_tts, format="audio/mp3")
+                    
                     # حفظ في السجل
-                    save_translation("(Group Chat)", translated_text, "محايد", source_lang_azure, target_lang_azure)
+                    save_translation(recognized_text, translated_text, emotion, source_lang_group, target_lang_group)
                 else:
-                    st.error(f"❌ فشلت الترجمة: {err}")
+                    st.error(f"❌ فشلت الترجمة: {err2}")
+        else:
+            st.error(f"❌ فشل التعرف: {err}")
 
 # ════════════════════════════════════════════════════════════
 #  Footer
