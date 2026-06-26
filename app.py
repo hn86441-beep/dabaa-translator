@@ -13,6 +13,8 @@ import base64
 import sqlite3
 from PIL import Image
 import time
+import subprocess
+import threading
 
 # ════════════════════════════════════════════════════════════
 #  استيراد EasyOCR للتعرف على النص من الصور
@@ -45,10 +47,98 @@ except ImportError:
     EXCEL_AVAILABLE = False
 
 # ════════════════════════════════════════════════════════════
-#  استيراد deep-translator للترجمة
+#  استيراد deep-translator للترجمة (خيار احتياطي)
 # ════════════════════════════════════════════════════════════
 from deep_translator import GoogleTranslator
 from gtts import gTTS
+
+# ════════════════════════════════════════════════════════════
+#  عنوان خادم WhisperLiveKit المحلي
+# ════════════════════════════════════════════════════════════
+WLK_URL = "http://localhost:8000/v1/audio/transcriptions"
+WLK_SERVER_RUNNING = False
+
+def start_whisperlivekit_server():
+    """تشغيل خادم WhisperLiveKit في الخلفية."""
+    global WLK_SERVER_RUNNING
+    try:
+        # التحقق مما إذا كان الخادم يعمل بالفعل
+        response = requests.get("http://localhost:8000/health", timeout=2)
+        if response.status_code == 200:
+            WLK_SERVER_RUNNING = True
+            return True
+    except:
+        pass
+    
+    try:
+        # تشغيل الخادم
+        subprocess.Popen(
+            ["whisperlivekit-server", "--model", "base", "--language", "auto", "--target-language", "en"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        time.sleep(3)  # انتظار حتى يبدأ الخادم
+        WLK_SERVER_RUNNING = True
+        return True
+    except Exception as e:
+        st.error(f"❌ فشل تشغيل خادم WhisperLiveKit: {e}")
+        return False
+
+def translate_with_whisperlivekit(audio_bytes, target_lang="en", source_lang="auto"):
+    """ترجمة الصوت باستخدام WhisperLiveKit مع تمييز المتحدثين."""
+    if not WLK_SERVER_RUNNING:
+        if not start_whisperlivekit_server():
+            return None, "خادم WhisperLiveKit غير متاح"
+    
+    try:
+        # حفظ الصوت مؤقتاً
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+        
+        # إرسال الطلب إلى خادم WhisperLiveKit
+        with open(tmp_path, "rb") as f:
+            files = {"file": f}
+            data = {
+                "model": "whisper-1",
+                "language": source_lang,
+                "target_language": target_lang,
+                "response_format": "json",
+                "speaker_diarization": "true"
+            }
+            response = requests.post(WLK_URL, files=files, data=data, timeout=60)
+        
+        # حذف الملف المؤقت
+        os.unlink(tmp_path)
+        
+        if response.status_code == 200:
+            result = response.json()
+            text = result.get("text", "")
+            # استخراج النص مع المتحدثين
+            segments = result.get("segments", [])
+            if segments:
+                formatted_text = ""
+                for seg in segments:
+                    speaker = seg.get("speaker", "Unknown")
+                    text_seg = seg.get("text", "")
+                    formatted_text += f"[{speaker}] {text_seg}\n"
+                return formatted_text.strip(), None
+            return text, None
+        else:
+            return None, f"خطأ في الخادم: {response.status_code} - {response.text}"
+    except requests.exceptions.ConnectionError:
+        return None, "تعذر الاتصال بخادم WhisperLiveKit. تأكد من تشغيله."
+    except Exception as e:
+        return None, str(e)
+
+def translate_with_google(text, source_lang, target_lang):
+    """ترجمة النص باستخدام deep-translator (خيار احتياطي)."""
+    try:
+        translator = GoogleTranslator(source=source_lang, target=target_lang)
+        translated = translator.translate(text)
+        return translated, None
+    except Exception as e:
+        return None, str(e)
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
@@ -920,11 +1010,24 @@ with tab4:
                 else:
                     st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 5: Group Chat (ترجمة فورية باستخدام st.audio_input) -----
+# ----- Tab 5: Group Chat (WhisperLiveKit) -----
 with tab5:
     st.markdown("---")
-    st.markdown('<div class="section-heading">👥 Group Chat Translation (Live)</div>', unsafe_allow_html=True)
-    st.caption("سجّل صوتك وستظهر الترجمة فوراً (بدون الحاجة إلى ميكروفون مباشر)")
+    st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
+    st.caption("ترجمة المحادثات الجماعية مع تمييز المتحدثين (WhisperLiveKit - مجاني بالكامل)")
+    
+    # التحقق من حالة خادم WhisperLiveKit
+    wlk_status = st.empty()
+    with wlk_status.container():
+        try:
+            response = requests.get("http://localhost:8000/health", timeout=2)
+            if response.status_code == 200:
+                st.success("✅ خادم WhisperLiveKit يعمل")
+                WLK_SERVER_RUNNING = True
+            else:
+                st.warning("⚠️ خادم WhisperLiveKit غير متصل. سيتم محاولة تشغيله عند الترجمة.")
+        except:
+            st.warning("⚠️ خادم WhisperLiveKit غير متصل. سيتم محاولة تشغيله عند الترجمة.")
     
     # اختيار اللغة المصدر والهدف
     col1, col2 = st.columns(2)
@@ -936,50 +1039,91 @@ with tab5:
     source_code = languages_dict[source_lang_group]
     target_code = languages_dict[target_lang_group]
     
-    # عنصر تسجيل الصوت (نفس الموجود في تبويب Voice)
-    audio_value_group = st.audio_input("سجّل المحادثة", key="group_audio_input", label_visibility="collapsed")
+    # رفع ملف صوتي
+    audio_file = st.file_uploader("اختر ملف صوتي (WAV, MP3, M4A)", type=["wav", "mp3", "m4a"], key="group_audio_file")
     
-    # معالجة الصوت المسجل
-    if audio_value_group is not None:
-        with st.spinner("⏳ جاري التعرف والترجمة..."):
-            audio_bytes = audio_value_group.getvalue()
-            
-            # 1. التعرف على الصوت باستخدام Cohere (نفس دالة speech_to_text)
-            recognized_text, engine_used = speech_to_text(audio_bytes, source_code)
-            
-            if recognized_text:
-                # 2. ترجمة النص باستخدام DeepL
-                translated_text, err = fetch_ai_translation(recognized_text, target_code)
-                
-                if translated_text:
-                    emotion = analyze_emotion(recognized_text)
+    if audio_file is not None:
+        file_bytes = audio_file.getvalue()
+        file_size = len(file_bytes) // 1024
+        st.success(f"✅ {audio_file.name} ({file_size} KB)")
+        
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("🚀 ترجمة (WhisperLiveKit)", key="wlk_btn"):
+                with st.spinner("⏳ جاري الترجمة مع تمييز المتحدثين..."):
+                    # محاولة تشغيل الخادم إذا لم يكن يعمل
+                    if not WLK_SERVER_RUNNING:
+                        start_whisperlivekit_server()
                     
-                    # عرض النتيجة
-                    st.markdown('<div class="section-heading">النتيجة</div>', unsafe_allow_html=True)
-                    st.markdown(f"""
-                    <div class="result-box">
-                        <span class="label">✦ النص المتعرف عليه</span>
-                        <div class="text">{recognized_text}</div>
-                    </div>
-                    <div class="result-box" style="margin-top: 0.5rem;">
-                        <span class="label">✦ الترجمة</span>
-                        <div class="text" style="color: #4ECBA0;">{translated_text}</div>
-                        <div class="emotion">{emotion}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    st.code(translated_text, language=None)
+                    # الترجمة باستخدام WhisperLiveKit
+                    result, err = translate_with_whisperlivekit(file_bytes, target_code, source_code)
                     
-                    # تشغيل الصوت المترجم
-                    audio_bytes_tts = generate_audio(translated_text, target_code)
-                    if audio_bytes_tts:
-                        st.audio(audio_bytes_tts, format="audio/mp3")
-                    
-                    # حفظ في السجل
-                    save_translation(recognized_text, translated_text, emotion, source_lang_group, target_lang_group)
-                else:
-                    st.error(f"❌ فشلت الترجمة: {err}")
-            else:
-                st.error(f"❌ فشل التعرف: {engine_used}")
+                    if result:
+                        # عرض النتيجة مع تمييز المتحدثين
+                        st.markdown('<div class="section-heading">النتيجة</div>', unsafe_allow_html=True)
+                        
+                        # تقسيم النص حسب المتحدثين
+                        lines = result.split('\n')
+                        for line in lines:
+                            if line.strip():
+                                if line.startswith('[Speaker'):
+                                    st.markdown(f"""
+                                    <div class="result-box" style="border-left: 3px solid #4ECBA0;">
+                                        <div class="text" style="color: #4ECBA0; font-weight: bold;">{line}</div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"""
+                                    <div class="result-box">
+                                        <div class="text">{line}</div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                        
+                        st.code(result, language=None)
+                        
+                        # تشغيل الصوت المترجم (لآخر جملة فقط)
+                        last_line = lines[-1] if lines else ""
+                        if last_line and not last_line.startswith('[Speaker'):
+                            audio_bytes_tts = generate_audio(last_line, target_code)
+                            if audio_bytes_tts:
+                                st.audio(audio_bytes_tts, format="audio/mp3")
+                        
+                        # حفظ في السجل
+                        save_translation(audio_file.name, result, analyze_emotion(result), "Group Chat (WLK)", target_lang_group)
+                    else:
+                        st.error(f"❌ فشلت الترجمة: {err}")
+        
+        with col_btn2:
+            if st.button("🔄 خيار احتياطي (Google)", key="google_btn"):
+                with st.spinner("⏳ جاري الترجمة..."):
+                    # استخدام Cohere للتعرف أولاً ثم Google للترجمة
+                    recognized_text, err = speech_to_text(file_bytes, source_code)
+                    if recognized_text:
+                        translated_text, err2 = fetch_ai_translation(recognized_text, target_code)
+                        if translated_text:
+                            emotion = analyze_emotion(recognized_text)
+                            
+                            st.markdown('<div class="section-heading">النتيجة (Google)</div>', unsafe_allow_html=True)
+                            st.markdown(f"""
+                            <div class="result-box">
+                                <span class="label">✦ النص المتعرف عليه</span>
+                                <div class="text">{recognized_text}</div>
+                            </div>
+                            <div class="result-box" style="margin-top: 0.5rem;">
+                                <span class="label">✦ الترجمة</span>
+                                <div class="text" style="color: #4ECBA0;">{translated_text}</div>
+                                <div class="emotion">{emotion}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.code(translated_text, language=None)
+                            
+                            save_translation(recognized_text, translated_text, emotion, source_lang_group, target_lang_group)
+                        else:
+                            st.error(f"❌ فشلت الترجمة: {err2}")
+                    else:
+                        st.error(f"❌ فشل التعرف: {err}")
+        
+        st.caption("💡 WhisperLiveKit يعمل محلياً على جهازك، يوفر تمييز المتحدثين وترجمة لأكثر من 100 لغة مجاناً.")
 
 # ════════════════════════════════════════════════════════════
 #  Footer
