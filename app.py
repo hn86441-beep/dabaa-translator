@@ -14,36 +14,6 @@ import sqlite3
 from PIL import Image
 import time
 import numpy as np
-import torch
-
-# ════════════════════════════════════════════════════════════
-#  استيراد مكتبات الصوت والتعرف الجماعي
-# ════════════════════════════════════════════════════════════
-try:
-    from faster_whisper import WhisperModel
-    WHISPER_AVAILABLE = True
-except ImportError:
-    WHISPER_AVAILABLE = False
-
-try:
-    from resemblyzer import VoiceEncoder, preprocess_wav
-    from sklearn.cluster import KMeans
-    import librosa
-    RESEMBLYZER_AVAILABLE = True
-except ImportError:
-    RESEMBLYZER_AVAILABLE = False
-
-try:
-    from silero_vad import load_silero_vad, get_speech_timestamps
-    SILERO_VAD_AVAILABLE = True
-except ImportError:
-    SILERO_VAD_AVAILABLE = False
-
-try:
-    import noisereduce as nr
-    NOISEREDUCE_AVAILABLE = True
-except ImportError:
-    NOISEREDUCE_AVAILABLE = False
 
 # ════════════════════════════════════════════════════════════
 #  استيراد EasyOCR للصور (للملفات فقط)
@@ -271,11 +241,11 @@ def extract_text_from_file(file_bytes, filename):
         return None, f"نوع الملف غير مدعوم: {ext}"
 
 # ════════════════════════════════════════════════════════════
-#  دوال الترجمة والتعرف على الصوت (Voice / Text / File)
+#  دوال الترجمة (DeepL أساسي + Google احتياطي)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
     """استدعاء DeepL للترجمة. تُرجع (الترجمة, None) أو (None, رسالة خطأ)."""
-    if not st.session_state.deepl_api_key:
+    if not st.session_state.get("deepl_api_key"):
         return None, "No API key"
     tl = target_lang.upper()
     endpoint = "https://api-free.deepl.com/v2/translate" if st.session_state.deepl_api_key.endswith(":fx") else "https://api.deepl.com/v2/translate"
@@ -287,251 +257,11 @@ def translate_deepl(text, target_lang):
     except Exception as e:
         return None, f"Error: {str(e)}"
 
-def fetch_ai_translation(text, target_lang):
-    """تُستخدم في التبويبات القديمة (Voice, Text, File) – تفضل DeepL ثم Google."""
-    if st.session_state.deepl_api_key:
-        tr, err = translate_deepl(text, target_lang)
-        if tr:
-            return tr, None
-    try:
-        translator = GoogleTranslator(source='auto', target=target_lang)
-        return translator.translate(text), None
-    except Exception as e:
-        return None, f"Google error: {str(e)}"
-
-def speech_to_text_cohere(audio_bytes, language_code="auto"):
-    if not st.session_state.cohere_api_key:
-        return None, "API key missing"
-    try:
-        fields = OrderedDict()
-        lang = "en" if language_code == "auto" or language_code is None else language_code
-        fields['language'] = lang
-        fields['model'] = 'cohere-transcribe-03-2026'
-        fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
-        encoder = MultipartEncoder(fields=fields)
-        response = requests.post(
-            "https://api.cohere.com/v2/audio/transcriptions",
-            headers={"Authorization": f"Bearer {st.session_state.cohere_api_key}", "Content-Type": encoder.content_type},
-            data=encoder,
-            timeout=30
-        )
-        if response.status_code == 200:
-            text = response.json().get("text", "").strip()
-            if text:
-                return text, "Speech Recognition"
-            else:
-                return None, "No speech detected"
-        return None, f"Cohere error {response.status_code}"
-    except Exception as e:
-        return None, f"Error: {str(e)}"
-
-@st.cache_resource
-def load_whisper_model_old():
-    try:
-        from faster_whisper import WhisperModel
-        return WhisperModel("small", device="cpu", compute_type="int8")
-    except:
-        return None
-
-def speech_to_text_whisper(audio_bytes):
-    model = load_whisper_model_old()
-    if not model:
-        return None, "Whisper unavailable"
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_bytes)
-            tmp_path = tmp_file.name
-        segments, info = model.transcribe(tmp_path, language="ru", beam_size=5, vad_filter=True)
-        text = " ".join(segment.text for segment in segments).strip()
-        if text:
-            return text, "Speech Recognition"
-        else:
-            return None, "No speech detected"
-    except Exception as e:
-        return None, f"Error: {str(e)}"
-    finally:
-        try:
-            if tmp_path and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-        except:
-            pass
-
-def speech_to_text(audio_bytes, language_code="auto"):
-    if language_code == "ru":
-        return speech_to_text_whisper(audio_bytes)
-    return speech_to_text_cohere(audio_bytes, language_code)
-
-# ════════════════════════════════════════════════════════════
-#  دوال المحادثة الجماعية (مُحسَّنة + DeepL أساسي)
-# ════════════════════════════════════════════════════════════
-@st.cache_resource
-def load_whisper_model(model_size="medium"):
-    if WHISPER_AVAILABLE:
-        try:
-            return WhisperModel(model_size, device="cpu", compute_type="int8")
-        except:
-            return None
-    return None
-
-@st.cache_resource
-def load_resemblyzer_encoder():
-    if RESEMBLYZER_AVAILABLE:
-        return VoiceEncoder()
-    return None
-
-@st.cache_resource
-def load_vad_model():
-    if SILERO_VAD_AVAILABLE:
-        return load_silero_vad()
-    return None
-
-whisper_model = load_whisper_model("medium")
-resemblyzer_encoder = load_resemblyzer_encoder()
-vad_model = load_vad_model()
-
-def prepare_audio(audio_bytes, target_sr=16000):
-    """تحويل الصوت إلى 16kHz أحادي، تطبيع المستوى، وتقليل الضوضاء."""
-    try:
-        audio_np, sr = librosa.load(io.BytesIO(audio_bytes), sr=target_sr, mono=True)
-        if NOISEREDUCE_AVAILABLE:
-            audio_np = nr.reduce_noise(y=audio_np, sr=sr, prop_decrease=0.85)
-        peak = np.abs(audio_np).max()
-        if peak > 0:
-            audio_np = audio_np / peak * 0.9
-        return audio_np, sr
-    except:
-        return None, None
-
-def get_speech_segments(audio_np, sr):
-    """استخراج مقاطع الكلام باستخدام Silero VAD."""
-    if vad_model is None:
-        return None, "VAD غير متاح"
-    try:
-        audio_tensor = torch.from_numpy(audio_np).float()
-        timestamps = get_speech_timestamps(audio_tensor, vad_model, sampling_rate=sr)
-        return timestamps, None
-    except Exception as e:
-        return None, str(e)
-
-def transcribe_segment(audio_np, sr, start, end, model):
-    """تفريغ مقطع صوتي واحد باستخدام نموذج معين."""
-    if model is None:
-        return None, "النموذج غير محمّل"
-    snippet = audio_np[int(start*sr):int(end*sr)]
-    if len(snippet) < 400:
-        return "", None
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        import soundfile as sf
-        sf.write(tmp.name, snippet, sr)
-        tmp_path = tmp.name
-    try:
-        segs, info = model.transcribe(tmp_path, language=None, beam_size=1)
-        text = " ".join(s.text.strip() for s in segs)
-        return text, info.language if info else None
-    except Exception as e:
-        return None, str(e)
-    finally:
-        os.unlink(tmp_path)
-
-def speaker_diarization(audio_np, sr, segments, num_speakers=None):
-    """تعيين متحدث لكل مقطع بناءً على البصمة الصوتية، مع تسمية عربية."""
-    if resemblyzer_encoder is None:
-        for i, seg in enumerate(segments):
-            seg["speaker"] = f"متحدث {i+1}"
-        return segments
-    embeddings = []
-    for seg in segments:
-        start, end = seg["start"], seg["end"]
-        snippet = audio_np[int(start*sr):int(end*sr)]
-        if len(snippet) < 4000:
-            continue
-        try:
-            processed = preprocess_wav(snippet, source_sr=sr)
-            if processed is None or len(processed) == 0:
-                continue
-            embed = resemblyzer_encoder.embed_utterance(processed)
-            embeddings.append(embed)
-        except:
-            continue
-    if len(embeddings) == 0:
-        for i, seg in enumerate(segments):
-            seg["speaker"] = f"متحدث {i+1}"
-        return segments
-    if num_speakers is None or num_speakers <= 0:
-        max_k = min(10, len(embeddings))
-        inertias = []
-        for k in range(1, max_k+1):
-            km = KMeans(n_clusters=k, random_state=42, n_init=10)
-            km.fit(embeddings)
-            inertias.append(km.inertia_)
-        if len(inertias) > 1:
-            diffs = [inertias[i] - inertias[i+1] for i in range(len(inertias)-1)]
-            best_k = np.argmax(diffs) + 1
-        else:
-            best_k = 1
-        num_speakers = best_k
-    kmeans = KMeans(n_clusters=num_speakers, random_state=42, n_init=10)
-    labels = kmeans.fit_predict(embeddings)
-    for i, seg in enumerate(segments):
-        if i < len(labels):
-            seg["speaker"] = f"متحدث {labels[i]+1}"
-        else:
-            seg["speaker"] = f"متحدث {i+1}"
-    return segments
-
-def process_multi_speaker_audio(audio_bytes, num_speakers=None, model=None):
-    """المسار الكامل: VAD -> تفريغ كل مقطع -> Diarization -> نتائج."""
-    if model is None:
-        model = whisper_model
-    audio_np, sr = prepare_audio(audio_bytes)
-    if audio_np is None:
-        return None, "فشل تحويل الصوت"
-    timestamps, err = get_speech_segments(audio_np, sr)
-    if err:
-        return None, f"خطأ VAD: {err}"
-    if not timestamps:
-        return None, "لم يتم اكتشاف أي كلام"
-    segments = []
-    for ts in timestamps:
-        start_sec = ts['start'] / sr
-        end_sec = ts['end'] / sr
-        text, lang = transcribe_segment(audio_np, sr, start_sec, end_sec, model)
-        if text:
-            segments.append({"start": start_sec, "end": end_sec, "text": text, "lang": lang})
-    if not segments:
-        return None, "لم يتم التعرف على أي نص"
-    segments = speaker_diarization(audio_np, sr, segments, num_speakers)
-    return segments, None
-
-def transcribe_audio_single(audio_bytes, language=None, model=None):
-    """نسخ سريع لمقطع صوتي (للاستخدام الفردي) مع إمكانية تحديد اللغة."""
-    if model is None:
-        model = whisper_model
-    if model is None:
-        return None, "النموذج غير محمّل"
-    audio_np, sr = prepare_audio(audio_bytes)
-    if audio_np is None:
-        return None, "فشل تحويل الصوت"
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        import soundfile as sf
-        sf.write(tmp.name, audio_np, sr)
-        tmp_path = tmp.name
-    try:
-        lang_param = None if language == "auto" else language
-        segments, info = model.transcribe(tmp_path, language=lang_param, beam_size=1)
-        text = " ".join(seg.text.strip() for seg in segments)
-        return text, info.language
-    except Exception as e:
-        return None, str(e)
-    finally:
-        os.unlink(tmp_path)
-
 def translate_text(text, target_lang):
     """
     الترجمة الذكية:
-    1. DeepL (إن وُجد المفتاح) – يدعم معظم اللغات ماعدا العربية.
-       إذا فشل (لغة غير مدعومة أو خطأ)، ننتقل تلقائياً إلى Google.
+    1. DeepL (إن وُجد المفتاح).
+       إذا فشل، ننتقل تلقائياً إلى Google.
     2. Google Translator (يدعم العربية وجميع اللغات).
     3. LibreTranslate (احتياطي إن وُجد رابطه).
     """
@@ -540,7 +270,6 @@ def translate_text(text, target_lang):
         tr, err = translate_deepl(text, target_lang)
         if tr:
             return tr, None
-        # إذا فشل نكمل بصمت إلى Google
     # 2. Google Translator
     try:
         translator = GoogleTranslator(source='auto', target=target_lang)
@@ -559,6 +288,44 @@ def translate_text(text, target_lang):
             except Exception as e2:
                 return None, f"Google: {e1} | LibreTranslate: {e2}"
         return None, f"Google Translator error: {e1}"
+
+# ════════════════════════════════════════════════════════════
+#  دوال التعرف على الصوت (Cohere أساسي)
+# ════════════════════════════════════════════════════════════
+def speech_to_text_cohere(audio_bytes, language_code="auto"):
+    """تحويل الصوت إلى نص باستخدام Cohere."""
+    if not st.session_state.get("cohere_api_key"):
+        return None, "API key missing"
+    try:
+        fields = OrderedDict()
+        lang = "en" if language_code == "auto" or language_code is None else language_code
+        fields['language'] = lang
+        fields['model'] = 'cohere-transcribe-03-2026'
+        fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
+        encoder = MultipartEncoder(fields=fields)
+        response = requests.post(
+            "https://api.cohere.com/v2/audio/transcriptions",
+            headers={
+                "Authorization": f"Bearer {st.session_state.cohere_api_key}",
+                "Content-Type": encoder.content_type
+            },
+            data=encoder,
+            timeout=30
+        )
+        if response.status_code == 200:
+            text = response.json().get("text", "").strip()
+            if text:
+                return text, "Cohere"
+            else:
+                return None, "No speech detected"
+        return None, f"Cohere error {response.status_code}"
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+def transcribe_audio_single(audio_bytes, language=None):
+    """نسخ سريع لمقطع صوتي باستخدام Cohere."""
+    lang_param = "en" if language == "auto" or language is None else language
+    return speech_to_text_cohere(audio_bytes, lang_param)
 
 # ════════════════════════════════════════════════════════════
 #  إعدادات الصفحة
@@ -823,396 +590,4 @@ DOMAIN_KEYWORDS = {
     "environmental": ["environment", "pollution", "climate", "solar", "wind", "بيئة", "تلوث", "مناخ", "شمسية", "رياح"],
     "agricultural": ["agriculture", "farm", "crop", "wheat", "rice", "زراعة", "مزرعة", "محصول", "قمح", "أرز"],
     "media": ["media", "journalism", "television", "news", "report", "إعلام", "صحافة", "تلفزيون", "خبر", "تقرير"],
-    "tourism": ["tourism", "hotel", "travel", "airport", "visa", "سياحة", "فندق", "سفر", "مطار", "تأشيرة"],
-}
-
-def detect_domains(text):
-    text_lower = text.lower()
-    scores = {}
-    for domain, keywords in DOMAIN_KEYWORDS.items():
-        score = sum(text_lower.count(kw.lower()) for kw in keywords)
-        if score > 0:
-            scores[domain] = score
-    return sorted(scores, key=scores.get, reverse=True) if scores else []
-
-# ════════════════════════════════════════════════════════════
-#  API KEYS (لـ Voice, Text, File)
-# ════════════════════════════════════════════════════════════
-try:
-    deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
-except:
-    deepl_from_secrets = ""
-try:
-    cohere_from_secrets = st.secrets.get("COHERE_API_KEY", "")
-except:
-    cohere_from_secrets = ""
-
-if "deepl_api_key" not in st.session_state:
-    st.session_state.deepl_api_key = deepl_from_secrets
-if "cohere_api_key" not in st.session_state:
-    st.session_state.cohere_api_key = cohere_from_secrets
-
-# ════════════════════════════════════════════════════════════
-#  SESSION STATE
-# ════════════════════════════════════════════════════════════
-if "source_lang" not in st.session_state:
-    st.session_state.source_lang = "Auto-Detect"
-if "target_lang" not in st.session_state:
-    st.session_state.target_lang = "Arabic"
-if "input_text" not in st.session_state:
-    st.session_state.input_text = ""
-if "selected_style" not in st.session_state:
-    st.session_state.selected_style = "Auto-Detect"
-if "translated_text" not in st.session_state:
-    st.session_state.translated_text = ""
-if "group_chat_messages" not in st.session_state:
-    st.session_state.group_chat_messages = []
-if "audio_key_counter" not in st.session_state:
-    st.session_state.audio_key_counter = 0
-
-def swap_languages():
-    old_source = st.session_state.source_lang
-    old_target = st.session_state.target_lang
-    st.session_state.source_lang = old_target
-    st.session_state.target_lang = old_source
-    if st.session_state.source_lang == "Auto-Detect":
-        st.session_state.source_lang = "English"
-        if st.session_state.target_lang == "English":
-            st.session_state.target_lang = "Arabic"
-    if st.session_state.source_lang == st.session_state.target_lang:
-        for lang in languages_dict.keys():
-            if lang != st.session_state.source_lang and lang != "Auto-Detect":
-                st.session_state.target_lang = lang
-                break
-    st.rerun()
-
-def clear_audio():
-    if "mic_audio_main" in st.session_state:
-        del st.session_state.mic_audio_main
-    st.session_state.input_text = ""
-    st.session_state.translated_text = ""
-    st.rerun()
-
-# ════════════════════════════════════════════════════════════
-#  واجهة المستخدم
-# ════════════════════════════════════════════════════════════
-lang_list = list(languages_dict.keys())
-style_list = list(STYLE_OPTIONS.keys())
-
-if st.session_state.target_lang == st.session_state.source_lang:
-    for lang in lang_list:
-        if lang != st.session_state.source_lang:
-            st.session_state.target_lang = lang
-            break
-
-src_idx = lang_list.index(st.session_state.source_lang) if st.session_state.source_lang in lang_list else 0
-tgt_options = [k for k in lang_list if k != st.session_state.source_lang and k != "Auto-Detect"]
-if st.session_state.target_lang not in tgt_options:
-    st.session_state.target_lang = tgt_options[0] if tgt_options else "English"
-tgt_idx = tgt_options.index(st.session_state.target_lang) if st.session_state.target_lang in tgt_options else 0
-style_idx = style_list.index(st.session_state.selected_style) if st.session_state.selected_style in style_list else 0
-
-st.markdown('<div class="section-heading">Translation Direction</div>', unsafe_allow_html=True)
-col_left, col_mid, col_right = st.columns([1, 0.18, 1])
-with col_left:
-    source_lang_name = st.selectbox("From", lang_list, index=src_idx)
-with col_mid:
-    st.markdown("<div style='height:22px;'></div>", unsafe_allow_html=True)
-    if st.button("⇄", help="Swap", use_container_width=True):
-        swap_languages()
-with col_right:
-    target_lang_name = st.selectbox("To", tgt_options, index=tgt_idx)
-
-if source_lang_name != st.session_state.source_lang:
-    st.session_state.source_lang = source_lang_name
-if target_lang_name != st.session_state.target_lang:
-    st.session_state.target_lang = target_lang_name
-
-source_lang = languages_dict[st.session_state.source_lang]
-target_lang = languages_dict[st.session_state.target_lang]
-
-st.markdown('<div class="section-heading">Domain Style</div>', unsafe_allow_html=True)
-selected_style_label = st.selectbox("Style", style_list, index=style_idx, label_visibility="collapsed")
-selected_domain = STYLE_OPTIONS[selected_style_label]
-st.session_state.selected_style = selected_style_label
-
-# ════════════════════════════════════════════════════════════
-#  التبويبات
-# ════════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "👥 Group"])
-
-# ----- Tab 1: Voice -----
-with tab1:
-    st.markdown("---")
-    st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
-    if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
-        st.info("تحتاج لمفاتيح DeepL و Cohere لاستخدام هذا التبويب.")
-    else:
-        col_mic, col_clear = st.columns([5, 1])
-        with col_mic:
-            audio_value = st.audio_input("", key="mic_audio_main", label_visibility="collapsed")
-        with col_clear:
-            if "mic_audio_main" in st.session_state and st.session_state.mic_audio_main is not None:
-                if st.button("✖", key="clear_btn", help="حذف التسجيل", type="secondary"):
-                    clear_audio()
-        if audio_value is not None:
-            with st.spinner("⏳ جاري التعرف..."):
-                audio_bytes = audio_value.getvalue()
-                recognized_text, engine_used = speech_to_text(audio_bytes, source_lang)
-                if recognized_text:
-                    st.success(f"✅ {recognized_text}")
-                    st.session_state.input_text = recognized_text
-                    with st.spinner("⏳ جاري الترجمة..."):
-                        translated_text, engine = fetch_ai_translation(recognized_text, target_lang)
-                        if translated_text:
-                            st.session_state.translated_text = translated_text
-                            emotion = analyze_emotion(recognized_text)
-                            st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                            st.markdown(f"""
-                            <div class="result-box">
-                                <span class="label">✦ Translation</span>
-                                <div class="text">{translated_text}</div>
-                                <div class="emotion">{emotion}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            st.code(translated_text, language=None)
-                            audio_bytes_tts = generate_audio(translated_text, target_lang)
-                            if audio_bytes_tts:
-                                st.audio(audio_bytes_tts, format="audio/mp3")
-                            save_translation(recognized_text, translated_text, emotion, source_lang_name, target_lang_name)
-                        else:
-                            st.error(f"❌ {engine}")
-                else:
-                    st.error(f"❌ {engine_used}")
-
-# ----- Tab 2: Text -----
-with tab2:
-    st.markdown("---")
-    st.markdown('<div class="section-heading">📝 Text Input</div>', unsafe_allow_html=True)
-    if not st.session_state.deepl_api_key:
-        st.info("تحتاج لمفتاح DeepL لترجمة النصوص.")
-    else:
-        input_text = st.text_area("", height=70, placeholder="اكتب أو الصق النص هنا...", value=st.session_state.input_text, key="input_text_area")
-        if input_text != st.session_state.input_text:
-            st.session_state.input_text = input_text
-        if input_text.strip():
-            detected = detect_domains(input_text)
-            if detected:
-                badges = ""
-                for d in detected[:3]:
-                    dn = DOMAINS[d]["name_en"]
-                    emoji = DOMAINS[d]["emoji"]
-                    badges += f'<span class="tag">{emoji} {dn}</span>'
-                st.markdown(f'<div class="context">🔍 {badges}</div>', unsafe_allow_html=True)
-        if st.button("Translate ✦", use_container_width=True, key="translate_btn"):
-            if not input_text.strip():
-                st.warning("الرجاء إدخال نص للترجمة.")
-            else:
-                with st.spinner("جاري الترجمة..."):
-                    translation_result, _ = fetch_ai_translation(input_text, target_lang)
-                    if translation_result:
-                        emotion = analyze_emotion(input_text)
-                        st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                        st.markdown(f"""
-                        <div class="result-box">
-                            <span class="label">✦ Translation</span>
-                            <div class="text">{translation_result}</div>
-                            <div class="emotion">{emotion}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.code(translation_result, language=None)
-                        audio_bytes_tts = generate_audio(translation_result, target_lang)
-                        if audio_bytes_tts:
-                            st.audio(audio_bytes_tts, format="audio/mp3")
-                        save_translation(input_text, translation_result, emotion, source_lang_name, target_lang_name)
-                    else:
-                        st.error(f"❌ {translation_result}")
-
-# ----- Tab 3: File -----
-with tab3:
-    st.markdown("---")
-    st.markdown('<div class="section-heading">📄 File Translation</div>', unsafe_allow_html=True)
-    if not st.session_state.deepl_api_key:
-        st.info("تحتاج لمفتاح DeepL لترجمة الملفات.")
-    else:
-        uploaded_file = st.file_uploader("اختر ملف", type=None, key="file_uploader")
-        if uploaded_file is not None:
-            file_bytes = uploaded_file.getvalue()
-            file_size = len(file_bytes) // 1024
-            st.success(f"✅ {uploaded_file.name} ({file_size} KB)")
-            if st.button("🔍 استخراج النص وترجمته", key="file_btn"):
-                with st.spinner("جاري استخراج النص..."):
-                    extracted_text, err = extract_text_from_file(file_bytes, uploaded_file.name)
-                    if extracted_text:
-                        st.markdown('<div class="section-heading">Extracted Text</div>', unsafe_allow_html=True)
-                        display_text = extracted_text[:1500] + ("..." if len(extracted_text) > 1500 else "")
-                        st.code(display_text, language=None)
-                        st.caption(f"عدد الكلمات: {len(extracted_text.split())}")
-                        with st.spinner("جاري الترجمة..."):
-                            translated_text, _ = fetch_ai_translation(extracted_text, target_lang)
-                            if translated_text:
-                                emotion = analyze_emotion(extracted_text)
-                                st.markdown('<div class="section-heading">Translation Result</div>', unsafe_allow_html=True)
-                                st.markdown(f"""
-                                <div class="result-box">
-                                    <span class="label">✦ Translation</span>
-                                    <div class="text">{translated_text}</div>
-                                    <div class="emotion">{emotion}</div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                st.code(translated_text, language=None)
-                                save_translation(extracted_text[:500], translated_text, emotion, "File", target_lang_name)
-                                st.download_button(
-                                    label="📥 تحميل الترجمة (TXT)",
-                                    data=translated_text,
-                                    file_name="file_translation.txt",
-                                    mime="text/plain"
-                                )
-                            else:
-                                st.error("فشلت الترجمة")
-                    else:
-                        st.error(f"فشل استخراج النص: {err}")
-
-# ----- Tab 4: Group Chat (DeepL أساسي) -----
-with tab4:
-    st.markdown("---")
-    st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
-    st.caption("ترجمة فورية مع DeepL (إن وُجد) – يدعم جميع اللغات مع احتياطي Google")
-
-    model_size = st.selectbox("🔧 جودة التعرف الصوتي (الأكبر = أدق لكن أبطأ)",
-                              ["medium", "small", "tiny"],
-                              index=0,
-                              key="model_size")
-    if "current_model_size" not in st.session_state or st.session_state.current_model_size != model_size:
-        whisper_model = load_whisper_model(model_size)
-        st.session_state.current_model_size = model_size
-    else:
-        whisper_model = load_whisper_model(model_size)
-
-    if whisper_model is None:
-        st.error("❌ نموذج Whisper غير محمّل. تأكد من تثبيت faster-whisper.")
-    elif vad_model is None:
-        st.error("❌ مكتبة Silero VAD غير متاحة. تأكد من تثبيت silero-vad.")
-    else:
-        target_options = [k for k in languages_dict.keys() if k != "Auto-Detect"]
-        target_lang_group = st.selectbox("ترجمة إلى", target_options, key="group_target_live")
-        target_code = languages_dict[target_lang_group]
-
-        mode = st.radio("وضع المحادثة:",
-                        ["محادثة مباشرة (متحدث واحد)", "محادثة جماعية (تسجيل واحد)"],
-                        key="mode_radio")
-
-        if mode == "محادثة مباشرة (متحدث واحد)":
-            st.markdown("---")
-            source_lang_group = st.selectbox("اللغة التي ستتحدث بها", list(languages_dict.keys()), key="single_source_lang")
-            source_code = languages_dict[source_lang_group]
-
-            speaker_options = ["SPEAKER_1", "SPEAKER_2", "SPEAKER_3", "SPEAKER_4", "مخصص..."]
-            selected = st.selectbox("المتحدث", speaker_options, key="single_speaker_select")
-            if selected == "مخصص...":
-                custom = st.text_input("أدخل الاسم", key="single_custom")
-                speaker = custom.strip() if custom.strip() else "SPEAKER"
-            else:
-                speaker = selected
-
-            audio_chunk = st.audio_input(f"🎤 تحدث كـ {speaker}", key=f"single_chunk_{st.session_state.audio_key_counter}")
-            if audio_chunk is not None:
-                with st.spinner("⏳ جارٍ النسخ والترجمة..."):
-                    text, lang = transcribe_audio_single(audio_chunk.getvalue(), language=source_code, model=whisper_model)
-                    if text:
-                        tr, err = translate_text(text, target_code)
-                        if not tr:
-                            tr = f"[خطأ: {err}]"
-                        st.session_state.group_chat_messages.append({
-                            "speaker": speaker,
-                            "original": text,
-                            "translated": tr,
-                            "lang": lang if lang else "?"
-                        })
-                        st.session_state.audio_key_counter += 1
-                        st.success(f"✅ أُضيفت رسالة {speaker}")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ فشل التعرف: {lang}")
-
-            if st.session_state.group_chat_messages:
-                st.markdown("### 💬 سجل المحادثة")
-                speaker_colors = {}
-                palette = ["#4ECBA0", "#FF6B6B", "#FFD93D", "#6C5CE7", "#45B7D1", "#F39C12", "#9B59B6", "#E74C3C", "#2ECC71", "#3498DB"]
-                for msg in st.session_state.group_chat_messages:
-                    spk = msg["speaker"]
-                    if spk not in speaker_colors:
-                        speaker_colors[spk] = palette[len(speaker_colors) % len(palette)]
-                    color = speaker_colors[spk]
-                    st.markdown(f"""
-                    <div class="chat-bubble" style="border-left-color: {color};">
-                        <div class="speaker" style="color: {color};">👤 {spk} ({msg.get('lang', '')})</div>
-                        <div class="original">🎙️ {msg['original']}</div>
-                        <div class="translated">🌍 {msg['translated']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    if st.button("🧹 مسح", key="clear_single"):
-                        st.session_state.group_chat_messages = []
-                        st.rerun()
-                with col2:
-                    last = st.session_state.group_chat_messages[-1]["translated"]
-                    if last and not last.startswith("["):
-                        audio_out = generate_audio(last, target_code)
-                        if audio_out:
-                            st.audio(audio_out, format="audio/mp3")
-                with col3:
-                    full = "\n".join([f"[{m['speaker']}] 🎙️ {m['original']}\n🌍 {m['translated']}" for m in st.session_state.group_chat_messages])
-                    st.download_button("📥 تحميل", full, file_name="single_chat.txt")
-
-        else:  # محادثة جماعية (تسجيل واحد)
-            st.markdown("---")
-            st.write("سجّل مقطعاً صوتياً واحداً يحوي عدة أشخاص. سيكتشفهم النظام ويترجم كلامهم بدقة عالية.")
-            audio_chunk = st.audio_input("🎙️ اضغط للتسجيل (متعدد المتحدثين)", key="multi_speaker_audio")
-            if audio_chunk is not None:
-                with st.spinner("⏳ جارٍ تحليل الصوت وتمييز المتحدثين..."):
-                    segments, err = process_multi_speaker_audio(audio_chunk.getvalue(), model=whisper_model)
-                    if segments:
-                        num_speakers_found = len(set(s["speaker"] for s in segments))
-                        st.success(f"✅ تم اكتشاف {num_speakers_found} متحدثين")
-                        translated = []
-                        prog = st.progress(0)
-                        for i, seg in enumerate(segments):
-                            tr, _ = translate_text(seg["text"], target_code)
-                            if not tr:
-                                tr = f"[خطأ]"
-                            translated.append({
-                                "speaker": seg["speaker"],
-                                "original": seg["text"],
-                                "translated": tr,
-                                "lang": seg.get("lang", "?")
-                            })
-                            prog.progress((i+1)/len(segments))
-                        prog.empty()
-                        st.markdown("### 💬 الحوار المترجم")
-                        spk_colors = {}
-                        palette = ["#4ECBA0", "#FF6B6B", "#FFD93D", "#6C5CE7", "#45B7D1", "#F39C12", "#9B59B6", "#E74C3C", "#2ECC71", "#3498DB"]
-                        for item in translated:
-                            spk = item["speaker"]
-                            if spk not in spk_colors:
-                                spk_colors[spk] = palette[len(spk_colors) % len(palette)]
-                            color = spk_colors[spk]
-                            st.markdown(f"""
-                            <div class="chat-bubble" style="border-left-color: {color};">
-                                <div class="speaker" style="color: {color};">👤 {spk} ({item['lang']})</div>
-                                <div class="original">🎙️ {item['original']}</div>
-                                <div class="translated">🌍 {item['translated']}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        full_text = "\n".join([f"[{i['speaker']}] 🎙️ {i['original']}\n🌍 {i['translated']}" for i in translated])
-                        st.download_button("📥 تحميل", full_text, file_name="multi_chat.txt")
-                    else:
-                        st.error(f"❌ فشل التحليل: {err}")
-
-# Footer
-st.markdown("""
-<div style="text-align:center; padding: 1rem 0; color:rgba(100,130,170,0.3); font-size:9px; letter-spacing:0.12em; text-transform:uppercase;">
-    HN TRANSLATOR · Voice Translation Suite
-</div>
-""", unsafe_allow_html=True)
+    "tourism": ["tourism", "hotel", "travel", "
