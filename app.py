@@ -205,23 +205,50 @@ def translate_text(text, target_lang):
                 return None, f"Google: {e1} | LibreTranslate: {e2}"
         return None, f"Google error: {e1}"
 
+# ════════════════════════════════════════════════════════════
+#  دالة التعرف على الصوت Cohere مع معالجة 429 وإعادة المحاولة
+# ════════════════════════════════════════════════════════════
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.get("cohere_api_key"):
         return None, "API key missing"
-    try:
-        fields = OrderedDict()
-        lang = "en" if language_code == "auto" or language_code is None else language_code
-        fields['language'] = lang
-        fields['model'] = 'cohere-transcribe-03-2026'
-        fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
-        encoder = MultipartEncoder(fields=fields)
-        response = requests.post("https://api.cohere.com/v2/audio/transcriptions", headers={"Authorization": f"Bearer {st.session_state.cohere_api_key}", "Content-Type": encoder.content_type}, data=encoder, timeout=30)
-        if response.status_code == 200:
-            text = response.json().get("text", "").strip()
-            return (text, "Cohere") if text else (None, "No speech detected")
-        return None, f"Cohere error {response.status_code}"
-    except Exception as e:
-        return None, str(e)
+
+    max_retries = 3
+    retry_delays = [1, 2, 4]  # ثواني
+
+    for attempt in range(max_retries):
+        try:
+            fields = OrderedDict()
+            lang = "en" if language_code == "auto" or language_code is None else language_code
+            fields['language'] = lang
+            fields['model'] = 'cohere-transcribe-03-2026'
+            fields['file'] = ('audio.wav', audio_bytes, 'audio/wav')
+            encoder = MultipartEncoder(fields=fields)
+            response = requests.post(
+                "https://api.cohere.com/v2/audio/transcriptions",
+                headers={
+                    "Authorization": f"Bearer {st.session_state.cohere_api_key}",
+                    "Content-Type": encoder.content_type
+                },
+                data=encoder,
+                timeout=30
+            )
+            if response.status_code == 200:
+                text = response.json().get("text", "").strip()
+                return (text, "Cohere") if text else (None, "No speech detected")
+            elif response.status_code == 429:
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delays[attempt])
+                    continue
+                else:
+                    return None, "Cohere: تجاوزت الحد اليومي، حاول لاحقاً"
+            else:
+                return None, f"Cohere error {response.status_code}"
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delays[attempt])
+                continue
+            return None, f"Error: {str(e)}"
+    return None, "Cohere: فشل بعد عدة محاولات"
 
 st.set_page_config(page_title="HN TRANSLATOR", page_icon="🌐", layout="centered")
 
