@@ -340,7 +340,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (بدون تغيير)
+#  CSS (مختصر لكن كامل)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -369,30 +369,6 @@ def get_css(theme):
         .stCode, code, pre { background: #f0f0f0 !important; color: #1a1a2e !important; border: 1px solid #ddd !important; border-radius: 8px !important; }
         .section-heading { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #2a7a60; margin: 0.6rem 0 0.3rem; }
         hr { margin: 0.5rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(42,122,96,0.2), transparent); }
-        button[data-baseweb="tab"] {
-            font-family: 'Space Grotesk', sans-serif !important;
-            font-size: 13px !important;
-            font-weight: 600 !important;
-            color: #1a1a2e !important;
-            background: transparent !important;
-            border: none !important;
-            padding: 0.5rem 1.2rem !important;
-            border-radius: 8px 8px 0 0 !important;
-            transition: all 0.3s ease !important;
-        }
-        button[data-baseweb="tab"]:hover {
-            background: rgba(42,122,96,0.08) !important;
-        }
-        button[data-baseweb="tab"][aria-selected="true"] {
-            background: rgba(42,122,96,0.12) !important;
-            color: #2a7a60 !important;
-            border-bottom: 2px solid #2a7a60 !important;
-        }
-        div[data-baseweb="tab-list"] {
-            gap: 4px !important;
-            border-bottom: 1px solid rgba(0,0,0,0.08) !important;
-            padding-bottom: 0 !important;
-        }
         .chat-bubble {
             margin: 10px 0;
             border-radius: 15px;
@@ -434,31 +410,6 @@ def get_css(theme):
         .stCode, code, pre { background: rgba(0,0,0,0.35) !important; color: #a8f0d8 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 8px !important; }
         .section-heading { font-size: 9px; font-weight: 700; text-transform: uppercase; color: rgba(150,185,230,0.5); margin: 0.6rem 0 0.3rem; }
         hr { margin: 0.5rem 0; border: none; height: 1px; background: linear-gradient(90deg, transparent, rgba(78,203,160,0.2), transparent); }
-        button[data-baseweb="tab"] {
-            font-family: 'Space Grotesk', sans-serif !important;
-            font-size: 13px !important;
-            font-weight: 600 !important;
-            color: #b0c4de !important;
-            background: transparent !important;
-            border: none !important;
-            padding: 0.5rem 1.2rem !important;
-            border-radius: 8px 8px 0 0 !important;
-            transition: all 0.3s ease !important;
-        }
-        button[data-baseweb="tab"]:hover {
-            background: rgba(78,203,160,0.06) !important;
-            color: #e8f0ff !important;
-        }
-        button[data-baseweb="tab"][aria-selected="true"] {
-            background: rgba(78,203,160,0.1) !important;
-            color: #4ECBA0 !important;
-            border-bottom: 2px solid #4ECBA0 !important;
-        }
-        div[data-baseweb="tab-list"] {
-            gap: 4px !important;
-            border-bottom: 1px solid rgba(78,203,160,0.1) !important;
-            padding-bottom: 0 !important;
-        }
         .chat-bubble {
             margin: 10px 0;
             border-radius: 15px;
@@ -590,4 +541,59 @@ DOMAIN_KEYWORDS = {
     "environmental": ["environment", "pollution", "climate", "solar", "wind", "بيئة", "تلوث", "مناخ", "شمسية", "رياح"],
     "agricultural": ["agriculture", "farm", "crop", "wheat", "rice", "زراعة", "مزرعة", "محصول", "قمح", "أرز"],
     "media": ["media", "journalism", "television", "news", "report", "إعلام", "صحافة", "تلفزيون", "خبر", "تقرير"],
-    "tourism": ["tourism", "hotel", "travel", "
+    "tourism": ["tourism", "hotel", "travel", "airport", "visa", "سياحة", "فندق", "سفر", "مطار", "تأشيرة"],
+}
+
+def detect_domains(text):
+    text_lower = text.lower()
+    scores = {}
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        score = sum(text_lower.count(kw.lower()) for kw in keywords)
+        if score > 0:
+            scores[domain] = score
+    return sorted(scores, key=scores.get, reverse=True) if scores else []
+
+# ════════════════════════════════════════════════════════════
+#  API KEYS
+# ════════════════════════════════════════════════════════════
+try:
+    deepl_from_secrets = st.secrets.get("DEEPL_API_KEY", "")
+except:
+    deepl_from_secrets = ""
+try:
+    cohere_from_secrets = st.secrets.get("COHERE_API_KEY", "")
+except:
+    cohere_from_secrets = ""
+
+if "deepl_api_key" not in st.session_state:
+    st.session_state.deepl_api_key = deepl_from_secrets
+if "cohere_api_key" not in st.session_state:
+    st.session_state.cohere_api_key = cohere_from_secrets
+
+# ════════════════════════════════════════════════════════════
+#  SESSION STATE
+# ════════════════════════════════════════════════════════════
+if "source_lang" not in st.session_state:
+    st.session_state.source_lang = "Auto-Detect"
+if "target_lang" not in st.session_state:
+    st.session_state.target_lang = "Arabic"
+if "input_text" not in st.session_state:
+    st.session_state.input_text = ""
+if "selected_style" not in st.session_state:
+    st.session_state.selected_style = "Auto-Detect"
+if "translated_text" not in st.session_state:
+    st.session_state.translated_text = ""
+if "group_chat_messages" not in st.session_state:
+    st.session_state.group_chat_messages = []
+if "audio_key_counter" not in st.session_state:
+    st.session_state.audio_key_counter = 0
+
+def swap_languages():
+    old_source = st.session_state.source_lang
+    old_target = st.session_state.target_lang
+    st.session_state.source_lang = old_target
+    st.session_state.target_lang = old_source
+    if st.session_state.source_lang == "Auto-Detect":
+        st.session_state.source_lang = "English"
+        if st.session_state.target_lang == "English":
+            st.session_state.target_lang =
