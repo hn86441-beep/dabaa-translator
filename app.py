@@ -341,7 +341,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  دوال المحادثة الجماعية (مجانية بالكامل)
+#  دوال المحادثة الجماعية (مجانية بالكامل، بدون HF Token)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_whisper_model():
@@ -365,7 +365,6 @@ resemblyzer_encoder = load_resemblyzer_encoder()
 def diarize_segments(audio_path, segments, num_speakers=None):
     """تجميع المقاطع الصوتية حسب المتحدث باستخدام Resemblyzer + KMeans."""
     if resemblyzer_encoder is None:
-        # إذا لم توجد المكتبة، نعطي الجميع نفس المتحدث
         for seg in segments:
             seg["speaker"] = "SPEAKER_0"
         return segments
@@ -405,7 +404,6 @@ def diarize_segments(audio_path, segments, num_speakers=None):
             seg["speaker"] = "SPEAKER_0"
         return segments
 
-    # تحديد عدد المتحدثين
     if num_speakers is None or num_speakers <= 0:
         max_speakers = min(10, len(embeddings))
         inertias = []
@@ -1013,7 +1011,6 @@ with tab4:
         with col1:
             source_lang_group = st.selectbox("اللغة المنطوقة (أو تلقائي)", list(languages_dict.keys()), key="group_source_free")
         with col2:
-            # لا يمكن اختيار Auto-Detect كلغة هدف
             target_options = [k for k in languages_dict.keys() if k != "Auto-Detect"]
             target_lang_group = st.selectbox("اللغة الهدف للترجمة", target_options, key="group_target_free")
         
