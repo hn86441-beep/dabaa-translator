@@ -341,14 +341,14 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  دوال المحادثة الجماعية (مجانية بالكامل، بدون HF Token)
+#  دوال المحادثة الجماعية (خفيفة وسريعة)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_whisper_model():
     if WHISPER_AVAILABLE:
         try:
-            # نموذج medium – يوازن بين الدقة والسرعة. غيّره إلى "large-v3" إن أردت دقة أفضل
-            return WhisperModel("medium", device="cpu", compute_type="int8")
+            # استخدام "small" لتسريع الأداء بشكل كبير مع الحفاظ على دقة جيدة
+            return WhisperModel("small", device="cpu", compute_type="int8")
         except:
             return None
     return None
@@ -363,7 +363,7 @@ whisper_model = load_whisper_model()
 resemblyzer_encoder = load_resemblyzer_encoder()
 
 def transcribe_audio(audio_bytes, language=None):
-    """تحويل مقطع صوتي إلى نص (دون تمييز متحدثين)."""
+    """تحويل مقطع صوتي إلى نص (للاستخدام المباشر)."""
     if whisper_model is None:
         return None, "النموذج غير محمّل"
     tmp_path = None
@@ -371,7 +371,14 @@ def transcribe_audio(audio_bytes, language=None):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
-        segments, info = whisper_model.transcribe(tmp_path, language=language, beam_size=5)
+        # تحسينات السرعة: beam_size=3 وفلترة الصمت
+        segments, info = whisper_model.transcribe(
+            tmp_path,
+            language=language,
+            beam_size=3,
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=700)
+        )
         text = " ".join(seg.text.strip() for seg in segments)
         return text, info.language
     except Exception as e:
@@ -812,7 +819,6 @@ if "selected_style" not in st.session_state:
     st.session_state.selected_style = "Auto-Detect"
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
-# جلسة المحادثة المباشرة
 if "group_chat_messages" not in st.session_state:
     st.session_state.group_chat_messages = []
 
@@ -1019,11 +1025,11 @@ with tab3:
                     else:
                         st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Group Chat (محادثة فورية + رفع ملف) -----
+# ----- Tab 4: Group Chat (خفيف وسريع) -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
-    st.caption("محادثة فورية مع تمييز المتحدثين · يدعم جميع اللغات")
+    st.caption("محادثة فورية مع تمييز المتحدثين · يدعم جميع اللغات (نموذج small للسرعة)")
 
     if whisper_model is None:
         st.error("❌ نموذج Whisper غير محمّل. تأكد من تثبيت faster-whisper.")
@@ -1038,7 +1044,6 @@ with tab4:
 
         if mode == "محادثة مباشرة (تحدث الآن)":
             st.markdown('<div class="section-heading">🗣️ المتحدث الحالي</div>', unsafe_allow_html=True)
-            # اختيار اسم المتحدث من قائمة أو يدويًا
             speaker_options = ["SPEAKER_1", "SPEAKER_2", "SPEAKER_3", "SPEAKER_4", "SPEAKER_5", "مخصص..."]
             selected_speaker = st.selectbox("اختر المتحدث", speaker_options, key="speaker_select")
             if selected_speaker == "مخصص...":
@@ -1048,17 +1053,15 @@ with tab4:
                 current_speaker = selected_speaker
 
             st.markdown("---")
-            # تسجيل المقطع
             audio_chunk = st.audio_input(f"🎤 تحدث الآن كـ {current_speaker}", key="live_single_chunk")
             if audio_chunk is not None:
                 with st.spinner("⏳ جاري النسخ والترجمة..."):
-                    # التعرف على الصوت مع الاكتشاف التلقائي للغة (language=None)
+                    # التعرف التلقائي على اللغة (language=None) مع تسريع beam_size=3 و VAD
                     text, lang_detected = transcribe_audio(audio_chunk.getvalue(), language=None)
                     if text:
                         translated, err = translate_text(text, target_code)
                         if not translated:
                             translated = f"[خطأ: {err}]"
-                        # إضافة إلى سجل المحادثة
                         st.session_state.group_chat_messages.append({
                             "speaker": current_speaker,
                             "original": text,
@@ -1088,14 +1091,12 @@ with tab4:
                     </div>
                     """, unsafe_allow_html=True)
 
-                # أزرار التحكم
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     if st.button("🧹 مسح المحادثة", use_container_width=True):
                         st.session_state.group_chat_messages = []
                         st.rerun()
                 with col2:
-                    # تشغيل صوتي لآخر ترجمة
                     last_msg = st.session_state.group_chat_messages[-1]
                     if last_msg["translated"] and not last_msg["translated"].startswith("["):
                         audio_out = generate_audio(last_msg["translated"], target_code)
@@ -1107,7 +1108,7 @@ with tab4:
                     )
                     st.download_button("📥 تحميل المحادثة", full_text, file_name="live_chat.txt", use_container_width=True)
 
-        else:  # رفع ملف صوتي (اجتماع مسجل)
+        else:  # رفع ملف صوتي
             if resemblyzer_encoder is None:
                 st.warning("⚠️ تمييز المتحدثين غير متاح (تأكد من تثبيت resemblyzer). سيتم التعامل مع الملف كمتحدث واحد.")
             audio_file = st.file_uploader("اختر ملف صوتي", type=["wav", "mp3", "m4a"], key="group_audio_file")
