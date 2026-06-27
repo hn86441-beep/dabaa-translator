@@ -1,15 +1,16 @@
-streamlit
-requests
-requests-toolbelt
-transformers
-torch
-gtts
-pdfplumber
-python-docx
-openpyxl
-Pillow
-easyocr
-numpy
-deep-translator
-faster-whisper
-pyannote.audio
+streamlit>=1.28
+faster-whisper>=0.10
+pyannote.audio>=3.1
+torch>=2.0
+deep-translator>=1.11
+gtts>=2.3
+pdfplumber>=0.9
+python-docx>=0.8
+openpyxl>=3.1
+Pillow>=9.0
+easyocr>=1.6
+numpy>=1.24
+requests>=2.28
+requests-toolbelt>=0.10
+librosa>=0.10   # لتحويل الصوت إذا احتجنا
+pydub>=0.25     # لتحويل الصوت (اختياري)
