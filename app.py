@@ -509,4 +509,52 @@ with tab4:
                     spk = msg["speaker"]
                     if spk not in speaker_colors:
                         speaker_colors[spk] = palette[len(speaker_colors) % len(palette)]
-                    color = speaker_colors[spk
+                    color = speaker_colors[spk]
+                    st.markdown(f"""<div class="chat-bubble" style="border-left-color: {color};"><div class="speaker" style="color: {color};">👤 {spk} ({msg.get('lang', '')})</div><div class="original">🎙️ {msg['original']}</div><div class="translated">🌍 {msg['translated']}</div></div>""", unsafe_allow_html=True)
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button("🧹 مسح", key="clear_single"):
+                        st.session_state.group_chat_messages = []
+                        st.rerun()
+                with col2:
+                    last = st.session_state.group_chat_messages[-1]["translated"]
+                    if last and not last.startswith("["):
+                        audio_out = generate_audio(last, target_code)
+                        if audio_out:
+                            st.audio(audio_out, format="audio/mp3")
+                with col3:
+                    full = "\n".join([f"[{m['speaker']}] 🎙️ {m['original']}\n🌍 {m['translated']}" for m in st.session_state.group_chat_messages])
+                    st.download_button("📥 تحميل", full, file_name="single_chat.txt")
+
+        else:
+            st.markdown("---")
+            st.write("سجّل مقطعاً صوتياً واحداً يحوي عدة أشخاص. سيتعرف Cohere على النص ويترجمه DeepL.")
+            audio_chunk = st.audio_input("🎙️ اضغط للتسجيل (متعدد المتحدثين)", key="multi_speaker_audio")
+            if audio_chunk is not None:
+                with st.spinner("⏳ جارٍ النسخ والترجمة..."):
+                    text, engine = speech_to_text_cohere(audio_chunk.getvalue(), "auto")
+                    if text:
+                        tr, err = translate_text(text, target_code)
+                        if not tr:
+                            tr = f"[خطأ: {err}]"
+                        st.session_state.group_chat_messages.append({"speaker": "المجموعة", "original": text, "translated": tr, "lang": "auto"})
+                        st.session_state.audio_key_counter += 1
+                        st.success("✅ تمت إضافة المحادثة")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ فشل التعرف: {engine}")
+
+            if st.session_state.group_chat_messages:
+                st.markdown("### 💬 سجل المحادثة")
+                for msg in st.session_state.group_chat_messages:
+                    st.markdown(f"""<div class="chat-bubble"><div class="speaker">👤 {msg['speaker']}</div><div class="original">🎙️ {msg['original']}</div><div class="translated">🌍 {msg['translated']}</div></div>""", unsafe_allow_html=True)
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🧹 مسح", key="clear_multi"):
+                        st.session_state.group_chat_messages = []
+                        st.rerun()
+                with col2:
+                    full = "\n".join([f"[{m['speaker']}] 🎙️ {m['original']}\n🌍 {m['translated']}" for m in st.session_state.group_chat_messages])
+                    st.download_button("📥 تحميل", full, file_name="multi_chat.txt")
+
+st.markdown("""<div style="text-align:center; padding: 1rem 0; color:rgba(100,130,170,0.3); font-size:9px; letter-spacing:0.12em; text-transform:uppercase;">HN TRANSLATOR · Voice Translation Suite</div>""", unsafe_allow_html=True)
