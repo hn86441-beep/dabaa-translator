@@ -144,7 +144,7 @@ def export_history_json():
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر (لم أغيرها)
+#  تحليل المشاعر (بدون تغيير)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
@@ -418,9 +418,11 @@ def transcribe_segment(audio_np, sr, start, end):
         os.unlink(tmp_path)
 
 def speaker_diarization(audio_np, sr, segments, num_speakers=None):
-    """تعيين متحدث لكل مقطع بناءً على البصمة الصوتية."""
+    """تعيين متحدث لكل مقطع بناءً على البصمة الصوتية، مع تسمية عربية."""
     if resemblyzer_encoder is None:
-        return [{"speaker": "SPEAKER_0", **seg} for seg in segments]
+        for i, seg in enumerate(segments):
+            seg["speaker"] = f"متحدث {i+1}"
+        return segments
     embeddings = []
     for seg in segments:
         start, end = seg["start"], seg["end"]
@@ -436,7 +438,9 @@ def speaker_diarization(audio_np, sr, segments, num_speakers=None):
         except:
             continue
     if len(embeddings) == 0:
-        return [{"speaker": "SPEAKER_0", **seg} for seg in segments]
+        for i, seg in enumerate(segments):
+            seg["speaker"] = f"متحدث {i+1}"
+        return segments
     if num_speakers is None or num_speakers <= 0:
         max_k = min(10, len(embeddings))
         inertias = []
@@ -454,9 +458,9 @@ def speaker_diarization(audio_np, sr, segments, num_speakers=None):
     labels = kmeans.fit_predict(embeddings)
     for i, seg in enumerate(segments):
         if i < len(labels):
-            seg["speaker"] = f"SPEAKER_{labels[i]}"
+            seg["speaker"] = f"متحدث {labels[i]+1}"
         else:
-            seg["speaker"] = "SPEAKER_0"
+            seg["speaker"] = f"متحدث {i+1}"
     return segments
 
 def process_multi_speaker_audio(audio_bytes, num_speakers=None):
@@ -499,13 +503,19 @@ def transcribe_audio_single(audio_bytes, language=None):
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-# تخزين مؤقت للترجمة
-@st.cache_data(show_spinner=False, ttl=3600)
-def cached_translate(text, target_lang):
+# دالة الترجمة الذكية: DeepL أولاً إن وُجد، ثم Google، ثم LibreTranslate
+def translate_text(text, target_lang):
+    # 1. DeepL (الأعلى جودة)
+    if st.session_state.deepl_api_key:
+        tr, err = translate_deepl(text, target_lang)
+        if tr:
+            return tr, None
+    # 2. Google Translator
     try:
         translator = GoogleTranslator(source='auto', target=target_lang)
         return translator.translate(text), None
     except Exception as e1:
+        # 3. LibreTranslate إن وُجد
         libre_url = os.environ.get("LIBRETRANSLATE_URL", st.secrets.get("LIBRETRANSLATE_URL", ""))
         if libre_url:
             try:
@@ -518,9 +528,6 @@ def cached_translate(text, target_lang):
             except Exception as e2:
                 return None, f"Google: {e1} | LibreTranslate: {e2}"
         return None, f"Google Translator error: {e1}"
-
-def translate_text(text, target_lang):
-    return cached_translate(text, target_lang)
 
 # ════════════════════════════════════════════════════════════
 #  إعدادات الصفحة
@@ -535,7 +542,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS
+#  CSS (بدون تغيير)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -899,7 +906,7 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  التبويبات – التعريف هنا (حل المشكلة)
+#  التبويبات – تعريفها هنا
 # ════════════════════════════════════════════════════════════
 tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "👥 Group"])
 
