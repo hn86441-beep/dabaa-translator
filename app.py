@@ -150,11 +150,12 @@ def export_history_json():
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر (بدون تغيير)
+#  تحليل المشاعر (دالة أصلية 100%، لم تُمس)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
     try:
+        # استخدام نموذج بديل متعدد اللغات لا يحتاج إلى مصادقة
         return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
     except Exception as e:
         st.warning(f"⚠️ فشل تحميل النموذج: {e}")
@@ -201,7 +202,7 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  استخراج النص من الملفات (بدون تغيير)
+#  استخراج النص من الملفات
 # ════════════════════════════════════════════════════════════
 def extract_text_from_file(file_bytes, filename):
     ext = os.path.splitext(filename)[1].lower()
@@ -353,10 +354,8 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  دوال المحادثة الجماعية (مُحسَّنة بدقة أعلى)
+#  دوال المحادثة الجماعية (مُحسَّنة)
 # ════════════════════════════════════════════════════════════
-
-# نموذج Whisper ديناميكي حسب اختيار المستخدم
 @st.cache_resource
 def load_whisper_model(model_size="medium"):
     if WHISPER_AVAILABLE:
@@ -378,7 +377,6 @@ def load_vad_model():
         return load_silero_vad()
     return None
 
-# سنقوم بتحميل النموذج الافتراضي medium أولاً، وسيتم تغييره لاحقاً حسب اختيار المستخدم
 whisper_model = load_whisper_model("medium")
 resemblyzer_encoder = load_resemblyzer_encoder()
 vad_model = load_vad_model()
@@ -387,10 +385,8 @@ def prepare_audio(audio_bytes, target_sr=16000):
     """تحويل الصوت إلى 16kHz أحادي، تطبيع المستوى، وتقليل الضوضاء."""
     try:
         audio_np, sr = librosa.load(io.BytesIO(audio_bytes), sr=target_sr, mono=True)
-        # تقليل الضوضاء (إن كانت المكتبة متوفرة)
         if NOISEREDUCE_AVAILABLE:
             audio_np = nr.reduce_noise(y=audio_np, sr=sr, prop_decrease=0.85)
-        # تطبيع
         peak = np.abs(audio_np).max()
         if peak > 0:
             audio_np = audio_np / peak * 0.9
@@ -410,7 +406,7 @@ def get_speech_segments(audio_np, sr):
         return None, str(e)
 
 def transcribe_segment(audio_np, sr, start, end, model):
-    """تفريغ مقطع صوتي واحد باستخدام نموذج معين (يدعم متعدد اللغات)."""
+    """تفريغ مقطع صوتي واحد باستخدام نموذج معين."""
     if model is None:
         return None, "النموذج غير محمّل"
     snippet = audio_np[int(start*sr):int(end*sr)]
@@ -421,7 +417,6 @@ def transcribe_segment(audio_np, sr, start, end, model):
         sf.write(tmp.name, snippet, sr)
         tmp_path = tmp.name
     try:
-        # language=None يجعل النموذج يتعرف تلقائياً على اللغة (يعمل أفضل مع medium+)
         segs, info = model.transcribe(tmp_path, language=None, beam_size=1)
         text = " ".join(s.text.strip() for s in segs)
         return text, info.language if info else None
@@ -501,12 +496,11 @@ def process_multi_speaker_audio(audio_bytes, num_speakers=None, model=None):
     return segments, None
 
 def transcribe_audio_single(audio_bytes, language=None, model=None):
-    """نسخ سريع لمقطع صوتي (للاستخدام الفردي)."""
+    """نسخ سريع لمقطع صوتي (للاستخدام الفردي) مع إمكانية تحديد اللغة."""
     if model is None:
         model = whisper_model
     if model is None:
         return None, "النموذج غير محمّل"
-    # تطبيق تقليل الضوضاء أولاً
     audio_np, sr = prepare_audio(audio_bytes)
     if audio_np is None:
         return None, "فشل تحويل الصوت"
@@ -515,7 +509,9 @@ def transcribe_audio_single(audio_bytes, language=None, model=None):
         sf.write(tmp.name, audio_np, sr)
         tmp_path = tmp.name
     try:
-        segments, info = model.transcribe(tmp_path, language=language, beam_size=1)
+        # إذا كانت اللغة "auto" نمرر None ليكتشف تلقائياً، وإلا نحدد اللغة
+        lang_param = None if language == "auto" else language
+        segments, info = model.transcribe(tmp_path, language=lang_param, beam_size=1)
         text = " ".join(seg.text.strip() for seg in segments)
         return text, info.language
     except Exception as e:
@@ -523,7 +519,6 @@ def transcribe_audio_single(audio_bytes, language=None, model=None):
     finally:
         os.unlink(tmp_path)
 
-# دالة الترجمة الذكية (DeepL أولاً، ثم Google، ثم LibreTranslate)
 def translate_text(text, target_lang):
     if st.session_state.deepl_api_key:
         tr, err = translate_deepl(text, target_lang)
@@ -559,7 +554,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (بدون تغيير)
+#  CSS (نفس الكود السابق دون تغيير)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -738,7 +733,7 @@ with st.sidebar:
         st.markdown("<div style='text-align:center; color: rgba(150,175,220,0.3); font-size: 30px;'>📭</div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  الإعدادات الأساسية (بدون تغيير)
+#  الإعدادات الأساسية
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -1059,18 +1054,16 @@ with tab3:
                     else:
                         st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Group Chat (الأكثر تطوراً) -----
+# ----- Tab 4: Group Chat -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
-    st.caption("ترجمة فورية مع تعرّف دقيق على عدة متحدثين – اختر حجم النموذج للدقة المطلوبة")
+    st.caption("اختر جودة التعرف واللغة المصدر لنتائج أدق")
 
-    # اختيار حجم النموذج
     model_size = st.selectbox("🔧 جودة التعرف الصوتي (الأكبر = أدق لكن أبطأ)",
                               ["medium", "small", "tiny"],
                               index=0,
                               key="model_size")
-    # تحميل النموذج المناسب (قد يُعاد تحميله إذا تغير الحجم)
     if "current_model_size" not in st.session_state or st.session_state.current_model_size != model_size:
         whisper_model = load_whisper_model(model_size)
         st.session_state.current_model_size = model_size
@@ -1092,7 +1085,10 @@ with tab4:
 
         if mode == "محادثة مباشرة (متحدث واحد)":
             st.markdown("---")
-            st.write("اختر اسم المتحدث ثم سجل رسالتك. يمكنك إضافة عدة رسائل من متحدثين مختلفين.")
+            # اختيار اللغة المصدر (مهم لتحديد اللغة الصحيحة)
+            source_lang_group = st.selectbox("اللغة التي ستتحدث بها", list(languages_dict.keys()), key="single_source_lang")
+            source_code = languages_dict[source_lang_group]  # قد يكون "auto" أو كود لغة
+
             speaker_options = ["SPEAKER_1", "SPEAKER_2", "SPEAKER_3", "SPEAKER_4", "مخصص..."]
             selected = st.selectbox("المتحدث", speaker_options, key="single_speaker_select")
             if selected == "مخصص...":
@@ -1104,7 +1100,8 @@ with tab4:
             audio_chunk = st.audio_input(f"🎤 تحدث كـ {speaker}", key=f"single_chunk_{st.session_state.audio_key_counter}")
             if audio_chunk is not None:
                 with st.spinner("⏳ جارٍ النسخ والترجمة..."):
-                    text, lang = transcribe_audio_single(audio_chunk.getvalue(), language=None, model=whisper_model)
+                    # تمرير اللغة المصدر المختارة (إن لم تكن auto فسنمرر كود اللغة)
+                    text, lang = transcribe_audio_single(audio_chunk.getvalue(), language=source_code, model=whisper_model)
                     if text:
                         tr, err = translate_text(text, target_code)
                         if not tr:
