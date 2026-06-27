@@ -101,56 +101,110 @@ LANG_NAMES_NO_AUTO = [k for k in LANG_NAMES if k != "Auto-Detect"]
 
 # ════════════════════════════════════════════════════════════
 #  قاعدة بيانات SQLite
+#  نستخدم /tmp/ لأن Streamlit Cloud يسمح بالكتابة هناك فقط
 # ════════════════════════════════════════════════════════════
-DB_PATH = "translations.db"
+import tempfile as _tempfile
+
+# مسار آمن يعمل على Streamlit Cloud وأي بيئة أخرى
+DB_PATH = os.path.join(_tempfile.gettempdir(), "hn_translations.db")
+
+def _get_conn():
+    """فتح اتصال SQLite مع timeout لتجنب تعارض الكتابة."""
+    return sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False)
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            original TEXT NOT NULL,
-            translated TEXT NOT NULL,
-            emotion TEXT,
-            source_lang TEXT,
-            target_lang TEXT,
-            engine TEXT,
-            timestamp TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = _get_conn()
+        c = conn.cursor()
+        # إنشاء الجدول بالشكل الكامل
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                original    TEXT NOT NULL,
+                translated  TEXT NOT NULL,
+                emotion     TEXT DEFAULT '',
+                source_lang TEXT DEFAULT '',
+                target_lang TEXT DEFAULT '',
+                engine      TEXT DEFAULT '',
+                timestamp   TEXT DEFAULT ''
+            )
+        ''')
+        # migration: أضف أي عمود ناقص في قاعدة بيانات قديمة
+        existing = {row[1] for row in c.execute("PRAGMA table_info(history)")}
+        for col, typ in [("engine", "TEXT DEFAULT ''"),
+                         ("emotion", "TEXT DEFAULT ''"),
+                         ("source_lang", "TEXT DEFAULT ''"),
+                         ("target_lang", "TEXT DEFAULT ''")]:
+            if col not in existing:
+                c.execute(f"ALTER TABLE history ADD COLUMN {col} {typ}")
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        # لا نوقف التطبيق — نستخدم الذاكرة كاحتياطي
+        if "db_error" not in st.session_state:
+            st.session_state["db_error"] = str(e)
+        return False
 
 def save_translation(original, translated, emotion, source_lang, target_lang, engine=""):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''
-        INSERT INTO history (original, translated, emotion, source_lang, target_lang, engine, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (original, translated, emotion, source_lang, target_lang, engine,
-          datetime.now().strftime("%Y-%m-%d %H:%M")))
-    conn.commit()
-    conn.close()
+    # احتياطي في الذاكرة دائماً
+    if "_mem_history" not in st.session_state:
+        st.session_state["_mem_history"] = []
+    entry = {
+        "original": str(original or "")[:500],
+        "translated": str(translated or "")[:500],
+        "emotion": str(emotion or ""),
+        "source_lang": str(source_lang or ""),
+        "target_lang": str(target_lang or ""),
+        "engine": str(engine or ""),
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+    st.session_state["_mem_history"].insert(0, entry)
+    st.session_state["_mem_history"] = st.session_state["_mem_history"][:200]
+    # محاولة الحفظ في SQLite أيضاً
+    try:
+        conn = _get_conn()
+        conn.cursor().execute('''
+            INSERT INTO history
+                (original, translated, emotion, source_lang, target_lang, engine, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (entry["original"], entry["translated"], entry["emotion"],
+              entry["source_lang"], entry["target_lang"], entry["engine"], entry["time"]))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass  # نكتفي بالذاكرة
 
 def get_history(limit=100):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''
-        SELECT original, translated, emotion, source_lang, target_lang, engine, timestamp
-        FROM history ORDER BY id DESC LIMIT ?
-    ''', (limit,))
-    rows = c.fetchall()
-    conn.close()
-    return [{"original": r[0], "translated": r[1], "emotion": r[2],
-             "source_lang": r[3], "target_lang": r[4], "engine": r[5], "time": r[6]}
-            for r in rows]
+    # حاول قراءة SQLite
+    try:
+        conn = _get_conn()
+        c = conn.cursor()
+        c.execute('''
+            SELECT original, translated, emotion, source_lang, target_lang, engine, timestamp
+            FROM history ORDER BY id DESC LIMIT ?
+        ''', (limit,))
+        rows = c.fetchall()
+        conn.close()
+        if rows:
+            return [{"original": r[0], "translated": r[1], "emotion": r[2] or "",
+                     "source_lang": r[3] or "", "target_lang": r[4] or "",
+                     "engine": r[5] or "", "time": r[6] or ""}
+                    for r in rows]
+    except Exception:
+        pass
+    # احتياطي: اعرض من الذاكرة
+    return st.session_state.get("_mem_history", [])[:limit]
 
 def clear_history():
-    conn = sqlite3.connect(DB_PATH)
-    conn.cursor().execute('DELETE FROM history')
-    conn.commit()
-    conn.close()
+    st.session_state["_mem_history"] = []
+    try:
+        conn = _get_conn()
+        conn.cursor().execute('DELETE FROM history')
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 def export_history_json():
     return json.dumps(get_history(limit=1000), ensure_ascii=False, indent=2)
