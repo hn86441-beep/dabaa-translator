@@ -16,4 +16,5 @@ resemblyzer==0.1.3
 scikit-learn>=1.3
 librosa>=0.10
 pydub>=0.25
-cachetools>=5.3
+silero-vad>=5.1
+soundfile>=0.12
