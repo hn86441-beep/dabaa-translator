@@ -347,7 +347,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
 def load_whisper_model():
     if WHISPER_AVAILABLE:
         try:
-            # نموذج medium لدقة أفضل، يمكن تغييره لـ "large-v3" لو توفرت موارد
+            # نموذج medium – يوازن بين الدقة والسرعة. غيّره إلى "large-v3" إن أردت دقة أفضل
             return WhisperModel("medium", device="cpu", compute_type="int8")
         except:
             return None
@@ -362,8 +362,29 @@ def load_resemblyzer_encoder():
 whisper_model = load_whisper_model()
 resemblyzer_encoder = load_resemblyzer_encoder()
 
+def transcribe_audio(audio_bytes, language=None):
+    """تحويل مقطع صوتي إلى نص (دون تمييز متحدثين)."""
+    if whisper_model is None:
+        return None, "النموذج غير محمّل"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+        segments, info = whisper_model.transcribe(tmp_path, language=language, beam_size=5)
+        text = " ".join(seg.text.strip() for seg in segments)
+        return text, info.language
+    except Exception as e:
+        return None, str(e)
+    finally:
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except:
+            pass
+
 def diarize_segments(audio_path, segments, num_speakers=None):
-    """تجميع المقاطع الصوتية حسب المتحدث باستخدام Resemblyzer + KMeans."""
+    """تجميع المقاطع الصوتية حسب المتحدث (للملفات المرفوعة فقط)."""
     if resemblyzer_encoder is None:
         for seg in segments:
             seg["speaker"] = "SPEAKER_0"
@@ -384,7 +405,7 @@ def diarize_segments(audio_path, segments, num_speakers=None):
     for i, seg in enumerate(segments):
         start_sample = int(seg["start"] * sr)
         end_sample = int(seg["end"] * sr)
-        if end_sample - start_sample < 4000:  # أقل من 0.25 ثانية نتجاهل
+        if end_sample - start_sample < 4000:
             continue
         snippet = wav[start_sample:end_sample]
         if np.abs(snippet).max() < 0.01:
@@ -432,7 +453,7 @@ def diarize_segments(audio_path, segments, num_speakers=None):
     return segments
 
 def transcribe_with_speakers_free(audio_bytes, source_lang="auto", num_speakers=None):
-    """تحويل الصوت إلى نص مع تمييز المتحدثين (بدون Hugging Face Token)."""
+    """تحويل الصوت إلى نص مع تمييز المتحدثين (للملفات المرفوعة)."""
     if whisper_model is None:
         return None, "نموذج Whisper غير محمّل"
 
@@ -465,7 +486,7 @@ def transcribe_with_speakers_free(audio_bytes, source_lang="auto", num_speakers=
             pass
 
 def translate_text(text, target_lang):
-    """ترجمة النص مع احتياطي LibreTranslate إذا وُجد."""
+    """ترجمة النص مع احتياطي LibreTranslate."""
     try:
         translator = GoogleTranslator(source='auto', target=target_lang)
         return translator.translate(text), None
@@ -499,7 +520,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (كما هو سابقاً مع إضافة فقاعات المحادثة)
+#  CSS
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -791,8 +812,9 @@ if "selected_style" not in st.session_state:
     st.session_state.selected_style = "Auto-Detect"
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
-if "group_chunks" not in st.session_state:
-    st.session_state.group_chunks = []
+# جلسة المحادثة المباشرة
+if "group_chat_messages" not in st.session_state:
+    st.session_state.group_chat_messages = []
 
 def swap_languages():
     old_source = st.session_state.source_lang
@@ -865,11 +887,10 @@ st.session_state.selected_style = selected_style_label
 # ════════════════════════════════════════════════════════════
 tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "👥 Group"])
 
-# ----- Tab 1: Voice (يحتاج DeepL + Cohere) -----
+# ----- Tab 1: Voice -----
 with tab1:
     st.markdown("---")
     st.markdown('<div class="section-heading">🎤 Voice Input</div>', unsafe_allow_html=True)
-
     if not st.session_state.deepl_api_key or not st.session_state.cohere_api_key:
         st.info("تحتاج لمفاتيح DeepL و Cohere لاستخدام هذا التبويب.")
     else:
@@ -910,7 +931,7 @@ with tab1:
                 else:
                     st.error(f"❌ {engine_used}")
 
-# ----- Tab 2: Text (يحتاج DeepL) -----
+# ----- Tab 2: Text -----
 with tab2:
     st.markdown("---")
     st.markdown('<div class="section-heading">📝 Text Input</div>', unsafe_allow_html=True)
@@ -953,7 +974,7 @@ with tab2:
                     else:
                         st.error(f"❌ {translation_result}")
 
-# ----- Tab 3: File (يحتاج DeepL) -----
+# ----- Tab 3: File -----
 with tab3:
     st.markdown("---")
     st.markdown('<div class="section-heading">📄 File Translation</div>', unsafe_allow_html=True)
@@ -998,63 +1019,120 @@ with tab3:
                     else:
                         st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Group Chat (مجاني بالكامل، بدون Hugging Face Token) -----
+# ----- Tab 4: Group Chat (محادثة فورية + رفع ملف) -----
 with tab4:
     st.markdown("---")
-    st.markdown('<div class="section-heading">👥 Group Chat Translation (مجاني)</div>', unsafe_allow_html=True)
-    st.caption("ترجمة المحادثات الجماعية مع تمييز المتحدثين · بدون الحاجة إلى Hugging Face Token")
-    
-    if whisper_model is None or resemblyzer_encoder is None:
-        st.error("❌ النماذج غير متاحة. تأكد من تثبيت faster-whisper و resemblyzer و scikit-learn و librosa.")
+    st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
+    st.caption("محادثة فورية مع تمييز المتحدثين · يدعم جميع اللغات")
+
+    if whisper_model is None:
+        st.error("❌ نموذج Whisper غير محمّل. تأكد من تثبيت faster-whisper.")
     else:
-        col1, col2 = st.columns(2)
-        with col1:
-            source_lang_group = st.selectbox("اللغة المنطوقة (أو تلقائي)", list(languages_dict.keys()), key="group_source_free")
-        with col2:
-            target_options = [k for k in languages_dict.keys() if k != "Auto-Detect"]
-            target_lang_group = st.selectbox("اللغة الهدف للترجمة", target_options, key="group_target_free")
-        
-        source_code = languages_dict[source_lang_group]
+        # اختيار اللغة الهدف فقط (المصدر تلقائي دائمًا)
+        target_options = [k for k in languages_dict.keys() if k != "Auto-Detect"]
+        target_lang_group = st.selectbox("ترجمة إلى", target_options, key="group_target_live")
         target_code = languages_dict[target_lang_group]
-        
-        num_speakers = st.number_input("عدد المتحدثين المتوقع (اختياري، اترك 0 للتلقائي)", min_value=0, max_value=20, value=0, key="num_speakers")
-        num_speakers = num_speakers if num_speakers > 0 else None
-        
-        mode = st.radio("اختر وضع الإدخال:", ["رفع ملف صوتي (اجتماع مسجل)", "تسجيل مباشر (مقاطع متعددة)"], key="mode_radio")
-        
-        if mode == "رفع ملف صوتي (اجتماع مسجل)":
-            audio_file = st.file_uploader("اختر ملف صوتي (WAV, MP3, M4A)", type=["wav", "mp3", "m4a"], key="group_audio_free")
+
+        st.markdown('<div class="section-heading">🎙️ اختر وضع المحادثة</div>', unsafe_allow_html=True)
+        mode = st.radio("الوضع:", ["محادثة مباشرة (تحدث الآن)", "رفع ملف صوتي (اجتماع مسجل)"], key="mode_radio")
+
+        if mode == "محادثة مباشرة (تحدث الآن)":
+            st.markdown('<div class="section-heading">🗣️ المتحدث الحالي</div>', unsafe_allow_html=True)
+            # اختيار اسم المتحدث من قائمة أو يدويًا
+            speaker_options = ["SPEAKER_1", "SPEAKER_2", "SPEAKER_3", "SPEAKER_4", "SPEAKER_5", "مخصص..."]
+            selected_speaker = st.selectbox("اختر المتحدث", speaker_options, key="speaker_select")
+            if selected_speaker == "مخصص...":
+                custom_speaker = st.text_input("أدخل اسم المتحدث", value="", key="custom_speaker")
+                current_speaker = custom_speaker.strip() if custom_speaker.strip() else "SPEAKER"
+            else:
+                current_speaker = selected_speaker
+
+            st.markdown("---")
+            # تسجيل المقطع
+            audio_chunk = st.audio_input(f"🎤 تحدث الآن كـ {current_speaker}", key="live_single_chunk")
+            if audio_chunk is not None:
+                with st.spinner("⏳ جاري النسخ والترجمة..."):
+                    # التعرف على الصوت مع الاكتشاف التلقائي للغة (language=None)
+                    text, lang_detected = transcribe_audio(audio_chunk.getvalue(), language=None)
+                    if text:
+                        translated, err = translate_text(text, target_code)
+                        if not translated:
+                            translated = f"[خطأ: {err}]"
+                        # إضافة إلى سجل المحادثة
+                        st.session_state.group_chat_messages.append({
+                            "speaker": current_speaker,
+                            "original": text,
+                            "translated": translated,
+                            "lang": lang_detected if lang_detected else "?"
+                        })
+                        st.success(f"تمت إضافة رسالة من {current_speaker}")
+                        st.rerun()
+                    else:
+                        st.error(f"فشل التعرف على الصوت: {lang_detected}")
+
+            # عرض المحادثة الحالية
+            if st.session_state.group_chat_messages:
+                st.markdown('<div class="section-heading">💬 المحادثة</div>', unsafe_allow_html=True)
+                speaker_colors = {}
+                color_palette = ["#4ECBA0", "#FF6B6B", "#FFD93D", "#6C5CE7", "#45B7D1", "#F39C12", "#9B59B6", "#E74C3C", "#2ECC71", "#3498DB"]
+                for msg in st.session_state.group_chat_messages:
+                    spk = msg["speaker"]
+                    if spk not in speaker_colors:
+                        speaker_colors[spk] = color_palette[len(speaker_colors) % len(color_palette)]
+                    color = speaker_colors[spk]
+                    st.markdown(f"""
+                    <div class="chat-bubble" style="border-left-color: {color};">
+                        <div class="speaker" style="color: {color};">👤 {spk} <small style="opacity:0.7;">({msg.get('lang', '')})</small></div>
+                        <div class="original">🎙️ {msg['original']}</div>
+                        <div class="translated">🌍 {msg['translated']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                # أزرار التحكم
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button("🧹 مسح المحادثة", use_container_width=True):
+                        st.session_state.group_chat_messages = []
+                        st.rerun()
+                with col2:
+                    # تشغيل صوتي لآخر ترجمة
+                    last_msg = st.session_state.group_chat_messages[-1]
+                    if last_msg["translated"] and not last_msg["translated"].startswith("["):
+                        audio_out = generate_audio(last_msg["translated"], target_code)
+                        if audio_out:
+                            st.audio(audio_out, format="audio/mp3")
+                with col3:
+                    full_text = "\n".join(
+                        [f"[{m['speaker']}] 🎙️ {m['original']}\n🌍 {m['translated']}" for m in st.session_state.group_chat_messages]
+                    )
+                    st.download_button("📥 تحميل المحادثة", full_text, file_name="live_chat.txt", use_container_width=True)
+
+        else:  # رفع ملف صوتي (اجتماع مسجل)
+            if resemblyzer_encoder is None:
+                st.warning("⚠️ تمييز المتحدثين غير متاح (تأكد من تثبيت resemblyzer). سيتم التعامل مع الملف كمتحدث واحد.")
+            audio_file = st.file_uploader("اختر ملف صوتي", type=["wav", "mp3", "m4a"], key="group_audio_file")
             if audio_file is not None:
                 file_bytes = audio_file.getvalue()
-                file_size = len(file_bytes) // 1024
-                st.success(f"✅ {audio_file.name} ({file_size} KB)")
-                if st.button("🚀 تحليل وترجمة المحادثة", key="group_free_btn"):
-                    with st.spinner("⏳ جاري التعرف على المتحدثين وترجمة الحوار..."):
-                        segments, detected_lang = transcribe_with_speakers_free(file_bytes, source_code, num_speakers)
+                st.success(f"✅ {audio_file.name} ({len(file_bytes)//1024} KB)")
+                num_speakers = st.number_input("عدد المتحدثين المتوقع (اختياري)", min_value=0, max_value=20, value=0)
+                num_speakers = num_speakers if num_speakers > 0 else None
+                if st.button("🚀 تحليل الملف وترجمته", key="process_file"):
+                    with st.spinner("⏳ جاري التعرف على المتحدثين..."):
+                        segments, detected_lang = transcribe_with_speakers_free(file_bytes, "auto", num_speakers)
                         if segments:
-                            lang_display = detected_lang if isinstance(detected_lang, str) else "تلقائي"
-                            st.info(f"اللغة المكتشفة: {lang_display}")
+                            st.info(f"اللغة المكتشفة: {detected_lang}")
                             translated_segments = []
-                            progress_bar = st.progress(0)
-                            for idx, seg in enumerate(segments):
-                                text = seg["text"]
-                                speaker = seg["speaker"]
-                                translated_text, err2 = translate_text(text, target_code)
-                                if translated_text:
-                                    translated_segments.append({
-                                        "speaker": speaker,
-                                        "original": text,
-                                        "translated": translated_text
-                                    })
-                                else:
-                                    translated_segments.append({
-                                        "speaker": speaker,
-                                        "original": text,
-                                        "translated": f"[خطأ: {err2}]"
-                                    })
-                                progress_bar.progress((idx + 1) / len(segments))
-                            progress_bar.empty()
-                            
+                            prog = st.progress(0)
+                            for i, seg in enumerate(segments):
+                                tr, err = translate_text(seg["text"], target_code)
+                                translated_segments.append({
+                                    "speaker": seg.get("speaker", "SPEAKER_0"),
+                                    "original": seg["text"],
+                                    "translated": tr if tr else f"[خطأ: {err}]"
+                                })
+                                prog.progress((i+1)/len(segments))
+                            prog.empty()
+
                             st.markdown('<div class="section-heading">💬 المحادثة المترجمة</div>', unsafe_allow_html=True)
                             speaker_colors = {}
                             color_palette = ["#4ECBA0", "#FF6B6B", "#FFD93D", "#6C5CE7", "#45B7D1", "#F39C12", "#9B59B6", "#E74C3C", "#2ECC71", "#3498DB"]
@@ -1070,96 +1148,12 @@ with tab4:
                                     <div class="translated">🌍 {item['translated']}</div>
                                 </div>
                                 """, unsafe_allow_html=True)
-                            
-                            full_text = "\n".join([f"[{item['speaker']}] 🎙️ {item['original']}\n🌍 {item['translated']}" for item in translated_segments])
-                            st.code(full_text, language=None)
-                            
-                            if translated_segments:
-                                last_translated = translated_segments[-1]["translated"]
-                                if last_translated and not last_translated.startswith("[خطأ"):
-                                    audio_bytes_tts = generate_audio(last_translated, target_code)
-                                    if audio_bytes_tts:
-                                        st.audio(audio_bytes_tts, format="audio/mp3")
-                            
-                            save_translation("محادثة جماعية", full_text, analyze_emotion(full_text), "Group", target_lang_group)
-                            st.download_button(
-                                label="📥 تحميل الترجمة كاملة (TXT)",
-                                data=full_text,
-                                file_name="group_translation.txt",
-                                mime="text/plain"
-                            )
+
+                            full_text = "\n".join([f"[{i['speaker']}] 🎙️ {i['original']}\n🌍 {i['translated']}" for i in translated_segments])
+                            save_translation(audio_file.name, full_text, analyze_emotion(full_text), "Group File", target_lang_group)
+                            st.download_button("📥 تحميل الترجمة", full_text, file_name="group_file_translation.txt")
                         else:
-                            st.error(f"❌ فشل المعالجة: {detected_lang if isinstance(detected_lang, str) else 'خطأ'}")
-        else:  # تسجيل مباشر
-            st.info("سيتم تسجيل عدة مقاطع صوتية متتالية، ثم تحليلها معًا.")
-            audio_chunk = st.audio_input("تحدث الآن (اضغط لإضافة مقطع)", key="live_chunk")
-            if audio_chunk:
-                st.session_state.group_chunks.append(audio_chunk.getvalue())
-                st.success(f"تمت إضافة مقطع #{len(st.session_state.group_chunks)}")
-                st.rerun()
-            
-            if st.session_state.group_chunks:
-                st.write(f"المقاطع المسجلة: {len(st.session_state.group_chunks)}")
-                if st.button("🧹 مسح جميع المقاطع", key="clear_chunks"):
-                    st.session_state.group_chunks = []
-                    st.rerun()
-                if st.button("🚀 تحليل المحادثة المجمعة", key="process_live"):
-                    with st.spinner("⏳ جاري دمج المقاطع وتحليلها..."):
-                        full_audio = b''.join(st.session_state.group_chunks)
-                        segments, detected_lang = transcribe_with_speakers_free(full_audio, source_code, num_speakers)
-                        if segments:
-                            lang_display = detected_lang if isinstance(detected_lang, str) else "تلقائي"
-                            st.info(f"اللغة المكتشفة: {lang_display}")
-                            translated_segments = []
-                            progress_bar = st.progress(0)
-                            for idx, seg in enumerate(segments):
-                                text = seg["text"]
-                                speaker = seg["speaker"]
-                                translated_text, err2 = translate_text(text, target_code)
-                                if translated_text:
-                                    translated_segments.append({
-                                        "speaker": speaker,
-                                        "original": text,
-                                        "translated": translated_text
-                                    })
-                                else:
-                                    translated_segments.append({
-                                        "speaker": speaker,
-                                        "original": text,
-                                        "translated": f"[خطأ: {err2}]"
-                                    })
-                                progress_bar.progress((idx + 1) / len(segments))
-                            progress_bar.empty()
-                            
-                            st.markdown('<div class="section-heading">💬 المحادثة المترجمة</div>', unsafe_allow_html=True)
-                            speaker_colors = {}
-                            color_palette = ["#4ECBA0", "#FF6B6B", "#FFD93D", "#6C5CE7", "#45B7D1", "#F39C12", "#9B59B6", "#E74C3C", "#2ECC71", "#3498DB"]
-                            for item in translated_segments:
-                                spk = item["speaker"]
-                                if spk not in speaker_colors:
-                                    speaker_colors[spk] = color_palette[len(speaker_colors) % len(color_palette)]
-                                color = speaker_colors[spk]
-                                st.markdown(f"""
-                                <div class="chat-bubble" style="border-left-color: {color};">
-                                    <div class="speaker" style="color: {color};">👤 {spk}</div>
-                                    <div class="original">🎙️ {item['original']}</div>
-                                    <div class="translated">🌍 {item['translated']}</div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            
-                            full_text = "\n".join([f"[{item['speaker']}] 🎙️ {item['original']}\n🌍 {item['translated']}" for item in translated_segments])
-                            st.code(full_text, language=None)
-                            
-                            if translated_segments:
-                                last = translated_segments[-1]["translated"]
-                                if last and not last.startswith("[خطأ"):
-                                    aud = generate_audio(last, target_code)
-                                    if aud:
-                                        st.audio(aud, format="audio/mp3")
-                            save_translation("محادثة مباشرة", full_text, analyze_emotion(full_text), "Group", target_lang_group)
-                            st.download_button("📥 تحميل الترجمة", full_text, file_name="group_live_translation.txt")
-                        else:
-                            st.error(f"❌ فشل المعالجة: {detected_lang if isinstance(detected_lang, str) else 'خطأ'}")
+                            st.error(f"فشل المعالجة: {detected_lang}")
 
 # Footer
 st.markdown("""
