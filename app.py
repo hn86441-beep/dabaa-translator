@@ -423,28 +423,74 @@ def extract_text_from_image(image_bytes: bytes) -> tuple[str | None, str | None]
         return None, str(e)
 
 # ════════════════════════════════════════════════════════════
-#  التعرف على الصوت — Cohere STT
+#  التعرف على الصوت
+#  الأولوية:  1 Groq whisper-large-v3-turbo (أفضل جودة، مجاني، 99 لغة)
+#             2 Cohere (احتياطي)
+#             3 faster-whisper محلي (احتياطي أخير)
 # ════════════════════════════════════════════════════════════
 
-def speech_to_text_cohere(audio_bytes: bytes, language_code: str = "en") -> tuple[str | None, str | None]:
+_WHISPER_LANG = {
+    "auto": None, "ar": "ar", "en": "en", "ru": "ru",
+    "zh-CN": "zh", "zh-cn": "zh", "de": "de", "es": "es",
+    "fr": "fr", "pt": "pt", "it": "it", "ja": "ja",
+    "ko": "ko", "tr": "tr", "nl": "nl", "pl": "pl",
+    "uk": "uk", "sv": "sv", "da": "da", "fi": "fi",
+    "ro": "ro", "hu": "hu", "cs": "cs", "bg": "bg",
+    "el": "el", "id": "id", "hi": "hi", "fa": "fa",
+    "iw": "he", "ur": "ur",
+}
+
+def _whisper_lang(code):
+    if not code or code == "auto":
+        return None
+    return _WHISPER_LANG.get(code, code[:2])
+
+
+def speech_to_text_groq(audio_bytes, language_code="auto"):
+    """Groq Whisper Large V3 Turbo — مجاني 7200 ثانية/يوم، 99 لغة."""
+    api_key = st.session_state.get("groq_api_key", "")
+    if not api_key:
+        return None, "مفتاح Groq غير موجود"
+    try:
+        lang = _whisper_lang(language_code)
+        files = {
+            "file": ("audio.wav", audio_bytes, "audio/wav"),
+            "model": (None, "whisper-large-v3-turbo"),
+            "response_format": (None, "json"),
+        }
+        if lang:
+            files["language"] = (None, lang)
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            files=files,
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            text = resp.json().get("text", "").strip()
+            return (text, None) if text else (None, "لم يُكتشف كلام")
+        return None, f"Groq {resp.status_code}: {resp.text[:120]}"
+    except Exception as e:
+        return None, str(e)
+
+
+def speech_to_text_cohere(audio_bytes, language_code="en"):
     api_key = st.session_state.get("cohere_api_key", "")
     if not api_key:
         return None, "مفتاح Cohere غير موجود"
     try:
-        lang = "en" if not language_code or language_code == "auto" else language_code
-        # يقبل Cohere رمزَي حرف فقط
-        lang = lang[:2]
+        lang = _whisper_lang(language_code) or "en"
         fields = OrderedDict()
-        fields['language'] = lang
-        fields['model']    = 'cohere-transcribe-03-2026'
-        fields['file']     = ('audio.wav', audio_bytes, 'audio/wav')
+        fields["language"] = lang
+        fields["model"]    = "cohere-transcribe-03-2026"
+        fields["file"]     = ("audio.wav", audio_bytes, "audio/wav")
         enc = MultipartEncoder(fields=fields)
         resp = requests.post(
             "https://api.cohere.com/v2/audio/transcriptions",
             headers={"Authorization": f"Bearer {api_key}",
                      "Content-Type": enc.content_type},
             data=enc,
-            timeout=30
+            timeout=30,
         )
         if resp.status_code == 200:
             text = resp.json().get("text", "").strip()
@@ -454,7 +500,7 @@ def speech_to_text_cohere(audio_bytes: bytes, language_code: str = "en") -> tupl
         return None, str(e)
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_whisper_model():
     try:
         from faster_whisper import WhisperModel
@@ -462,10 +508,10 @@ def load_whisper_model():
     except Exception:
         return None
 
-def speech_to_text_whisper(audio_bytes: bytes, lang: str = "ru") -> tuple[str | None, str | None]:
+def speech_to_text_whisper_local(audio_bytes, lang=None):
     model = load_whisper_model()
     if not model:
-        return None, "Whisper غير متاح"
+        return None, "Whisper المحلي غير متاح"
     tmp = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
@@ -481,11 +527,25 @@ def speech_to_text_whisper(audio_bytes: bytes, lang: str = "ru") -> tuple[str | 
             os.unlink(tmp)
 
 
-def speech_to_text(audio_bytes: bytes, language_code: str = "auto") -> tuple[str | None, str | None]:
-    """Whisper للروسية، Cohere لباقي اللغات."""
-    if language_code == "ru":
-        return speech_to_text_whisper(audio_bytes, lang="ru")
-    return speech_to_text_cohere(audio_bytes, language_code)
+def speech_to_text(audio_bytes, language_code="auto"):
+    """يجرّب: Groq -> Cohere -> Whisper محلي"""
+    wlang  = _whisper_lang(language_code)
+    errors = []
+    if st.session_state.get("groq_api_key"):
+        r, e = speech_to_text_groq(audio_bytes, language_code)
+        if r:
+            return r, None
+        errors.append(f"Groq: {e}")
+    if st.session_state.get("cohere_api_key"):
+        r, e = speech_to_text_cohere(audio_bytes, language_code)
+        if r:
+            return r, None
+        errors.append(f"Cohere: {e}")
+    r, e = speech_to_text_whisper_local(audio_bytes, lang=wlang)
+    if r:
+        return r, None
+    errors.append(f"Whisper: {e}")
+    return None, " | ".join(errors)
 
 # ════════════════════════════════════════════════════════════
 #  أنماط المجال
@@ -556,6 +616,7 @@ _defaults = {
     "theme":          "dark",
     "deepl_api_key":  _secret("DEEPL_API_KEY"),
     "cohere_api_key": _secret("COHERE_API_KEY"),
+    "groq_api_key":   _secret("GROQ_API_KEY"),
     "source_lang":    "Auto-Detect",
     "target_lang":    "Arabic",
     "input_text":     "",
@@ -677,17 +738,45 @@ with st.sidebar:
     st.divider()
 
     with st.expander("🔑 مفاتيح API", expanded=False):
-        dk = st.text_input("DeepL API Key", type="password",
-                           value=st.session_state.deepl_api_key, key="deepl_input")
-        ck = st.text_input("Cohere API Key", type="password",
-                           value=st.session_state.cohere_api_key, key="cohere_input")
+        # ── Groq (STT) ──
+        gk = st.text_input(
+            "🎤 Groq API Key (للتعرف على الصوت)",
+            type="password",
+            value=st.session_state.groq_api_key,
+            key="groq_input",
+            help="احصل على مفتاح مجاني من console.groq.com — أفضل دقة لجميع اللغات",
+        )
+        if gk != st.session_state.groq_api_key:
+            st.session_state.groq_api_key = gk
+
+        # ── DeepL (ترجمة) ──
+        dk = st.text_input(
+            "🌐 DeepL API Key (للترجمة)",
+            type="password",
+            value=st.session_state.deepl_api_key,
+            key="deepl_input",
+        )
         if dk != st.session_state.deepl_api_key:
             st.session_state.deepl_api_key = dk
+
+        # ── Cohere (STT احتياطي) ──
+        ck = st.text_input(
+            "🔄 Cohere API Key (احتياطي STT)",
+            type="password",
+            value=st.session_state.cohere_api_key,
+            key="cohere_input",
+        )
         if ck != st.session_state.cohere_api_key:
             st.session_state.cohere_api_key = ck
-        # عرض حالة المحرك
+
+        st.divider()
+        # حالة المحركات
+        if st.session_state.groq_api_key:
+            st.success("🎤 Groq نشط — جودة عالية، 99 لغة")
+        else:
+            st.warning("⚠️ Groq غير نشط — أضف مفتاحاً مجانياً من console.groq.com")
         if st.session_state.deepl_api_key:
-            st.success("✅ DeepL نشط (جودة عالية)")
+            st.success("🌐 DeepL نشط — جودة ترجمة عالية")
         else:
             st.info("ℹ️ DeepL غير نشط — يُستخدم Google مجاناً")
 
