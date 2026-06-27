@@ -11,3 +11,4 @@ requests>=2.28
 requests-toolbelt>=0.10
 transformers>=4.36
 faster-whisper>=1.0
+langdetect>=1.0.9
