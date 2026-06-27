@@ -347,7 +347,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
 def load_whisper_model():
     if WHISPER_AVAILABLE:
         try:
-            # النموذج small للسرعة، int8 للمعالجة السريعة
+            # نموذج small للسرعة، int8 لتقليل استهلاك الذاكرة
             return WhisperModel("small", device="cpu", compute_type="int8")
         except:
             return None
@@ -371,7 +371,6 @@ def transcribe_audio(audio_bytes, language=None):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
-        # استخدام beam_size=1 وبدون vad_filter لتجنب أي بطء
         segments, info = whisper_model.transcribe(
             tmp_path,
             language=language,
@@ -820,6 +819,10 @@ if "translated_text" not in st.session_state:
 if "group_chat_messages" not in st.session_state:
     st.session_state.group_chat_messages = []
 
+# عداد لتغيير مفتاح أداة التسجيل ومنع التكرار
+if "audio_key_counter" not in st.session_state:
+    st.session_state.audio_key_counter = 0
+
 def swap_languages():
     old_source = st.session_state.source_lang
     old_target = st.session_state.target_lang
@@ -1023,11 +1026,11 @@ with tab3:
                     else:
                         st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Group Chat (خفيف وسريع) -----
+# ----- Tab 4: Group Chat (يعمل بشكل صحيح الآن) -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
-    st.caption("محادثة فورية – تحدث باسمك ثم تُترجم رسالتك فوراً (نموذج small سريع)")
+    st.caption("محادثة فورية – تحدث باسمك ثم تُترجم رسالتك فوراً")
 
     if whisper_model is None:
         st.error("❌ نموذج Whisper غير محمّل. تأكد من تثبيت faster-whisper.")
@@ -1049,7 +1052,13 @@ with tab4:
                 current_speaker = selected_speaker
 
             st.markdown("---")
-            audio_chunk = st.audio_input(f"🎤 تحدث الآن كـ {current_speaker}", key="live_single_chunk")
+
+            # استخدام مفتاح متغير لتفريغ الأداة بعد كل رسالة ناجحة
+            audio_chunk = st.audio_input(
+                f"🎤 تحدث الآن كـ {current_speaker}",
+                key=f"live_single_chunk_{st.session_state.audio_key_counter}"
+            )
+
             if audio_chunk is not None:
                 with st.spinner("⏳ جاري النسخ والترجمة..."):
                     text, lang_detected = transcribe_audio(audio_chunk.getvalue(), language=None)
@@ -1063,6 +1072,8 @@ with tab4:
                             "translated": translated,
                             "lang": lang_detected if lang_detected else "?"
                         })
+                        # زيادة العداد لتغيير المفتاح وبالتالي تفريغ التسجيل
+                        st.session_state.audio_key_counter += 1
                         st.success(f"✅ تمت إضافة رسالة من {current_speaker}")
                         st.rerun()
                     else:
