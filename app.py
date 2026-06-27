@@ -144,7 +144,7 @@ def export_history_json():
 init_db()
 
 # ════════════════════════════════════════════════════════════
-#  تحليل المشاعر (لم أغيرها أبداً – كما هي في كودك الأصلي)
+#  تحليل المشاعر (لم أغيرها)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_emotion_classifier():
@@ -347,7 +347,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  دوال المحادثة الجماعية (خفيفة وسريعة + تحسينات)
+#  دوال المحادثة الجماعية (المُحسَّنة)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_whisper_model():
@@ -499,7 +499,7 @@ def transcribe_audio_single(audio_bytes, language=None):
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-# تخزين الترجمة مؤقتاً
+# تخزين مؤقت للترجمة
 @st.cache_data(show_spinner=False, ttl=3600)
 def cached_translate(text, target_lang):
     try:
@@ -535,7 +535,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (بدون تغيير)
+#  CSS
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -899,7 +899,7 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  التبويبات
+#  التبويبات – التعريف هنا (حل المشكلة)
 # ════════════════════════════════════════════════════════════
 tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "👥 Group"])
 
