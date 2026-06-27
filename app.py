@@ -39,6 +39,12 @@ try:
 except ImportError:
     SILERO_VAD_AVAILABLE = False
 
+try:
+    import noisereduce as nr
+    NOISEREDUCE_AVAILABLE = True
+except ImportError:
+    NOISEREDUCE_AVAILABLE = False
+
 # ════════════════════════════════════════════════════════════
 #  استيراد EasyOCR للصور (للملفات فقط)
 # ════════════════════════════════════════════════════════════
@@ -195,7 +201,7 @@ def generate_audio(text, lang_code="en"):
         return None
 
 # ════════════════════════════════════════════════════════════
-#  استخراج النص من الملفات
+#  استخراج النص من الملفات (بدون تغيير)
 # ════════════════════════════════════════════════════════════
 def extract_text_from_file(file_bytes, filename):
     ext = os.path.splitext(filename)[1].lower()
@@ -347,13 +353,15 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  دوال المحادثة الجماعية (المُحسَّنة)
+#  دوال المحادثة الجماعية (مُحسَّنة بدقة أعلى)
 # ════════════════════════════════════════════════════════════
+
+# نموذج Whisper ديناميكي حسب اختيار المستخدم
 @st.cache_resource
-def load_whisper_model():
+def load_whisper_model(model_size="medium"):
     if WHISPER_AVAILABLE:
         try:
-            return WhisperModel("small", device="cpu", compute_type="int8")
+            return WhisperModel(model_size, device="cpu", compute_type="int8")
         except:
             return None
     return None
@@ -370,15 +378,19 @@ def load_vad_model():
         return load_silero_vad()
     return None
 
-whisper_model = load_whisper_model()
+# سنقوم بتحميل النموذج الافتراضي medium أولاً، وسيتم تغييره لاحقاً حسب اختيار المستخدم
+whisper_model = load_whisper_model("medium")
 resemblyzer_encoder = load_resemblyzer_encoder()
 vad_model = load_vad_model()
 
 def prepare_audio(audio_bytes, target_sr=16000):
-    """تحويل الصوت إلى 16kHz أحادي وتطبيع المستوى."""
+    """تحويل الصوت إلى 16kHz أحادي، تطبيع المستوى، وتقليل الضوضاء."""
     try:
-        import soundfile as sf
         audio_np, sr = librosa.load(io.BytesIO(audio_bytes), sr=target_sr, mono=True)
+        # تقليل الضوضاء (إن كانت المكتبة متوفرة)
+        if NOISEREDUCE_AVAILABLE:
+            audio_np = nr.reduce_noise(y=audio_np, sr=sr, prop_decrease=0.85)
+        # تطبيع
         peak = np.abs(audio_np).max()
         if peak > 0:
             audio_np = audio_np / peak * 0.9
@@ -397,9 +409,9 @@ def get_speech_segments(audio_np, sr):
     except Exception as e:
         return None, str(e)
 
-def transcribe_segment(audio_np, sr, start, end):
-    """تفريغ مقطع صوتي واحد (start, end بالثواني)."""
-    if whisper_model is None:
+def transcribe_segment(audio_np, sr, start, end, model):
+    """تفريغ مقطع صوتي واحد باستخدام نموذج معين (يدعم متعدد اللغات)."""
+    if model is None:
         return None, "النموذج غير محمّل"
     snippet = audio_np[int(start*sr):int(end*sr)]
     if len(snippet) < 400:
@@ -409,7 +421,8 @@ def transcribe_segment(audio_np, sr, start, end):
         sf.write(tmp.name, snippet, sr)
         tmp_path = tmp.name
     try:
-        segs, info = whisper_model.transcribe(tmp_path, language=None, beam_size=1)
+        # language=None يجعل النموذج يتعرف تلقائياً على اللغة (يعمل أفضل مع medium+)
+        segs, info = model.transcribe(tmp_path, language=None, beam_size=1)
         text = " ".join(s.text.strip() for s in segs)
         return text, info.language if info else None
     except Exception as e:
@@ -463,8 +476,10 @@ def speaker_diarization(audio_np, sr, segments, num_speakers=None):
             seg["speaker"] = f"متحدث {i+1}"
     return segments
 
-def process_multi_speaker_audio(audio_bytes, num_speakers=None):
+def process_multi_speaker_audio(audio_bytes, num_speakers=None, model=None):
     """المسار الكامل: VAD -> تفريغ كل مقطع -> Diarization -> نتائج."""
+    if model is None:
+        model = whisper_model
     audio_np, sr = prepare_audio(audio_bytes)
     if audio_np is None:
         return None, "فشل تحويل الصوت"
@@ -477,7 +492,7 @@ def process_multi_speaker_audio(audio_bytes, num_speakers=None):
     for ts in timestamps:
         start_sec = ts['start'] / sr
         end_sec = ts['end'] / sr
-        text, lang = transcribe_segment(audio_np, sr, start_sec, end_sec)
+        text, lang = transcribe_segment(audio_np, sr, start_sec, end_sec, model)
         if text:
             segments.append({"start": start_sec, "end": end_sec, "text": text, "lang": lang})
     if not segments:
@@ -485,37 +500,39 @@ def process_multi_speaker_audio(audio_bytes, num_speakers=None):
     segments = speaker_diarization(audio_np, sr, segments, num_speakers)
     return segments, None
 
-def transcribe_audio_single(audio_bytes, language=None):
+def transcribe_audio_single(audio_bytes, language=None, model=None):
     """نسخ سريع لمقطع صوتي (للاستخدام الفردي)."""
-    if whisper_model is None:
+    if model is None:
+        model = whisper_model
+    if model is None:
         return None, "النموذج غير محمّل"
-    tmp_path = None
+    # تطبيق تقليل الضوضاء أولاً
+    audio_np, sr = prepare_audio(audio_bytes)
+    if audio_np is None:
+        return None, "فشل تحويل الصوت"
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        import soundfile as sf
+        sf.write(tmp.name, audio_np, sr)
+        tmp_path = tmp.name
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_bytes)
-            tmp_path = tmp_file.name
-        segments, info = whisper_model.transcribe(tmp_path, language=language, beam_size=1)
+        segments, info = model.transcribe(tmp_path, language=language, beam_size=1)
         text = " ".join(seg.text.strip() for seg in segments)
         return text, info.language
     except Exception as e:
         return None, str(e)
     finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+        os.unlink(tmp_path)
 
-# دالة الترجمة الذكية: DeepL أولاً إن وُجد، ثم Google، ثم LibreTranslate
+# دالة الترجمة الذكية (DeepL أولاً، ثم Google، ثم LibreTranslate)
 def translate_text(text, target_lang):
-    # 1. DeepL (الأعلى جودة)
     if st.session_state.deepl_api_key:
         tr, err = translate_deepl(text, target_lang)
         if tr:
             return tr, None
-    # 2. Google Translator
     try:
         translator = GoogleTranslator(source='auto', target=target_lang)
         return translator.translate(text), None
     except Exception as e1:
-        # 3. LibreTranslate إن وُجد
         libre_url = os.environ.get("LIBRETRANSLATE_URL", st.secrets.get("LIBRETRANSLATE_URL", ""))
         if libre_url:
             try:
@@ -721,7 +738,7 @@ with st.sidebar:
         st.markdown("<div style='text-align:center; color: rgba(150,175,220,0.3); font-size: 30px;'>📭</div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-#  الإعدادات الأساسية
+#  الإعدادات الأساسية (بدون تغيير)
 # ════════════════════════════════════════════════════════════
 languages_dict = {
     "Auto-Detect": "auto",
@@ -906,7 +923,7 @@ selected_domain = STYLE_OPTIONS[selected_style_label]
 st.session_state.selected_style = selected_style_label
 
 # ════════════════════════════════════════════════════════════
-#  التبويبات – تعريفها هنا
+#  التبويبات
 # ════════════════════════════════════════════════════════════
 tab1, tab2, tab3, tab4 = st.tabs(["🎤 Voice", "📝 Text", "📄 File", "👥 Group"])
 
@@ -1042,11 +1059,23 @@ with tab3:
                     else:
                         st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Group Chat (المُحسَّن) -----
+# ----- Tab 4: Group Chat (الأكثر تطوراً) -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
-    st.caption("محادثة جماعية – تعرّف تلقائي على المتحدثين في تسجيل واحد")
+    st.caption("ترجمة فورية مع تعرّف دقيق على عدة متحدثين – اختر حجم النموذج للدقة المطلوبة")
+
+    # اختيار حجم النموذج
+    model_size = st.selectbox("🔧 جودة التعرف الصوتي (الأكبر = أدق لكن أبطأ)",
+                              ["medium", "small", "tiny"],
+                              index=0,
+                              key="model_size")
+    # تحميل النموذج المناسب (قد يُعاد تحميله إذا تغير الحجم)
+    if "current_model_size" not in st.session_state or st.session_state.current_model_size != model_size:
+        whisper_model = load_whisper_model(model_size)
+        st.session_state.current_model_size = model_size
+    else:
+        whisper_model = load_whisper_model(model_size)
 
     if whisper_model is None:
         st.error("❌ نموذج Whisper غير محمّل. تأكد من تثبيت faster-whisper.")
@@ -1075,7 +1104,7 @@ with tab4:
             audio_chunk = st.audio_input(f"🎤 تحدث كـ {speaker}", key=f"single_chunk_{st.session_state.audio_key_counter}")
             if audio_chunk is not None:
                 with st.spinner("⏳ جارٍ النسخ والترجمة..."):
-                    text, lang = transcribe_audio_single(audio_chunk.getvalue(), language=None)
+                    text, lang = transcribe_audio_single(audio_chunk.getvalue(), language=None, model=whisper_model)
                     if text:
                         tr, err = translate_text(text, target_code)
                         if not tr:
@@ -1125,11 +1154,11 @@ with tab4:
 
         else:  # محادثة جماعية (تسجيل واحد)
             st.markdown("---")
-            st.write("سجّل مقطعاً صوتياً واحداً يحوي عدة أشخاص. سيكتشفهم النظام ويترجم كلامهم.")
+            st.write("سجّل مقطعاً صوتياً واحداً يحوي عدة أشخاص. سيكتشفهم النظام ويترجم كلامهم بدقة عالية.")
             audio_chunk = st.audio_input("🎙️ اضغط للتسجيل (متعدد المتحدثين)", key="multi_speaker_audio")
             if audio_chunk is not None:
                 with st.spinner("⏳ جارٍ تحليل الصوت وتمييز المتحدثين..."):
-                    segments, err = process_multi_speaker_audio(audio_chunk.getvalue())
+                    segments, err = process_multi_speaker_audio(audio_chunk.getvalue(), model=whisper_model)
                     if segments:
                         num_speakers_found = len(set(s["speaker"] for s in segments))
                         st.success(f"✅ تم اكتشاف {num_speakers_found} متحدثين")
