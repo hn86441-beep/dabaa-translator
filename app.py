@@ -155,7 +155,6 @@ init_db()
 @st.cache_resource
 def load_emotion_classifier():
     try:
-        # استخدام نموذج بديل متعدد اللغات لا يحتاج إلى مصادقة
         return pipeline("text-classification", model="nlptown/bert-base-multilingual-uncased-sentiment")
     except Exception as e:
         st.warning(f"⚠️ فشل تحميل النموذج: {e}")
@@ -275,6 +274,7 @@ def extract_text_from_file(file_bytes, filename):
 #  دوال الترجمة والتعرف على الصوت (Voice / Text / File)
 # ════════════════════════════════════════════════════════════
 def translate_deepl(text, target_lang):
+    """استدعاء DeepL للترجمة. تُرجع (الترجمة, None) أو (None, رسالة خطأ)."""
     if not st.session_state.deepl_api_key:
         return None, "No API key"
     tl = target_lang.upper()
@@ -288,7 +288,16 @@ def translate_deepl(text, target_lang):
         return None, f"Error: {str(e)}"
 
 def fetch_ai_translation(text, target_lang):
-    return translate_deepl(text, target_lang)
+    """تُستخدم في التبويبات القديمة (Voice, Text, File) – تفضل DeepL ثم Google."""
+    if st.session_state.deepl_api_key:
+        tr, err = translate_deepl(text, target_lang)
+        if tr:
+            return tr, None
+    try:
+        translator = GoogleTranslator(source='auto', target=target_lang)
+        return translator.translate(text), None
+    except Exception as e:
+        return None, f"Google error: {str(e)}"
 
 def speech_to_text_cohere(audio_bytes, language_code="auto"):
     if not st.session_state.cohere_api_key:
@@ -354,7 +363,7 @@ def speech_to_text(audio_bytes, language_code="auto"):
     return speech_to_text_cohere(audio_bytes, language_code)
 
 # ════════════════════════════════════════════════════════════
-#  دوال المحادثة الجماعية (مُحسَّنة)
+#  دوال المحادثة الجماعية (مُحسَّنة + DeepL أساسي)
 # ════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_whisper_model(model_size="medium"):
@@ -509,7 +518,6 @@ def transcribe_audio_single(audio_bytes, language=None, model=None):
         sf.write(tmp.name, audio_np, sr)
         tmp_path = tmp.name
     try:
-        # إذا كانت اللغة "auto" نمرر None ليكتشف تلقائياً، وإلا نحدد اللغة
         lang_param = None if language == "auto" else language
         segments, info = model.transcribe(tmp_path, language=lang_param, beam_size=1)
         text = " ".join(seg.text.strip() for seg in segments)
@@ -520,14 +528,25 @@ def transcribe_audio_single(audio_bytes, language=None, model=None):
         os.unlink(tmp_path)
 
 def translate_text(text, target_lang):
-    if st.session_state.deepl_api_key:
+    """
+    الترجمة الذكية:
+    1. DeepL (إن وُجد المفتاح) – يدعم معظم اللغات ماعدا العربية.
+       إذا فشل (لغة غير مدعومة أو خطأ)، ننتقل تلقائياً إلى Google.
+    2. Google Translator (يدعم العربية وجميع اللغات).
+    3. LibreTranslate (احتياطي إن وُجد رابطه).
+    """
+    # 1. محاولة DeepL أولاً
+    if st.session_state.get("deepl_api_key"):
         tr, err = translate_deepl(text, target_lang)
         if tr:
             return tr, None
+        # إذا فشل نكمل بصمت إلى Google
+    # 2. Google Translator
     try:
         translator = GoogleTranslator(source='auto', target=target_lang)
         return translator.translate(text), None
     except Exception as e1:
+        # 3. LibreTranslate احتياطي
         libre_url = os.environ.get("LIBRETRANSLATE_URL", st.secrets.get("LIBRETRANSLATE_URL", ""))
         if libre_url:
             try:
@@ -554,7 +573,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
 # ════════════════════════════════════════════════════════════
-#  CSS (نفس الكود السابق دون تغيير)
+#  CSS (بدون تغيير)
 # ════════════════════════════════════════════════════════════
 def get_css(theme):
     if theme == "light":
@@ -1054,11 +1073,11 @@ with tab3:
                     else:
                         st.error(f"فشل استخراج النص: {err}")
 
-# ----- Tab 4: Group Chat -----
+# ----- Tab 4: Group Chat (DeepL أساسي) -----
 with tab4:
     st.markdown("---")
     st.markdown('<div class="section-heading">👥 Group Chat Translation</div>', unsafe_allow_html=True)
-    st.caption("اختر جودة التعرف واللغة المصدر لنتائج أدق")
+    st.caption("ترجمة فورية مع DeepL (إن وُجد) – يدعم جميع اللغات مع احتياطي Google")
 
     model_size = st.selectbox("🔧 جودة التعرف الصوتي (الأكبر = أدق لكن أبطأ)",
                               ["medium", "small", "tiny"],
@@ -1085,9 +1104,8 @@ with tab4:
 
         if mode == "محادثة مباشرة (متحدث واحد)":
             st.markdown("---")
-            # اختيار اللغة المصدر (مهم لتحديد اللغة الصحيحة)
             source_lang_group = st.selectbox("اللغة التي ستتحدث بها", list(languages_dict.keys()), key="single_source_lang")
-            source_code = languages_dict[source_lang_group]  # قد يكون "auto" أو كود لغة
+            source_code = languages_dict[source_lang_group]
 
             speaker_options = ["SPEAKER_1", "SPEAKER_2", "SPEAKER_3", "SPEAKER_4", "مخصص..."]
             selected = st.selectbox("المتحدث", speaker_options, key="single_speaker_select")
@@ -1100,7 +1118,6 @@ with tab4:
             audio_chunk = st.audio_input(f"🎤 تحدث كـ {speaker}", key=f"single_chunk_{st.session_state.audio_key_counter}")
             if audio_chunk is not None:
                 with st.spinner("⏳ جارٍ النسخ والترجمة..."):
-                    # تمرير اللغة المصدر المختارة (إن لم تكن auto فسنمرر كود اللغة)
                     text, lang = transcribe_audio_single(audio_chunk.getvalue(), language=source_code, model=whisper_model)
                     if text:
                         tr, err = translate_text(text, target_code)
