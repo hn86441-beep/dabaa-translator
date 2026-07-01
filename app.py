@@ -136,16 +136,19 @@ def _sec(k, d=""):
     try: return st.secrets.get(k, d) or d
     except: return d
 
-# مفاتيح API — تُقرأ في كل طلب لضمان القراءة الصحيحة من secrets.toml
-def _gk(): return _sec("GROQ_API_KEY")
+# مفاتيح API — runtime key يُقرأ من session_state أولاً (إدخال المستخدم)، ثم secrets.toml
+def _gk():
+    rt = st.session_state.get("_rt_groq","").strip()
+    return rt if rt else _sec("GROQ_API_KEY")
 def _dk(): return _sec("DEEPL_API_KEY")
 def _ck(): return _sec("COHERE_API_KEY")
-_GROQ_KEY   = _gk()
+_GROQ_KEY   = _sec("GROQ_API_KEY")   # module-level fallback
 _DEEPL_KEY  = _dk()
 _COHERE_KEY = _ck()
 
 for k, v in {"theme":"dark","src_lang":"Auto-Detect",
-             "tgt_lang":"Arabic","input_text":""}.items():
+             "tgt_lang":"Arabic","input_text":"",
+             "_rt_groq":""}.items():
     if k not in st.session_state: st.session_state[k] = v
 
 # ═══════════════════════════════════════════════════════════
@@ -710,6 +713,17 @@ with st.sidebar:
     if st.button("🌓 تبديل المظهر", use_container_width=True):
         st.session_state.theme=("light" if st.session_state.theme=="dark" else "dark")
         st.rerun()
+    # مفتاح Groq — يظهر فقط إذا لم يكن موجوداً في secrets.toml
+    if not _gk():
+        with st.expander("🔑 الذكاء الاصطناعي", expanded=True):
+            nk=st.text_input("Groq API Key",type="password",
+                placeholder="gsk_...",key="_groq_input_box",
+                help="احصل على مفتاح مجاني من console.groq.com")
+            if nk.strip():
+                st.session_state["_rt_groq"]=nk.strip(); st.rerun()
+            st.caption("[console.groq.com →](https://console.groq.com)")
+    else:
+        st.markdown('<div style="font-size:11px;color:rgba(78,203,160,.75);padding:.15rem .3rem">🟢 الذكاء الاصطناعي جاهز</div>',unsafe_allow_html=True)
     st.divider()
     hist=get_hist(60)
     if hist:
@@ -757,6 +771,13 @@ tgt_tts=LANGS.get(tgt_name,{}).get("tts","en")
 # ═══════════════════════════════════════════════════════════
 #  TABS
 # ═══════════════════════════════════════════════════════════
+def _chat_err(err):
+    e=str(err or "")
+    if "401" in e: return "❌ مفتاح Groq غير صالح — أدخل مفتاحاً صحيحاً في حقل 🔑 بالشريط الجانبي"
+    if "429" in e: return "⚠️ تجاوزت الحد المجاني — انتظر دقيقة وأعد المحاولة"
+    if "timeout" in e.lower(): return "⚠️ انتهت مهلة الاتصال — حاول مجدداً"
+    return f"⚠️ {e or 'تعذر الاتصال بـ Groq'}"
+
 tab1,tab2,tab3,tab4,tab5,tab6=st.tabs(
     ["🎙️ Voice","✍️ Text + AI","📄 File","📸 Camera","🎬 Subtitles","🌍 Group Chat"])
 
@@ -865,7 +886,7 @@ with tab2:
             reply,err = result if isinstance(result,tuple) else (result,None)
             st.session_state["_chat_hist"].append({
                 "role":"assistant",
-                "content":reply if reply else f"⚠️ {err or 'تعذر الرد — تحقق من مفتاح Groq في secrets.toml'}"})
+                "content":reply if reply else _chat_err(err)})
             st.rerun()
 
 # ────────────── TAB 3: FILE ─────────────────────────────────────
