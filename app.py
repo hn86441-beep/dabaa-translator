@@ -136,15 +136,28 @@ def _sec(k, d=""):
     try: return st.secrets.get(k, d) or d
     except: return d
 
-# مفاتيح API — runtime key يُقرأ من session_state أولاً (إدخال المستخدم)، ثم secrets.toml
+# مفاتيح API — دائماً تُقرأ fresh من secrets أو session_state
 def _gk():
-    rt = st.session_state.get("_rt_groq","").strip()
-    return rt if rt else _sec("GROQ_API_KEY")
-def _dk(): return _sec("DEEPL_API_KEY")
-def _ck(): return _sec("COHERE_API_KEY")
-_GROQ_KEY   = _sec("GROQ_API_KEY")   # module-level fallback
-_DEEPL_KEY  = _dk()
-_COHERE_KEY = _ck()
+    """يقرأ مفتاح Groq: session_state أولاً ثم secrets.toml — دائماً fresh"""
+    rt = st.session_state.get("_rt_groq","")
+    if rt: return rt.strip()
+    try:
+        v = st.secrets.get("GROQ_API_KEY","")
+        return (v or "").strip()
+    except: return ""
+
+def _dk():
+    try: return (st.secrets.get("DEEPL_API_KEY","") or "").strip()
+    except: return ""
+
+def _ck():
+    try: return (st.secrets.get("COHERE_API_KEY","") or "").strip()
+    except: return ""
+
+# لا نحتفظ بقيم module-level لأن secrets تُقرأ بعد بدء التطبيق
+_GROQ_KEY   = ""
+_DEEPL_KEY  = ""
+_COHERE_KEY = ""
 
 for k, v in {"theme":"dark","src_lang":"Auto-Detect",
              "tgt_lang":"Arabic","input_text":"",
@@ -172,8 +185,8 @@ def groq_llm(prompt, system="", max_tokens=700, fast=False):
     except: pass
     return None
 
-@st.cache_data(show_spinner=False, ttl=3600)
 def groq_cached(prompt, system="", max_tokens=700, fast=False):
+    """لا cache هنا — المفتاح يتغير وcache يُجمّد نتيجة None القديمة"""
     return groq_llm(prompt, system, max_tokens, fast)
 
 # ═══════════════════════════════════════════════════════════
@@ -189,7 +202,6 @@ _TR_SYS = (
     "5. Return ONLY the translation — no explanations, no quotes"
 )
 
-@st.cache_data(show_spinner=False, ttl=3600)
 def smart_translate(text, tgt, src="Auto-Detect"):
     if not text or not text.strip(): return None, "no text"
     if _GROQ_KEY and len(text) <= 1500:
@@ -713,17 +725,24 @@ with st.sidebar:
     if st.button("🌓 تبديل المظهر", use_container_width=True):
         st.session_state.theme=("light" if st.session_state.theme=="dark" else "dark")
         st.rerun()
-    # مفتاح Groq — يظهر فقط إذا لم يكن موجوداً في secrets.toml
-    if not _gk():
-        with st.expander("🔑 الذكاء الاصطناعي", expanded=True):
-            nk=st.text_input("Groq API Key",type="password",
-                placeholder="gsk_...",key="_groq_input_box",
-                help="احصل على مفتاح مجاني من console.groq.com")
-            if nk.strip():
-                st.session_state["_rt_groq"]=nk.strip(); st.rerun()
-            st.caption("[console.groq.com →](https://console.groq.com)")
-    else:
-        st.markdown('<div style="font-size:11px;color:rgba(78,203,160,.75);padding:.15rem .3rem">🟢 الذكاء الاصطناعي جاهز</div>',unsafe_allow_html=True)
+    # مفتاح Groq — حقل صغير دائم (password مخفي)
+    _cur_key = _gk()
+    _key_status = "🟢 نشط" if _cur_key else "🔴 غير نشط"
+    with st.expander(f"🔑 Groq API  {_key_status}", expanded=not bool(_cur_key)):
+        nk = st.text_input("",
+            type="password",
+            placeholder="gsk_... (console.groq.com)",
+            value=st.session_state.get("_rt_groq",""),
+            key="_groq_input_box",
+            label_visibility="collapsed")
+        if st.button("💾 حفظ المفتاح", key="_save_key", use_container_width=True):
+            st.session_state["_rt_groq"] = nk.strip()
+            st.rerun()
+        if _cur_key:
+            masked = _cur_key[:8]+"…"+_cur_key[-4:]
+            st.caption(f"المفتاح النشط: `{masked}`")
+        else:
+            st.caption("[احصل على مفتاح مجاني ←](https://console.groq.com)")
     st.divider()
     hist=get_hist(60)
     if hist:
