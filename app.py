@@ -136,9 +136,13 @@ def _sec(k, d=""):
     try: return st.secrets.get(k, d) or d
     except: return d
 
-_GROQ_KEY   = _sec("GROQ_API_KEY")
-_DEEPL_KEY  = _sec("DEEPL_API_KEY")
-_COHERE_KEY = _sec("COHERE_API_KEY")
+# مفاتيح API — تُقرأ في كل طلب لضمان القراءة الصحيحة من secrets.toml
+def _gk(): return _sec("GROQ_API_KEY")
+def _dk(): return _sec("DEEPL_API_KEY")
+def _ck(): return _sec("COHERE_API_KEY")
+_GROQ_KEY   = _gk()
+_DEEPL_KEY  = _dk()
+_COHERE_KEY = _ck()
 
 for k, v in {"theme":"dark","src_lang":"Auto-Detect",
              "tgt_lang":"Arabic","input_text":""}.items():
@@ -148,7 +152,8 @@ for k, v in {"theme":"dark","src_lang":"Auto-Detect",
 #  GROQ LLM
 # ═══════════════════════════════════════════════════════════
 def groq_llm(prompt, system="", max_tokens=700, fast=False):
-    if not _GROQ_KEY: return None
+    k = _gk() or _GROQ_KEY
+    if not k: return None
     model = "llama-3.1-8b-instant" if fast else "llama-3.3-70b-versatile"
     msgs  = []
     if system: msgs.append({"role":"system","content":system})
@@ -156,7 +161,7 @@ def groq_llm(prompt, system="", max_tokens=700, fast=False):
     try:
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization":f"Bearer {_GROQ_KEY}","Content-Type":"application/json"},
+            headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
             json={"model":model,"messages":msgs,"max_tokens":max_tokens,"temperature":0.4},
             timeout=30)
         if r.status_code == 200:
@@ -236,6 +241,9 @@ _AI_SYS = (
 )
 
 def ai_chat(user_msg, source_text, current_trans, src_lang, tgt_lang, history):
+    key = _gk() or _GROQ_KEY
+    if not key:
+        return None, "لا يوجد مفتاح Groq — أضف GROQ_API_KEY في secrets.toml"
     context = (
         f"السياق:\n"
         f"- النص الأصلي ({src_lang}): {source_text[:600] if source_text else 'لا يوجد'}\n"
@@ -247,17 +255,22 @@ def ai_chat(user_msg, source_text, current_trans, src_lang, tgt_lang, history):
     for h in history[-8:]:
         msgs.append({"role":h["role"],"content":h["content"]})
     msgs.append({"role":"user","content":context})
-    try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization":f"Bearer {_GROQ_KEY}","Content-Type":"application/json"},
-            json={"model":"llama-3.3-70b-versatile","messages":msgs,
-                  "max_tokens":1000,"temperature":0.35},
-            timeout=35)
-        if r.status_code == 200:
-            return r.json()["choices"][0]["message"]["content"].strip()
-    except: pass
-    return None
+
+    last_err = None
+    for model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
+        try:
+            r = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},
+                json={"model":model,"messages":msgs,
+                      "max_tokens":1000,"temperature":0.35},
+                timeout=35)
+            if r.status_code == 200:
+                return r.json()["choices"][0]["message"]["content"].strip(), None
+            last_err = f"Groq {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            last_err = str(e)
+    return None, last_err or "خطأ غير معروف"
 
 # ═══════════════════════════════════════════════════════════
 #  TTS
@@ -349,14 +362,15 @@ def _mime(b):
     except: return "image/jpeg"
 
 def ocr_image(img):
-    if not _GROQ_KEY: return None,"أضف GROQ_API_KEY في secrets.toml"
+    key = _gk() or _GROQ_KEY
+    if not key: return None,"أضف GROQ_API_KEY في secrets.toml"
     try:
         mime=_mime(img); b64=base64.b64encode(img).decode()
         for model in ["meta-llama/llama-4-scout-17b-16e-instruct",
                       "llama-3.2-11b-vision-preview"]:
             r=requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization":f"Bearer {_GROQ_KEY}","Content-Type":"application/json"},
+                headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},
                 json={"model":model,"temperature":0,"max_tokens":2048,
                       "messages":[{"role":"user","content":[
                           {"type":"image_url","image_url":{"url":f"data:{mime};base64,{b64}"}},
@@ -378,6 +392,7 @@ def _wl(c):
     return {"zh-CN":"zh","zh-cn":"zh","iw":"he"}.get(c,c[:2])
 
 def groq_stt(audio, lang="auto", verbose=False):
+    key = _gk() or _GROQ_KEY
     if not _GROQ_KEY: return None,"No Groq key"
     lc=_wl(lang)
     files={"file":("audio.wav",audio,"audio/wav"),
@@ -387,7 +402,7 @@ def groq_stt(audio, lang="auto", verbose=False):
     if lc: files["language"]=(None,lc)
     try:
         r=requests.post("https://api.groq.com/openai/v1/audio/transcriptions",
-            headers={"Authorization":f"Bearer {_GROQ_KEY}"},files=files,timeout=60)
+            headers={"Authorization":f"Bearer {key}"},files=files,timeout=60)
         if r.status_code==200:
             data=r.json()
             if verbose: return data,None
@@ -845,11 +860,12 @@ with tab2:
         if user_input:
             st.session_state["_chat_hist"].append({"role":"user","content":user_input})
             with st.spinner("…"):
-                reply=ai_chat(user_input,input_text or "",auto_trans or "",
-                              src_name,tgt_name,st.session_state["_chat_hist"][:-1])
+                result=ai_chat(user_input,input_text or "",auto_trans or "",
+                               src_name,tgt_name,st.session_state["_chat_hist"][:-1])
+            reply,err = result if isinstance(result,tuple) else (result,None)
             st.session_state["_chat_hist"].append({
                 "role":"assistant",
-                "content":reply if reply else "⚠️ تعذر الرد. تحقق من اتصال Groq."})
+                "content":reply if reply else f"⚠️ {err or 'تعذر الرد — تحقق من مفتاح Groq في secrets.toml'}"})
             st.rerun()
 
 # ────────────── TAB 3: FILE ─────────────────────────────────────
