@@ -145,8 +145,8 @@ except: DEEPL_KEY  = ""
 try:    COHERE_KEY = (st.secrets.get("COHERE_API_KEY","") or "").strip()
 except: COHERE_KEY = ""
 
-for k, v in {"theme":"dark","src_lang":"Auto-Detect","tgt_lang":"Arabic","input_text":""}.items():
-
+for k, v in {"theme":"dark","src_lang":"Auto-Detect",
+             "tgt_lang":"Arabic","input_text":""}.items():
     if k not in st.session_state: st.session_state[k] = v
 
 
@@ -711,7 +711,6 @@ with st.sidebar:
     if st.button("🌓 تبديل المظهر", use_container_width=True):
         st.session_state.theme=("light" if st.session_state.theme=="dark" else "dark")
         st.rerun()
-    # مفتاح Groq — حقل صغير دائم (password مخفي)
     _cur_key = _gk()
     _key_status = "🟢 نشط" if _cur_key else "🔴 مطلوب"
     with st.expander(f"🔑 Groq AI  {_key_status}", expanded=not bool(_cur_key)):
@@ -855,156 +854,132 @@ with tab2:
         badges="".join(f'<span class="dom-badge">{_DOM[d]["e"]} {_DOM[d]["na"]}</span>' for d in doms)
         st.markdown(f'<div class="dom-row">{badges}</div>',unsafe_allow_html=True)
 
-    if auto_trans and input_text.strip():
-        save_tr(input_text.strip(),auto_trans,emotion(input_text),src_name,tgt_name,auto_eng)
-
-    # ── AI CHAT ──────────────────────────────────────────────────
     st.markdown("---")
-    st.markdown('<div class="sh">🤖 المساعد الذكي</div>',unsafe_allow_html=True)
+    if "chat_hist" not in st.session_state: st.session_state["chat_hist"]=[]
+    for msg in st.session_state["chat_hist"]:
+        cls="msg-u" if msg["role"]=="user" else "msg-a"
+        st.markdown(f'<div class="{cls}">{msg["content"]}</div>',unsafe_allow_html=True)
 
-    if not _gk():
-        st.info("💡 أضف GROQ_API_KEY في secrets.toml أو أدخله في الشريط الجانبي")
-    else:
-        if "_chat_hist" not in st.session_state:
-            st.session_state["_chat_hist"]=[]
-
-        # show chat history
-        if st.session_state["_chat_hist"]:
-            html='<div style="max-height:300px;overflow-y:auto;padding:.3rem 0">'
-            for msg in st.session_state["_chat_hist"][-14:]:
-                if msg["role"]=="user":
-                    html+=f'<div class="msg-u">{msg["content"]}</div>'
-                else:
-                    html+=f'<div class="msg-a">{msg["content"]}</div>'
-            html+="</div>"
-            st.markdown(html,unsafe_allow_html=True)
-            if st.button("🗑️ مسح المحادثة",key="_clr_chat"):
-                st.session_state["_chat_hist"]=[]; st.rerun()
-
-        user_input=st.chat_input("اطلب أي شيء: صحح، لخّص، اشرح مثلاً، غيّر الأسلوب…",key="_chat_in")
-        if user_input:
-            st.session_state["_chat_hist"].append({"role":"user","content":user_input})
-            with st.spinner("…"):
-                result=ai_chat(user_input,input_text or "",auto_trans or "",
-                               src_name,tgt_name,st.session_state["_chat_hist"][:-1])
-            reply,err = result if isinstance(result,tuple) else (result,None)
-            st.session_state["_chat_hist"].append({
-                "role":"assistant",
-                "content":reply if reply else _chat_err(err)})
-            st.rerun()
+    if q:=st.chat_input("اسأل المساعد…",key="_ci"):
+        st.session_state["chat_hist"].append({"role":"user","content":q})
+        st.markdown(f'<div class="msg-u">{q}</div>',unsafe_allow_html=True)
+        with st.spinner("⏳ تفكير..."):
+            ans,err=ai_chat(q,input_text,auto_trans,src_name,tgt_name,
+                            st.session_state["chat_hist"][:-1])
+        if ans:
+            st.session_state["chat_hist"].append({"role":"assistant","content":ans})
+            st.markdown(f'<div class="msg-a">{ans}</div>',unsafe_allow_html=True)
+        else:
+            st.error(_chat_err(err))
+        st.rerun()
 
 # ────────────── TAB 3: FILE ─────────────────────────────────────
 with tab3:
     st.markdown("---")
-    uploaded=st.file_uploader("📄 اختر ملفاً (PDF · DOCX · XLSX · TXT)",key="_file")
-    if uploaded:
-        st.caption(f"📎 {uploaded.name} — {len(uploaded.getvalue())//1024} KB")
-        if st.button("🔍 استخراج وترجمة",key="_file_btn"):
-            with st.spinner("استخراج النص..."):
-                extracted,err=extract_file(uploaded.getvalue(),uploaded.name)
-            if extracted:
-                st.markdown('<div class="sh">النص المستخرج</div>',unsafe_allow_html=True)
-                st.code(extracted[:2500]+("…" if len(extracted)>2500 else ""),language=None)
-                st.caption(f"الكلمات: {len(extracted.split())}")
-                with st.spinner("الترجمة..."):
-                    trans,eng=smart_translate(extracted,tgt_name,src_name)
-                if trans:
-                    emo=emotion(extracted[:400])
-                    st.markdown(f"""<div class="card">
-<span class="lbl">✦ الترجمة</span>
-<div class="body">{trans}</div>
-<div class="meta"><span>{eng}</span></div>
+    uf=st.file_uploader("📎 ارفع ملفاً",
+        type=["txt","pdf","docx","xlsx","xls"],key="_fu",label_visibility="visible")
+    if uf:
+        fb=uf.read(); txt,err=extract_file(fb,uf.name)
+        if err: st.error(f"❌ {err}")
+        elif txt:
+            with st.expander("📄 النص المستخرج",expanded=False):
+                st.text_area("",value=txt,height=160,key="_fe",label_visibility="collapsed")
+            with st.spinner("⏳ ترجمة الملف..."):
+                chunks=[txt[i:i+1400] for i in range(0,len(txt),1400)]
+                parts=[]
+                bar2=st.progress(0)
+                for i,ch in enumerate(chunks):
+                    r,_=smart_translate(ch,tgt_name,src_name)
+                    parts.append(r or ch)
+                    bar2.progress((i+1)/len(chunks))
+                bar2.empty()
+            full_tr="\n".join(parts)
+            emo=emotion(txt[:400]); eng_used=_
+            st.markdown(f"""<div class="card">
+<span class="lbl">✦ الترجمة الكاملة</span>
+<div class="body" style="max-height:260px;overflow-y:auto">{full_tr}</div>
+<div class="meta"><span>{emo}</span></div>
 </div>""",unsafe_allow_html=True)
-                    ca,cb=st.columns(2)
-                    with ca: st.download_button("📥 النص الأصلي",data=extracted,
-                                                file_name="original.txt",mime="text/plain")
-                    with cb: st.download_button("📥 الترجمة",data=trans,
-                                                file_name="translated.txt",mime="text/plain")
-                    aud=make_tts(trans,tgt_tts)
-                    if aud: st.audio(aud,format="audio/mp3")
-                    save_tr(extracted[:300],trans,emo,"File",tgt_name,eng)
-                else: st.error("❌ فشلت الترجمة")
-            else: st.error(f"❌ {err}")
+            ca,cb=st.columns(2)
+            with ca: st.code(full_tr,language=None)
+            with cb:
+                st.download_button("📥 تحميل",data=full_tr,
+                    file_name=f"translated_{uf.name}.txt",
+                    mime="text/plain",use_container_width=True)
+            save_tr(txt[:300],full_tr[:300],emo,src_name,tgt_name,"File")
 
-# ────────────── TAB 4: CAMERA ───────────────────────────────────
+# ────────────── TAB 4: CAMERA / IMAGE ───────────────────────────
 with tab4:
     st.markdown("---")
-    cam=st.file_uploader("📸 اختر صورة",type=["png","jpg","jpeg","webp","bmp"],key="_cam")
-    if cam:
-        img_b=cam.getvalue()
-        try: st.image(Image.open(io.BytesIO(img_b)).convert("RGB"),
-                     caption=cam.name,use_container_width=True)
-        except: pass
-        if st.button("🔍 استخراج النص وترجمته",key="_cam_btn"):
-            with st.spinner("استخراج النص..."):
-                extracted,err=ocr_image(img_b)
-            if not extracted: st.error(f"❌ {err}")
-            else:
-                lc,ln=detect_lang(extracted); src_for=LC2N.get(lc,src_name)
-                st.markdown('<div class="sh">النص المستخرج</div>',unsafe_allow_html=True)
-                st.code(extracted,language=None)
-                st.caption(f"اللغة: {ln} · الكلمات: {len(extracted.split())}")
-                with st.spinner("الترجمة..."):
-                    trans,eng=smart_translate(extracted,tgt_name,src_for)
-                if trans:
-                    emo=emotion(extracted[:400])
-                    st.markdown(f"""<div class="card">
-<span class="lbl">✦ الترجمة ({src_for} → {tgt_name})</span>
-<div class="body">{trans}</div>
+    img_src=st.radio("",["📷 كاميرا","🖼️ رفع صورة"],horizontal=True,
+                     key="_isrc",label_visibility="collapsed")
+    img_bytes=None
+    if "كاميرا" in img_src:
+        cam=st.camera_input("التقط صورة",key="_cam",label_visibility="visible")
+        if cam: img_bytes=cam.getvalue()
+    else:
+        up=st.file_uploader("",type=["png","jpg","jpeg","webp","bmp"],
+                            key="_iup",label_visibility="collapsed")
+        if up: img_bytes=up.read()
+
+    if img_bytes:
+        st.image(img_bytes,use_column_width=True)
+        with st.spinner("⏳ استخراج النص..."):
+            ocr_txt,ocr_err=ocr_image(img_bytes)
+        if ocr_err: st.error(f"❌ {ocr_err}")
+        elif ocr_txt:
+            with st.expander("📝 النص المستخرج"):
+                st.write(ocr_txt)
+            with st.spinner("⏳ الترجمة..."):
+                tr,eng=smart_translate(ocr_txt,tgt_name,src_name)
+            if tr:
+                emo=emotion(ocr_txt)
+                st.markdown(f"""<div class="card">
+<span class="lbl">✦ الترجمة</span>
+<div class="body">{tr}</div>
 <div class="meta"><span>{emo}</span><span>·</span><span>{eng}</span></div>
 </div>""",unsafe_allow_html=True)
-                    st.code(trans,language=None)
-                    ca,cb=st.columns(2)
-                    with ca: st.download_button("📥 النص",data=extracted,
-                                                file_name="ocr.txt",mime="text/plain")
-                    with cb: st.download_button("📥 الترجمة",data=trans,
-                                                file_name="ocr_tr.txt",mime="text/plain")
-                    aud=make_tts(trans,tgt_tts)
-                    if aud: st.audio(aud,format="audio/mp3")
-                    save_tr(extracted,trans,emo,f"Camera/{ln}",tgt_name,eng)
-                else: st.error("❌ فشلت الترجمة")
+                st.code(tr,language=None)
+                aud=make_tts(tr,tgt_tts)
+                if aud: st.audio(aud,format="audio/mp3")
+                save_tr(ocr_txt,tr,emo,src_name,tgt_name,eng)
+            else: st.error("❌ فشلت الترجمة")
+        else: st.warning("⚠️ لم يُعثر على نص في الصورة")
 
 # ────────────── TAB 5: SUBTITLES ────────────────────────────────
 with tab5:
     st.markdown("---")
-    st.markdown('<div class="sh">🎯 اللغة الهدف</div>',unsafe_allow_html=True)
-    sub_tgt=st.selectbox("",LN_NO_AUTO,
-        index=LN_NO_AUTO.index(tgt_name) if tgt_name in LN_NO_AUTO else 0,
-        key="_sub_tgt",label_visibility="collapsed")
-    av_file=st.file_uploader("🎵 ارفع ملف صوتي أو فيديو",
-        type=["mp3","wav","m4a","ogg","mp4","webm","mov"],key="_av_up")
-    if av_file:
-        st.caption(f"📎 {av_file.name} — {len(av_file.getvalue())//1024} KB")
-        if not _gk():
-            st.warning("⚠️ يتطلب GROQ_API_KEY في secrets.toml أو الشريط الجانبي")
-        elif st.button("🎙️ تفريغ وترجمة",use_container_width=True,key="_av_btn"):
-            bar=st.progress(0,text="⏳ جاري التفريغ...")
-            result,err=video_to_srt(av_file.getvalue(),sub_tgt)
-            bar.progress(100); bar.empty()
-            if not result: st.error(f"❌ {err}")
-            else:
-                st.session_state["_av_result"]=result
-                st.success(f"✅ تم تفريغ {result['count']} مقطع")
-    av_res=st.session_state.get("_av_result")
-    if av_res:
-        st.markdown('<div class="sh">معاينة</div>',unsafe_allow_html=True)
-        for b in av_res["blocks"][:10]:
-            st.markdown(f"""<div class="srt-line">
+    if not _gk():
+        st.info("💡 هذه الميزة تتطلب مفتاح Groq — أضفه في الشريط الجانبي")
+    else:
+        av_file=st.file_uploader("🎬 ارفع ملف صوت/فيديو",
+            type=["wav","mp3","mp4","m4a","ogg","webm"],
+            key="_avf",label_visibility="visible")
+        if av_file:
+            if st.button("🚀 استخراج وترجمة الترجمات",use_container_width=True,key="_av_btn"):
+                bar=st.progress(0,text="⏳ رفع وتحليل...")
+                av_res,av_err=video_to_srt(av_file.read(),tgt_name)
+                bar.progress(100); bar.empty()
+                if not av_res: st.error(f"❌ {av_err or 'تعذر'}")
+                else:
+                    st.success(f"✅ {av_res['count']} مقطع")
+                    with st.expander("👁️ معاينة الترجمات"):
+                        for b in av_res["blocks"][:30]:
+                            st.markdown(f"""<div class="srt-line">
 <span class="srt-num">{b['num']}</span>
-<span class="srt-time">{b['start'][:8]}</span>
+<span class="srt-time">{b['start'].replace(',','.')}</span>
 <span class="srt-trans">{b['text']}</span>
 </div>""",unsafe_allow_html=True)
-        if av_res["count"]>10: st.caption(f"… و{av_res['count']-10} مقطعاً آخر")
-        ca,cb,cc=st.columns(3)
-        with ca: st.download_button("📥 SRT أصلي",data=av_res["original"],
-            file_name="original.srt",mime="text/plain",key="_av_o")
-        with cb: st.download_button("📥 SRT مترجم",data=av_res["translated"],
-            file_name="translated.srt",mime="text/plain",key="_av_t")
-        with cc:
-            bi="\n\n".join(f"{b['num']}\n{b['start']} --> {b['end']}\n{b['text']}"
-                           for b in av_res["blocks"])
-            st.download_button("📥 SRT ثنائي",data=bi,
-                file_name="bilingual.srt",mime="text/plain",key="_av_b")
+                    ca,cb,cc=st.columns(3)
+                    with ca: st.download_button("📥 SRT أصلي",data=av_res["original"],
+                        file_name="original.srt",mime="text/plain",key="_av_o")
+                    with cb: st.download_button("📥 SRT مترجم",data=av_res["translated"],
+                        file_name="translated.srt",mime="text/plain",key="_av_t")
+                    with cc:
+                        bi="\n\n".join(f"{b['num']}\n{b['start']} --> {b['end']}\n{b['text']}"
+                                       for b in av_res["blocks"])
+                        st.download_button("📥 SRT ثنائي",data=bi,
+                            file_name="bilingual.srt",mime="text/plain",key="_av_b")
 
 # ────────────── TAB 6: GROUP CHAT ───────────────────────────────
 with tab6:
