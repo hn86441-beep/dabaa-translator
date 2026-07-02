@@ -109,18 +109,22 @@ def save_tr(orig, trans, emo, src, tgt, eng=""):
     except: pass
 
 def get_hist(n=60):
+    mem = list(st.session_state.get("_mem", []))
     try:
         c = _db()
         rows = c.execute('''SELECT original,translated,emotion,source_lang,
                             target_lang,engine,timestamp
                             FROM history ORDER BY id DESC LIMIT ?''', (n,)).fetchall()
         c.close()
-        if rows:
-            return [{"original":r[0],"translated":r[1],"emotion":r[2] or "",
+        db_items = [{"original":r[0],"translated":r[1],"emotion":r[2] or "",
                      "source_lang":r[3] or "","target_lang":r[4] or "",
                      "engine":r[5] or "","time":r[6] or ""} for r in rows]
-    except: pass
-    return st.session_state.get("_mem", [])[:n]
+        mem_sigs = {(e.get("original","")[:80], e.get("time","")) for e in mem}
+        merged = mem + [d for d in db_items
+                        if (d["original"][:80], d["time"]) not in mem_sigs]
+        return merged[:n]
+    except:
+        return mem[:n]
 
 def clr_hist():
     st.session_state["_mem"] = []
@@ -668,20 +672,37 @@ textarea::placeholder{{color:{ph} !important;opacity:.6 !important;font-weight:4
   font-family:'Tajawal','Space Grotesk',sans-serif}}
 .cb-eng{{font-size:9px;color:{sub};opacity:.42;margin-top:3px}}
 [data-testid="stSidebar"]{{background:{sbg} !important;border-right:1px solid {brd} !important}}
-.hist-card{{background:{card};border:1px solid {brd};border-radius:12px;
-  padding:.65rem .85rem;margin-bottom:.5rem;transition:all .15s;position:relative;overflow:hidden}}
+.hist-card{{
+  background:linear-gradient(135deg,{card} 0%,rgba(78,203,160,.04) 100%);
+  border:1px solid {brd};border-radius:14px;
+  padding:.7rem .9rem;margin-bottom:.45rem;
+  transition:all .2s cubic-bezier(.4,0,.2,1);
+  position:relative;overflow:hidden}}
 .hist-card::before{{content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,{ac}55,transparent)}}
-.hist-card:hover{{border-color:{ac}66;transform:translateX(2px);box-shadow:0 2px 12px {ac}15}}
-.hist-orig{{font-size:12px;color:{txt};font-weight:600;line-height:1.45;
-  font-family:'Tajawal','Space Grotesk',sans-serif;opacity:.85}}
-.hist-arrow{{font-size:10px;color:{ac};opacity:.5;margin:.15rem 0;line-height:1}}
-.hist-trans{{font-size:12px;color:{ac};font-weight:700;line-height:1.45;
-  font-family:'Tajawal','Space Grotesk',sans-serif}}
-.hist-foot{{display:flex;align-items:center;justify-content:space-between;margin-top:.4rem;gap:.4rem}}
-.hist-badge{{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;
-  border:1px solid;letter-spacing:.03em;white-space:nowrap}}
-.hist-meta{{font-size:9px;color:{sub};opacity:.5;text-align:right;flex:1}}
+  background:linear-gradient(90deg,transparent,{ac},transparent);opacity:.6}}
+.hist-card::after{{content:'';position:absolute;top:0;right:0;width:3px;
+  height:100%;background:linear-gradient(180deg,{ac}44,transparent);border-radius:0 14px 14px 0}}
+.hist-card:hover{{
+  border-color:{ac}55;transform:translateX(3px);
+  box-shadow:0 4px 20px {ac}18,inset 0 0 20px {ac}05;
+  background:linear-gradient(135deg,{card} 0%,rgba(78,203,160,.07) 100%)}}
+.hist-num{{position:absolute;top:.45rem;left:.6rem;font-size:8px;
+  font-weight:800;color:{ac};opacity:.25;font-family:monospace;letter-spacing:.05em}}
+.hist-orig{{font-size:12px;color:{txt};font-weight:600;line-height:1.5;
+  font-family:'Tajawal','Space Grotesk',sans-serif;opacity:.9;
+  padding-right:.3rem;border-right:2px solid {brd};margin-right:.1rem}}
+.hist-divider{{display:flex;align-items:center;gap:.3rem;margin:.25rem 0}}
+.hist-divider-line{{flex:1;height:1px;background:linear-gradient(90deg,{brd},transparent)}}
+.hist-divider-icon{{font-size:9px;color:{ac};opacity:.6}}
+.hist-trans{{font-size:12.5px;color:{ac};font-weight:700;line-height:1.5;
+  font-family:'Tajawal','Space Grotesk',sans-serif;
+  text-shadow:0 0 20px {ac}30}}
+.hist-foot{{display:flex;align-items:center;justify-content:space-between;
+  margin-top:.4rem;padding-top:.35rem;
+  border-top:1px solid {brd}44;gap:.4rem}}
+.hist-badge{{font-size:8.5px;font-weight:800;padding:2px 8px;border-radius:20px;
+  border:1px solid;letter-spacing:.05em;white-space:nowrap;text-transform:uppercase}}
+.hist-meta{{font-size:8.5px;color:{sub};opacity:.45;text-align:right;flex:1;font-family:monospace}}
 [data-testid="stSidebar"] div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"]{{
   background:transparent !important;border:1px solid {brd} !important;
   color:{sub} !important;font-size:10px !important;padding:2px 5px !important;
@@ -776,30 +797,45 @@ with st.sidebar:
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
         for i, it in enumerate(hist):
-            orig_full = it.get('original', '')
+            orig_full  = it.get('original', '')
             trans_full = it.get('translated', '')
-            orig  = orig_full[:52] + ("…" if len(orig_full) > 52 else "")
-            trans = trans_full[:52] + ("…" if len(trans_full) > 52 else "")
+            orig  = orig_full[:55]  + ("…" if len(orig_full)  > 55 else "")
+            trans = trans_full[:55] + ("…" if len(trans_full) > 55 else "")
             eng   = it.get('engine', '')
             tgt   = it.get('target_lang', '')
             ts    = it.get('time', '')
-            badge_color = "#4ECBA0" if "AI" in eng else ("#6ea8fe" if "DeepL" in eng else "#adb5bd")
+            emo   = it.get('emotion', '')
+            num   = f"#{len(hist)-i:02d}"
+
+            if "AI" in eng:
+                badge_color = "#4ECBA0"; eng_label = "✦ AI"
+            elif "DeepL" in eng:
+                badge_color = "#6ea8fe"; eng_label = "⬡ DeepL"
+            else:
+                badge_color = "#f4a261"; eng_label = "◎ Google"
+
+            emo_icon = emo.split()[0] if emo else "·"
 
             col_card, col_del = st.columns([11, 1])
             with col_card:
                 st.markdown(f"""
 <div class="hist-card">
+  <span class="hist-num">{num}</span>
   <div class="hist-orig">{orig}</div>
-  <div class="hist-arrow">↓</div>
+  <div class="hist-divider">
+    <div class="hist-divider-line"></div>
+    <span class="hist-divider-icon">{emo_icon} ↓</span>
+    <div class="hist-divider-line"></div>
+  </div>
   <div class="hist-trans">{trans}</div>
   <div class="hist-foot">
-    <span class="hist-badge" style="background:{badge_color}22;color:{badge_color};border-color:{badge_color}44">{eng or 'Google'}</span>
+    <span class="hist-badge" style="background:{badge_color}18;color:{badge_color};border-color:{badge_color}40">{eng_label}</span>
     <span class="hist-meta">{tgt} · {ts}</span>
   </div>
 </div>""", unsafe_allow_html=True)
             with col_del:
-                st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
-                if st.button("✕", key=f"_del_{i}", help="حذف هذا العنصر"):
+                st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+                if st.button("✕", key=f"_del_{i}", help="حذف"):
                     del_hist_item(orig_full, ts)
                     st.rerun()
     else:
@@ -890,9 +926,10 @@ with tab2:
         if ck!=st.session_state.get("_tc_key"):
             res=smart_translate(input_text.strip(),tgt_name,src_name)
             st.session_state["_tc_key"]=ck; st.session_state["_tc_val"]=res
-            if res and res[0]:
-                save_tr(input_text.strip(), res[0], emotion(input_text.strip()), src_name, tgt_name, res[1])
         auto_trans,auto_eng=st.session_state.get("_tc_val",("",""))
+        if auto_trans and ck!=st.session_state.get("_saved_ck"):
+            save_tr(input_text.strip(), auto_trans, emotion(input_text.strip()), src_name, tgt_name, auto_eng)
+            st.session_state["_saved_ck"]=ck
         doms=quick_domain(input_text)
 
     with col_t:
@@ -921,9 +958,21 @@ with tab2:
 
     st.markdown("---")
     if "chat_hist" not in st.session_state: st.session_state["chat_hist"]=[]
-    for msg in st.session_state["chat_hist"]:
-        cls="msg-u" if msg["role"]=="user" else "msg-a"
-        st.markdown(f'<div class="{cls}">{msg["content"]}</div>',unsafe_allow_html=True)
+
+    for i, msg in enumerate(st.session_state["chat_hist"]):
+        is_user = msg["role"] == "user"
+        cls = "msg-u" if is_user else "msg-a"
+        if is_user:
+            st.markdown(f'<div class="{cls}">{msg["content"]}</div>', unsafe_allow_html=True)
+        else:
+            col_msg, col_del = st.columns([20, 1])
+            with col_msg:
+                st.markdown(f'<div class="{cls}">{msg["content"]}</div>', unsafe_allow_html=True)
+            with col_del:
+                st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+                if st.button("✕", key=f"_cdel_{i}", help="حذف هذه الرسالة"):
+                    st.session_state["chat_hist"].pop(i)
+                    st.rerun()
 
     if q:=st.chat_input("اسأل المساعد…",key="_ci"):
         st.session_state["chat_hist"].append({"role":"user","content":q})
