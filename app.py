@@ -145,6 +145,15 @@ except: DEEPL_KEY  = ""
 try:    COHERE_KEY = (st.secrets.get("COHERE_API_KEY","") or "").strip()
 except: COHERE_KEY = ""
 
+def _gk():
+    return (st.session_state.get("_groq_key","") or GROQ_KEY or "").strip()
+
+def _dk():
+    return (DEEPL_KEY or "").strip()
+
+def _ck():
+    return (COHERE_KEY or "").strip()
+
 for k, v in {"theme":"dark","src_lang":"Auto-Detect",
              "tgt_lang":"Arabic","input_text":""}.items():
     if k not in st.session_state: st.session_state[k] = v
