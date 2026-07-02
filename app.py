@@ -659,11 +659,20 @@ textarea::placeholder{{color:{ph} !important;opacity:.6 !important;font-weight:4
   font-family:'Tajawal','Space Grotesk',sans-serif}}
 .cb-eng{{font-size:9px;color:{sub};opacity:.42;margin-top:3px}}
 [data-testid="stSidebar"]{{background:{sbg} !important;border-right:1px solid {brd} !important}}
-.hist{{padding:5px 7px;border-bottom:1px solid {brd}22;transition:background .12s}}
-.hist:hover{{background:{card};border-radius:5px}}
-.hist .o{{color:{txt};font-size:11.5px;line-height:1.4}}
-.hist .tr{{color:{ac};font-size:11.5px;line-height:1.4}}
-.hist .m{{font-size:9px;color:{sub};opacity:.5}}
+.hist-card{{background:{card};border:1px solid {brd};border-radius:12px;
+  padding:.65rem .85rem;margin-bottom:.5rem;transition:all .15s;position:relative;overflow:hidden}}
+.hist-card::before{{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,{ac}55,transparent)}}
+.hist-card:hover{{border-color:{ac}66;transform:translateX(2px);box-shadow:0 2px 12px {ac}15}}
+.hist-orig{{font-size:12px;color:{txt};font-weight:600;line-height:1.45;
+  font-family:'Tajawal','Space Grotesk',sans-serif;opacity:.85}}
+.hist-arrow{{font-size:10px;color:{ac};opacity:.5;margin:.15rem 0;line-height:1}}
+.hist-trans{{font-size:12px;color:{ac};font-weight:700;line-height:1.45;
+  font-family:'Tajawal','Space Grotesk',sans-serif}}
+.hist-foot{{display:flex;align-items:center;justify-content:space-between;margin-top:.4rem;gap:.4rem}}
+.hist-badge{{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;
+  border:1px solid;letter-spacing:.03em;white-space:nowrap}}
+.hist-meta{{font-size:9px;color:{sub};opacity:.5;text-align:right;flex:1}}
 div[data-testid="stAudioInput"]>div{{background:{card} !important;
   border:2px solid {brd} !important;border-radius:60px !important}}
 div[data-testid="stAudioInput"]>div:hover{{border-color:{ac} !important}}
@@ -717,44 +726,54 @@ st.markdown("""<div class="hdr">
 #  SIDEBAR
 # ═══════════════════════════════════════════════════════════
 with st.sidebar:
-    if st.button("🌓 تبديل المظهر", use_container_width=True):
-        st.session_state.theme=("light" if st.session_state.theme=="dark" else "dark")
-        st.rerun()
-    _cur_key = _gk()
-    _key_status = "🟢 نشط" if _cur_key else "🔴 مطلوب"
-    with st.expander(f"🔑 Groq AI  {_key_status}", expanded=not bool(_cur_key)):
-        nk = st.text_input("",
-            type="password",
-            placeholder="gsk_...",
-            value=_cur_key,
-            key="_groq_input_box",
-            label_visibility="collapsed")
-        if st.button("💾 حفظ", key="_save_key", use_container_width=True):
-            st.session_state["_groq_key"] = nk.strip()
-            st.rerun()
-        if _cur_key:
-            st.caption(f"✅ نشط: `{_cur_key[:10]}…`")
-        else:
-            st.caption("[console.groq.com →](https://console.groq.com)")
-    st.divider()
     hist=get_hist(60)
+    # ── عنوان المحفوظات ──
+    st.markdown("""
+<div style="display:flex;align-items:center;gap:8px;padding:.6rem 0 .4rem">
+  <span style="font-size:16px">🕘</span>
+  <span style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.7">سجل المحفوظات</span>
+</div>""", unsafe_allow_html=True)
+
     if hist:
-        ca,cb=st.columns(2)
+        ca,cb=st.columns([1,1])
         with ca:
-            if st.button("🗑️ مسح",use_container_width=True): clr_hist(); st.rerun()
+            if st.button("🗑️ مسح الكل", use_container_width=True, key="_clr"):
+                clr_hist(); st.rerun()
         with cb:
             b64h=base64.b64encode(json.dumps(hist,ensure_ascii=False,indent=2).encode()).decode()
-            st.markdown(f'<a href="data:application/json;base64,{b64h}" download="history.json">📥 تصدير</a>',
-                        unsafe_allow_html=True)
-        for it in hist:
-            st.markdown(f"""<div class="hist">
-<div class="o">{it.get('original','')[:48]}</div>
-<div class="tr">{it.get('translated','')[:48]}</div>
-<div class="m">{it.get('engine','')} · {it.get('target_lang','')} · {it.get('time','')}</div>
+            st.markdown(
+                f'<a href="data:application/json;base64,{b64h}" download="history.json">'
+                f'<button style="width:100%;padding:.38rem .5rem;border-radius:10px;'
+                f'border:1px solid rgba(78,203,160,.3);background:rgba(78,203,160,.08);'
+                f'color:inherit;font-size:12px;font-weight:600;cursor:pointer;">📥 تصدير</button></a>',
+                unsafe_allow_html=True)
+
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+        for i, it in enumerate(hist):
+            orig  = it.get('original','')[:52]
+            trans = it.get('translated','')[:52]
+            eng   = it.get('engine','')
+            tgt   = it.get('target_lang','')
+            ts    = it.get('time','')
+            badge_color = "#4ECBA0" if "AI" in eng else ("#6ea8fe" if "DeepL" in eng else "#adb5bd")
+            st.markdown(f"""
+<div class="hist-card">
+  <div class="hist-orig">{orig}</div>
+  <div class="hist-arrow">↓</div>
+  <div class="hist-trans">{trans}</div>
+  <div class="hist-foot">
+    <span class="hist-badge" style="background:{badge_color}22;color:{badge_color};border-color:{badge_color}44">{eng or 'Google'}</span>
+    <span class="hist-meta">{tgt} · {ts}</span>
+  </div>
 </div>""", unsafe_allow_html=True)
     else:
-        st.markdown("<div style='text-align:center;font-size:28px;opacity:.2;padding:1rem'>📭</div>",
-                    unsafe_allow_html=True)
+        st.markdown("""
+<div style="display:flex;flex-direction:column;align-items:center;
+     justify-content:center;padding:2.5rem 1rem;opacity:.3;gap:.5rem">
+  <span style="font-size:36px">📭</span>
+  <span style="font-size:12px;font-weight:600">لا توجد محفوظات بعد</span>
+</div>""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
 #  LANGUAGE SELECTOR
