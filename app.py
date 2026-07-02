@@ -127,6 +127,15 @@ def clr_hist():
     try: c = _db(); c.execute("DELETE FROM history"); c.commit(); c.close()
     except: pass
 
+def del_hist_item(original, time):
+    st.session_state["_mem"] = [e for e in st.session_state.get("_mem",[])
+                                  if not (e.get("original")==original and e.get("time")==time)]
+    try:
+        c = _db()
+        c.execute("DELETE FROM history WHERE original=? AND timestamp=?", (original, time))
+        c.commit(); c.close()
+    except: pass
+
 init_db()
 
 # ═══════════════════════════════════════════════════════════
@@ -673,6 +682,13 @@ textarea::placeholder{{color:{ph} !important;opacity:.6 !important;font-weight:4
 .hist-badge{{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;
   border:1px solid;letter-spacing:.03em;white-space:nowrap}}
 .hist-meta{{font-size:9px;color:{sub};opacity:.5;text-align:right;flex:1}}
+[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"]{{
+  background:transparent !important;border:1px solid {brd} !important;
+  color:{sub} !important;font-size:10px !important;padding:2px 5px !important;
+  border-radius:6px !important;min-height:0 !important;height:22px !important;
+  width:22px !important;box-shadow:none !important;opacity:.55}}
+[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"]:hover{{
+  background:{card} !important;opacity:1 !important;border-color:#e55 !important;color:#e55 !important}}
 div[data-testid="stAudioInput"]>div{{background:{card} !important;
   border:2px solid {brd} !important;border-radius:60px !important}}
 div[data-testid="stAudioInput"]>div:hover{{border-color:{ac} !important}}
@@ -726,21 +742,30 @@ st.markdown("""<div class="hdr">
 #  SIDEBAR
 # ═══════════════════════════════════════════════════════════
 with st.sidebar:
-    hist=get_hist(60)
+    # ── زر تبديل المظهر ──
+    theme_lbl = "☀️ الوضع الفاتح" if st.session_state.theme == "dark" else "🌙 الوضع الداكن"
+    if st.button(theme_lbl, use_container_width=True, key="_theme_btn"):
+        st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
+        st.rerun()
+
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
     # ── عنوان المحفوظات ──
     st.markdown("""
-<div style="display:flex;align-items:center;gap:8px;padding:.6rem 0 .4rem">
-  <span style="font-size:16px">🕘</span>
+<div style="display:flex;align-items:center;gap:8px;padding:.5rem 0 .3rem">
+  <span style="font-size:15px">🕘</span>
   <span style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.7">سجل المحفوظات</span>
 </div>""", unsafe_allow_html=True)
 
+    hist = get_hist(60)
+
     if hist:
-        ca,cb=st.columns([1,1])
+        ca, cb = st.columns([1, 1])
         with ca:
             if st.button("🗑️ مسح الكل", use_container_width=True, key="_clr"):
                 clr_hist(); st.rerun()
         with cb:
-            b64h=base64.b64encode(json.dumps(hist,ensure_ascii=False,indent=2).encode()).decode()
+            b64h = base64.b64encode(json.dumps(hist, ensure_ascii=False, indent=2).encode()).decode()
             st.markdown(
                 f'<a href="data:application/json;base64,{b64h}" download="history.json">'
                 f'<button style="width:100%;padding:.38rem .5rem;border-radius:10px;'
@@ -751,13 +776,18 @@ with st.sidebar:
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
         for i, it in enumerate(hist):
-            orig  = it.get('original','')[:52]
-            trans = it.get('translated','')[:52]
-            eng   = it.get('engine','')
-            tgt   = it.get('target_lang','')
-            ts    = it.get('time','')
+            orig_full = it.get('original', '')
+            trans_full = it.get('translated', '')
+            orig  = orig_full[:52] + ("…" if len(orig_full) > 52 else "")
+            trans = trans_full[:52] + ("…" if len(trans_full) > 52 else "")
+            eng   = it.get('engine', '')
+            tgt   = it.get('target_lang', '')
+            ts    = it.get('time', '')
             badge_color = "#4ECBA0" if "AI" in eng else ("#6ea8fe" if "DeepL" in eng else "#adb5bd")
-            st.markdown(f"""
+
+            col_card, col_del = st.columns([11, 1])
+            with col_card:
+                st.markdown(f"""
 <div class="hist-card">
   <div class="hist-orig">{orig}</div>
   <div class="hist-arrow">↓</div>
@@ -767,6 +797,11 @@ with st.sidebar:
     <span class="hist-meta">{tgt} · {ts}</span>
   </div>
 </div>""", unsafe_allow_html=True)
+            with col_del:
+                st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+                if st.button("✕", key=f"_del_{i}", help="حذف هذا العنصر"):
+                    del_hist_item(orig_full, ts)
+                    st.rerun()
     else:
         st.markdown("""
 <div style="display:flex;flex-direction:column;align-items:center;
@@ -855,6 +890,8 @@ with tab2:
         if ck!=st.session_state.get("_tc_key"):
             res=smart_translate(input_text.strip(),tgt_name,src_name)
             st.session_state["_tc_key"]=ck; st.session_state["_tc_val"]=res
+            if res and res[0]:
+                save_tr(input_text.strip(), res[0], emotion(input_text.strip()), src_name, tgt_name, res[1])
         auto_trans,auto_eng=st.session_state.get("_tc_val",("",""))
         doms=quick_domain(input_text)
 
