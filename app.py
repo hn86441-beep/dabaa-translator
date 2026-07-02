@@ -137,27 +137,15 @@ def _sec(k, d=""):
     except: return d
 
 
-# ── مفاتيح API: تُقرأ مرة واحدة عند البداية وتُخزّن في session_state ────────
-def _load_keys():
-    for ss_key, secret_key in [
-        ("_groq_key",  "GROQ_API_KEY"),
-        ("_deepl_key", "DEEPL_API_KEY"),
-        ("_cohere_key","COHERE_API_KEY"),
-    ]:
-        if ss_key not in st.session_state:
-            try:
-                v = st.secrets.get(secret_key, "") or ""
-                st.session_state[ss_key] = v.strip()
-            except:
-                st.session_state[ss_key] = ""
+# ── مفاتيح API (تُقرأ مباشرة من secrets.toml) ──────────────────
+try:    GROQ_KEY   = (st.secrets.get("GROQ_API_KEY","")   or "").strip()
+except: GROQ_KEY   = ""
+try:    DEEPL_KEY  = (st.secrets.get("DEEPL_API_KEY","")  or "").strip()
+except: DEEPL_KEY  = ""
+try:    COHERE_KEY = (st.secrets.get("COHERE_API_KEY","") or "").strip()
+except: COHERE_KEY = ""
 
-_load_keys()
-
-def _gk(): return st.session_state.get("_groq_key","").strip()
-def _dk(): return st.session_state.get("_deepl_key","").strip()
-def _ck(): return st.session_state.get("_cohere_key","").strip()
-
-for k, v in {"theme":"dark","src_lang":"Auto-Detect",
+for k, v in {"theme":"dark","src_lang":"Auto-Detect",:"dark","src_lang":"Auto-Detect",
              "tgt_lang":"Arabic","input_text":""}.items():
     if k not in st.session_state: st.session_state[k] = v
 
