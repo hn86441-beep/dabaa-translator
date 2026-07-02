@@ -212,10 +212,7 @@ _TR_SYS = (
 
 def smart_translate(text, tgt, src="Auto-Detect"):
     if not text or not text.strip(): return None, "no text"
-    if _gk() and len(text) <= 1500:
-        r = groq_cached(f"Translate from {src} to {tgt}:\n\n{text}",
-                        system=_TR_SYS, max_tokens=800, fast=len(text)<300)
-        if r: return r, "AI Contextual \u2726"
+    # 1) DeepL — أولاً إن توفر المفتاح
     if _dk():
         info = LANGS.get(tgt, {})
         if info.get("d"):
@@ -228,6 +225,12 @@ def smart_translate(text, tgt, src="Auto-Detect"):
                 if r.status_code == 200:
                     return r.json()["translations"][0]["text"], "DeepL \u2726"
             except: pass
+    # 2) AI (Groq) — إن لم يتوفر DeepL
+    if _gk() and len(text) <= 1500:
+        r = groq_cached(f"Translate from {src} to {tgt}:\n\n{text}",
+                        system=_TR_SYS, max_tokens=800, fast=len(text)<300)
+        if r: return r, "AI Contextual \u2726"
+    # 3) Google — احتياط
     src_g = LANGS.get(src, {}).get("g","auto")
     tgt_g = LANGS.get(tgt, {}).get("g","en")
     try:
@@ -959,20 +962,47 @@ with tab2:
     st.markdown("---")
     if "chat_hist" not in st.session_state: st.session_state["chat_hist"]=[]
 
-    for i, msg in enumerate(st.session_state["chat_hist"]):
+    chat = st.session_state["chat_hist"]
+    pair_idx = 0
+    i = 0
+    while i < len(chat):
+        msg = chat[i]
         is_user = msg["role"] == "user"
         cls = "msg-u" if is_user else "msg-a"
-        if is_user:
+        # إذا رسالة مستخدم تليها رسالة AI — اعرضهما كـ pair مع زر حذف واحد
+        if is_user and i + 1 < len(chat) and chat[i+1]["role"] == "assistant":
             st.markdown(f'<div class="{cls}">{msg["content"]}</div>', unsafe_allow_html=True)
-        else:
             col_msg, col_del = st.columns([20, 1])
             with col_msg:
-                st.markdown(f'<div class="{cls}">{msg["content"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="msg-a">{chat[i+1]["content"]}</div>', unsafe_allow_html=True)
             with col_del:
                 st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-                if st.button("✕", key=f"_cdel_{i}", help="حذف هذه الرسالة"):
-                    st.session_state["chat_hist"].pop(i)
+                if st.button("✕", key=f"_cdel_{pair_idx}", help="حذف السؤال والجواب"):
+                    del chat[i:i+2]
                     st.rerun()
+            i += 2
+        else:
+            # رسالة منفردة (مستخدم بدون رد أو AI منفردة)
+            if is_user:
+                col_msg, col_del = st.columns([20, 1])
+                with col_msg:
+                    st.markdown(f'<div class="{cls}">{msg["content"]}</div>', unsafe_allow_html=True)
+                with col_del:
+                    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+                    if st.button("✕", key=f"_cdel_{pair_idx}", help="حذف"):
+                        del chat[i]
+                        st.rerun()
+            else:
+                col_msg, col_del = st.columns([20, 1])
+                with col_msg:
+                    st.markdown(f'<div class="{cls}">{msg["content"]}</div>', unsafe_allow_html=True)
+                with col_del:
+                    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+                    if st.button("✕", key=f"_cdel_{pair_idx}", help="حذف"):
+                        del chat[i]
+                        st.rerun()
+            i += 1
+        pair_idx += 1
 
     if q:=st.chat_input("اسأل المساعد…",key="_ci"):
         st.session_state["chat_hist"].append({"role":"user","content":q})
