@@ -17,6 +17,9 @@ try:
     from langdetect import detect as _ld, DetectorFactory
     DetectorFactory.seed=42; LD_OK=True
 except: LD_OK=False
+try:
+    from spellchecker import SpellChecker; SPELL_OK=True
+except: SPELL_OK=False
 
 from deep_translator import GoogleTranslator, MyMemoryTranslator
 from gtts import gTTS
@@ -322,6 +325,41 @@ def emotion(text):
     p  = sum(1 for w in _POS if w in tl)
     n  = sum(1 for w in _NEG if w in tl)
     return "\U0001f60a إيجابي" if p>n else ("\U0001f614 سلبي" if n>p else "\U0001f610 محايد")
+
+# ═══════════════════════════════════════════════════════════
+#  DID YOU MEAN — تصحيح الإملاء
+# ═══════════════════════════════════════════════════════════
+_SPELL_LANGS = {"en","ar","es","fr","de","pt","ru","it"}
+
+@st.cache_resource
+def _get_speller(lc):
+    try:    return SpellChecker(language=lc if lc in _SPELL_LANGS else "en")
+    except: return None
+
+def did_you_mean(text, lang_code):
+    if not SPELL_OK or not text or len(text.strip()) < 4:
+        return None
+    lc = lang_code if lang_code in _SPELL_LANGS else "en"
+    sc = _get_speller(lc)
+    if not sc:
+        return None
+    try:
+        words = text.split()
+        corrected, changed = [], False
+        for w in words:
+            # strip punctuation for checking
+            stripped = re.sub(r"[^\w]", "", w)
+            if not stripped or stripped.isdigit() or len(stripped) < 3:
+                corrected.append(w); continue
+            fix = sc.correction(stripped)
+            if fix and fix.lower() != stripped.lower():
+                corrected.append(w.replace(stripped, fix, 1))
+                changed = True
+            else:
+                corrected.append(w)
+        return " ".join(corrected) if changed else None
+    except:
+        return None
 
 # ═══════════════════════════════════════════════════════════
 #  LANGUAGE DETECTION
@@ -706,6 +744,14 @@ textarea::placeholder{{color:{ph} !important;opacity:.6 !important;font-weight:4
 .hist-badge{{font-size:8.5px;font-weight:800;padding:2px 8px;border-radius:20px;
   border:1px solid;letter-spacing:.05em;white-space:nowrap;text-transform:uppercase}}
 .hist-meta{{font-size:8.5px;color:{sub};opacity:.45;text-align:right;flex:1;font-family:monospace}}
+.dym-bar{{display:flex;align-items:center;gap:.55rem;background:linear-gradient(90deg,{ac}12,{ac}06);
+  border:1px solid {ac}44;border-radius:10px;padding:.45rem .75rem;margin-top:.45rem;
+  animation:fadeIn .25s ease;flex-wrap:wrap}}
+.dym-label{{font-size:11px;font-weight:800;color:{ac};white-space:nowrap;letter-spacing:.03em}}
+.dym-suggestion{{font-size:12px;color:{txt};font-family:'Tajawal','Space Grotesk',sans-serif;
+  font-weight:600;flex:1;line-height:1.5;direction:auto}}
+.dym-changed{{background:{ac}22;color:{ac};border-radius:4px;padding:0 3px;font-style:normal}}
+@keyframes fadeIn{{from{{opacity:0;transform:translateY(-4px)}}to{{opacity:1;transform:translateY(0)}}}}
 [data-testid="stSidebar"] div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"]{{
   background:transparent !important;border:1px solid {brd} !important;
   color:{sub} !important;font-size:10px !important;padding:2px 5px !important;
@@ -922,6 +968,46 @@ with tab2:
         input_text=st.text_area("",height=200,placeholder="اكتب النص…",
             value=st.session_state.input_text,key="_txt",label_visibility="collapsed")
         st.session_state.input_text=input_text
+
+        # ── Did You Mean ────────────────────────────────────
+        if SPELL_OK and input_text and len(input_text.strip()) >= 4:
+            _dym_ck = f"_dym_{input_text.strip()[:120]}"
+            if _dym_ck != st.session_state.get("_dym_ck_prev"):
+                src_lc = LANGS.get(src_name, {}).get("g", "en")
+                if src_lc in ("auto", "", None):
+                    src_lc = "en"
+                st.session_state["_dym_suggestion"] = did_you_mean(input_text.strip(), src_lc)
+                st.session_state["_dym_ck_prev"] = _dym_ck
+
+            dym = st.session_state.get("_dym_suggestion")
+            if dym and dym.strip() != input_text.strip():
+                # highlight changed words
+                orig_words = input_text.split()
+                fix_words  = dym.split()
+                hi_parts   = []
+                for ow, fw in zip(orig_words, fix_words):
+                    if ow.lower() != fw.lower():
+                        hi_parts.append(f'<em class="dym-changed">{fw}</em>')
+                    else:
+                        hi_parts.append(fw)
+                hi_text = " ".join(hi_parts)
+                st.markdown(f"""<div class="dym-bar">
+  <span class="dym-label">✦ هل تقصد:</span>
+  <span class="dym-suggestion">{hi_text}</span>
+</div>""", unsafe_allow_html=True)
+                col_y, col_n = st.columns([1, 1])
+                with col_y:
+                    if st.button("✓ تطبيق التصحيح", key="_dym_yes", use_container_width=True):
+                        st.session_state["_txt"] = dym
+                        st.session_state.input_text = dym
+                        st.session_state["_dym_suggestion"] = None
+                        st.session_state["_dym_ck_prev"] = None
+                        st.rerun()
+                with col_n:
+                    if st.button("✕ تجاهل", key="_dym_no", use_container_width=True):
+                        st.session_state["_dym_suggestion"] = None
+                        st.session_state["_dym_ck_prev"] = "__ignored__"
+                        st.rerun()
 
     auto_trans=""; auto_eng=""; doms=[]
     if input_text and len(input_text.strip())>=3:
