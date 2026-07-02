@@ -136,39 +136,37 @@ def _sec(k, d=""):
     try: return st.secrets.get(k, d) or d
     except: return d
 
-# مفاتيح API — دائماً تُقرأ fresh من secrets أو session_state
-def _gk():
-    """يقرأ مفتاح Groq: session_state أولاً ثم secrets.toml — دائماً fresh"""
-    rt = st.session_state.get("_rt_groq","")
-    if rt: return rt.strip()
-    try:
-        v = st.secrets.get("GROQ_API_KEY","")
-        return (v or "").strip()
-    except: return ""
 
-def _dk():
-    try: return (st.secrets.get("DEEPL_API_KEY","") or "").strip()
-    except: return ""
+# ── مفاتيح API: تُقرأ مرة واحدة عند البداية وتُخزّن في session_state ────────
+def _load_keys():
+    for ss_key, secret_key in [
+        ("_groq_key",  "GROQ_API_KEY"),
+        ("_deepl_key", "DEEPL_API_KEY"),
+        ("_cohere_key","COHERE_API_KEY"),
+    ]:
+        if ss_key not in st.session_state:
+            try:
+                v = st.secrets.get(secret_key, "") or ""
+                st.session_state[ss_key] = v.strip()
+            except:
+                st.session_state[ss_key] = ""
 
-def _ck():
-    try: return (st.secrets.get("COHERE_API_KEY","") or "").strip()
-    except: return ""
+_load_keys()
 
-# لا نحتفظ بقيم module-level لأن secrets تُقرأ بعد بدء التطبيق
-_GROQ_KEY   = ""
-_DEEPL_KEY  = ""
-_COHERE_KEY = ""
+def _gk(): return st.session_state.get("_groq_key","").strip()
+def _dk(): return st.session_state.get("_deepl_key","").strip()
+def _ck(): return st.session_state.get("_cohere_key","").strip()
 
 for k, v in {"theme":"dark","src_lang":"Auto-Detect",
-             "tgt_lang":"Arabic","input_text":"",
-             "_rt_groq":""}.items():
+             "tgt_lang":"Arabic","input_text":""}.items():
     if k not in st.session_state: st.session_state[k] = v
+
 
 # ═══════════════════════════════════════════════════════════
 #  GROQ LLM
 # ═══════════════════════════════════════════════════════════
 def groq_llm(prompt, system="", max_tokens=700, fast=False):
-    k = _gk() or _GROQ_KEY
+    k = _gk()
     if not k: return None
     model = "llama-3.1-8b-instant" if fast else "llama-3.3-70b-versatile"
     msgs  = []
@@ -204,18 +202,18 @@ _TR_SYS = (
 
 def smart_translate(text, tgt, src="Auto-Detect"):
     if not text or not text.strip(): return None, "no text"
-    if _GROQ_KEY and len(text) <= 1500:
+    if _gk() and len(text) <= 1500:
         r = groq_cached(f"Translate from {src} to {tgt}:\n\n{text}",
                         system=_TR_SYS, max_tokens=800, fast=len(text)<300)
         if r: return r, "AI Contextual \u2726"
-    if _DEEPL_KEY:
+    if _dk():
         info = LANGS.get(tgt, {})
         if info.get("d"):
-            ep = ("https://api-free.deepl.com/v2/translate" if _DEEPL_KEY.endswith(":fx")
+            ep = ("https://api-free.deepl.com/v2/translate" if _dk().endswith(":fx")
                   else "https://api.deepl.com/v2/translate")
             try:
                 r = requests.post(ep,
-                    headers={"Authorization":f"DeepL-Auth-Key {_DEEPL_KEY}"},
+                    headers={"Authorization":f"DeepL-Auth-Key {_dk()}"},
                     data={"text":text,"target_lang":info["d"]}, timeout=15)
                 if r.status_code == 200:
                     return r.json()["translations"][0]["text"], "DeepL \u2726"
@@ -256,9 +254,9 @@ _AI_SYS = (
 )
 
 def ai_chat(user_msg, source_text, current_trans, src_lang, tgt_lang, history):
-    key = _gk() or _GROQ_KEY
+    key = _gk()
     if not key:
-        return None, "لا يوجد مفتاح Groq — أضف GROQ_API_KEY في secrets.toml"
+        return None, "لا يوجد مفتاح Groq"
     context = (
         f"السياق:\n"
         f"- النص الأصلي ({src_lang}): {source_text[:600] if source_text else 'لا يوجد'}\n"
@@ -377,7 +375,7 @@ def _mime(b):
     except: return "image/jpeg"
 
 def ocr_image(img):
-    key = _gk() or _GROQ_KEY
+    key = _gk()
     if not key: return None,"أضف GROQ_API_KEY في secrets.toml"
     try:
         mime=_mime(img); b64=base64.b64encode(img).decode()
@@ -407,8 +405,8 @@ def _wl(c):
     return {"zh-CN":"zh","zh-cn":"zh","iw":"he"}.get(c,c[:2])
 
 def groq_stt(audio, lang="auto", verbose=False):
-    key = _gk() or _GROQ_KEY
-    if not _GROQ_KEY: return None,"No Groq key"
+    key = _gk()
+    if not key: return None,"No Groq key"
     lc=_wl(lang)
     files={"file":("audio.wav",audio,"audio/wav"),
            "model":(None,"whisper-large-v3-turbo"),
@@ -427,14 +425,14 @@ def groq_stt(audio, lang="auto", verbose=False):
     except Exception as e: return None,str(e)
 
 def cohere_stt(audio, lang="en"):
-    if not _COHERE_KEY: return None,"No Cohere key"
+    if not _ck(): return None,"No Cohere key"
     lc=_wl(lang) or "en"
     try:
         fields=OrderedDict([("language",lc),("model","cohere-transcribe-03-2026"),
                              ("file",("audio.wav",audio,"audio/wav"))])
         enc=MultipartEncoder(fields=fields)
         r=requests.post("https://api.cohere.com/v2/audio/transcriptions",
-            headers={"Authorization":f"Bearer {_COHERE_KEY}","Content-Type":enc.content_type},
+            headers={"Authorization":f"Bearer {_ck()}","Content-Type":enc.content_type},
             data=enc,timeout=30)
         if r.status_code==200:
             txt=r.json().get("text","").strip()
@@ -465,10 +463,10 @@ def local_stt(audio, lang=None):
 
 def stt(audio, lang_code="auto"):
     wl=_wl(lang_code)
-    if _GROQ_KEY:
+    if _gk():
         r,_=groq_stt(audio,lang_code)
         if r: return r,None
-    if _COHERE_KEY:
+    if _ck():
         r,_=cohere_stt(audio,lang_code)
         if r: return r,None
     return local_stt(audio,lang=wl)
@@ -497,7 +495,7 @@ def group_analyze(audio,tgt):
     data,_=groq_stt(audio,lang="auto",verbose=True)
     if data is None:
         txt=None
-        if _COHERE_KEY: txt,_=cohere_stt(audio)
+        if _ck(): txt,_=cohere_stt(audio)
         if not txt: txt,err=local_stt(audio)
         if not txt: return None,"تعذر التعرف على الكلام"
         lc,ln=detect_lang(txt); return _mk(txt,lc,ln),None
@@ -727,22 +725,21 @@ with st.sidebar:
         st.rerun()
     # مفتاح Groq — حقل صغير دائم (password مخفي)
     _cur_key = _gk()
-    _key_status = "🟢 نشط" if _cur_key else "🔴 غير نشط"
-    with st.expander(f"🔑 Groq API  {_key_status}", expanded=not bool(_cur_key)):
+    _key_status = "🟢 نشط" if _cur_key else "🔴 مطلوب"
+    with st.expander(f"🔑 Groq AI  {_key_status}", expanded=not bool(_cur_key)):
         nk = st.text_input("",
             type="password",
-            placeholder="gsk_... (console.groq.com)",
-            value=st.session_state.get("_rt_groq",""),
+            placeholder="gsk_...",
+            value=_cur_key,
             key="_groq_input_box",
             label_visibility="collapsed")
-        if st.button("💾 حفظ المفتاح", key="_save_key", use_container_width=True):
-            st.session_state["_rt_groq"] = nk.strip()
+        if st.button("💾 حفظ", key="_save_key", use_container_width=True):
+            st.session_state["_groq_key"] = nk.strip()
             st.rerun()
         if _cur_key:
-            masked = _cur_key[:8]+"…"+_cur_key[-4:]
-            st.caption(f"المفتاح النشط: `{masked}`")
+            st.caption(f"✅ نشط: `{_cur_key[:10]}…`")
         else:
-            st.caption("[احصل على مفتاح مجاني ←](https://console.groq.com)")
+            st.caption("[console.groq.com →](https://console.groq.com)")
     st.divider()
     hist=get_hist(60)
     if hist:
@@ -877,8 +874,8 @@ with tab2:
     st.markdown("---")
     st.markdown('<div class="sh">🤖 المساعد الذكي</div>',unsafe_allow_html=True)
 
-    if not _GROQ_KEY:
-        st.info("💡 أضف GROQ_API_KEY في secrets.toml لتفعيل المساعد")
+    if not _gk():
+        st.info("💡 أضف GROQ_API_KEY في secrets.toml أو أدخله في الشريط الجانبي")
     else:
         if "_chat_hist" not in st.session_state:
             st.session_state["_chat_hist"]=[]
@@ -990,8 +987,8 @@ with tab5:
         type=["mp3","wav","m4a","ogg","mp4","webm","mov"],key="_av_up")
     if av_file:
         st.caption(f"📎 {av_file.name} — {len(av_file.getvalue())//1024} KB")
-        if not _GROQ_KEY:
-            st.warning("⚠️ يتطلب GROQ_API_KEY")
+        if not _gk():
+            st.warning("⚠️ يتطلب GROQ_API_KEY في secrets.toml أو الشريط الجانبي")
         elif st.button("🎙️ تفريغ وترجمة",use_container_width=True,key="_av_btn"):
             bar=st.progress(0,text="⏳ جاري التفريغ...")
             result,err=video_to_srt(av_file.getvalue(),sub_tgt)
