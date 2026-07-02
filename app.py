@@ -936,9 +936,7 @@ with tab2:
         doms=quick_domain(input_text)
 
     with col_t:
-        eng_badge=(f'<span style="font-size:9px;opacity:.5">{auto_eng}</span>'
-                   if auto_eng else "")
-        st.markdown(f'<div class="sh">🌐 الترجمة {eng_badge}</div>',unsafe_allow_html=True)
+        st.markdown('<div class="sh">🌐 الترجمة</div>',unsafe_allow_html=True)
         if auto_trans:
             st.markdown(f'<div class="t-panel"><div class="p-txt">{auto_trans}</div></div>',
                         unsafe_allow_html=True)
