@@ -145,8 +145,7 @@ except: DEEPL_KEY  = ""
 try:    COHERE_KEY = (st.secrets.get("COHERE_API_KEY","") or "").strip()
 except: COHERE_KEY = ""
 
-for k, v in {"theme":"dark","src_lang":"Auto-Detect",
-             "tgt_lang":"Arabic","input_text":""}.items():             "tgt_lang":"Arabic","input_text":""}.items():
+for k, v in {"theme":"dark","src_lang":"Auto-Detect"  "tgt_lang":"Arabic","input_text":""}.items():
     if k not in st.session_state: st.session_state[k] = v
 
 
