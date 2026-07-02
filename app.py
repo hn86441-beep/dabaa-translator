@@ -336,8 +336,28 @@ def _get_speller(lc):
     try:    return SpellChecker(language=lc if lc in _SPELL_LANGS else "en")
     except: return None
 
-def did_you_mean(text, lang_code):
-    if not SPELL_OK or not text or len(text.strip()) < 4:
+_DYM_SYS = (
+    "You are a strict spelling & typo corrector.\n"
+    "Fix ONLY spelling mistakes / typos in the given text (any language).\n"
+    "Do NOT rephrase, do NOT change meaning, grammar style, or word order.\n"
+    "If the text has NO spelling mistakes, reply with EXACTLY: NOCHANGE\n"
+    "Otherwise reply with ONLY the corrected text — no quotes, no explanation."
+)
+
+def _did_you_mean_ai(text):
+    if not _gk() or len(text) > 400:
+        return None
+    r = groq_cached(text, system=_DYM_SYS, max_tokens=250, fast=True)
+    if not r: return None
+    r = r.strip().strip('"').strip()
+    if r.upper() == "NOCHANGE" or not r:
+        return None
+    if r.strip() == text.strip():
+        return None
+    return r
+
+def _did_you_mean_dict(text, lang_code):
+    if not SPELL_OK:
         return None
     lc = lang_code if lang_code in _SPELL_LANGS else "en"
     sc = _get_speller(lc)
@@ -347,7 +367,6 @@ def did_you_mean(text, lang_code):
         words = text.split()
         corrected, changed = [], False
         for w in words:
-            # strip punctuation for checking
             stripped = re.sub(r"[^\w]", "", w)
             if not stripped or stripped.isdigit() or len(stripped) < 3:
                 corrected.append(w); continue
@@ -360,6 +379,15 @@ def did_you_mean(text, lang_code):
         return " ".join(corrected) if changed else None
     except:
         return None
+
+def did_you_mean(text, lang_code):
+    if not text or len(text.strip()) < 4:
+        return None
+    # الأولوية للذكاء الاصطناعي (أدق بكثير خصوصاً للعربية)
+    ai_fix = _did_you_mean_ai(text)
+    if ai_fix:
+        return ai_fix
+    return _did_you_mean_dict(text, lang_code)
 
 # ═══════════════════════════════════════════════════════════
 #  LANGUAGE DETECTION
@@ -968,9 +996,10 @@ with tab2:
         input_text=st.text_area("",height=200,placeholder="اكتب النص…",
             value=st.session_state.input_text,key="_txt",label_visibility="collapsed")
         st.session_state.input_text=input_text
+        st.caption("⌨️ اضغط Ctrl+Enter لترجمة فورية بدون انتظار")
 
         # ── Did You Mean ────────────────────────────────────
-        if SPELL_OK and input_text and len(input_text.strip()) >= 4:
+        if (_gk() or SPELL_OK) and input_text and len(input_text.strip()) >= 4:
             _dym_ck = f"_dym_{input_text.strip()[:120]}"
             if _dym_ck != st.session_state.get("_dym_ck_prev"):
                 src_lc = LANGS.get(src_name, {}).get("g", "en")
