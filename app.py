@@ -649,6 +649,7 @@ def _css(t):
     tp="rgba(255,255,255,.025)" if dk else "rgba(0,0,0,.02)"
     return f"""
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap');
+:root{{--c-ai:#4ECBA0;--c-dl:#6ea8fe;--c-go:#f4a261}}
 .stApp{{background:{bg} !important;font-family:'Space Grotesk','Tajawal',system-ui,sans-serif !important}}
 .hdr{{text-align:center;padding:.6rem 0 .3rem}}
 .hdr .br-row{{display:flex;align-items:center;justify-content:center;gap:.45rem;margin-bottom:.2rem}}
@@ -726,34 +727,122 @@ textarea::placeholder{{color:{ph} !important;opacity:.6 !important;font-weight:4
 .cb-trans{{font-size:15px;color:{txt};font-weight:600;line-height:1.7;
   font-family:'Tajawal','Space Grotesk',sans-serif}}
 .cb-eng{{font-size:9px;color:{sub};opacity:.42;margin-top:3px}}
-[data-testid="stSidebar"]{{background:{sbg} !important;border-right:1px solid {brd} !important}}
-.htl{{position:relative;margin:0 0 .55rem 14px;padding:.55rem .7rem .5rem .85rem;
-  background:{card};border-radius:0 12px 12px 0;border-left:3px solid var(--dot,{ac});
-  transition:all .18s cubic-bezier(.4,0,.2,1);overflow:hidden}}
-.htl::before{{content:'';position:absolute;left:-14px;top:.7rem;width:9px;height:9px;
-  border-radius:50%;background:var(--dot,{ac});box-shadow:0 0 0 3px {sbg},0 0 8px var(--dot,{ac});z-index:2}}
-.htl::after{{content:'';position:absolute;left:-10.5px;top:1.5rem;bottom:-.55rem;width:1.5px;
-  background:linear-gradient(180deg,{brd},transparent)}}
-.htl:last-child::after{{display:none}}
-.htl:hover{{transform:translateX(-3px);box-shadow:-2px 3px 14px {ac}1c;background:{card}}}
-.htl-top{{display:flex;align-items:center;justify-content:space-between;margin-bottom:.15rem}}
-.htl-tag{{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--dot,{ac});opacity:.85}}
-.htl-time{{font-size:8px;color:{sub};opacity:.4;font-family:monospace}}
-.htl-o{{color:{txt};font-size:11.5px;line-height:1.45;opacity:.65;
-  font-family:'Tajawal','Space Grotesk',sans-serif}}
-.htl-arrow{{font-size:9px;color:var(--dot,{ac});opacity:.55;margin:.1rem 0}}
-.htl-tr{{color:{txt};font-size:12.5px;font-weight:700;line-height:1.45;
-  font-family:'Tajawal','Space Grotesk',sans-serif}}
-.htl-lang{{display:inline-block;margin-top:.3rem;font-size:8px;font-weight:700;
-  padding:1px 7px;border-radius:20px;background:var(--dot,{ac})16;color:var(--dot,{ac})}}
-[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"]{{
-  background:transparent !important;border:1px solid {brd} !important;
-  color:{sub} !important;font-size:10px !important;padding:2px 5px !important;
-  border-radius:6px !important;min-height:0 !important;height:22px !important;
-  width:22px !important;box-shadow:none !important;opacity:.55}}
-[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"]:hover{{
-  background:{card} !important;opacity:1 !important;border-color:#e55 !important;color:#e55 !important}}
+/* ═══════════ SIDEBAR ═══════════ */
+[data-testid="stSidebar"]{{
+  background:{'linear-gradient(180deg,#06061a 0%,#0a1020 60%,#070d1a 100%)' if dk else 'linear-gradient(180deg,#f0f7f4 0%,#e8f3ef 100%)'} !important;
+  border-right:1px solid {brd} !important;padding-top:0 !important}}
+/* شريط علوي */
+.sb-top{{
+  background:{'rgba(78,203,160,.05)' if dk else 'rgba(26,158,112,.05)'};
+  border-bottom:1px solid {brd};padding:.9rem .9rem .7rem;margin-bottom:.4rem}}
+.sb-brand{{display:flex;align-items:center;gap:.55rem;margin-bottom:.55rem}}
+.sb-brand-icon{{
+  width:34px;height:34px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,{ac},{ac}88);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;box-shadow:0 3px 12px {ac}40}}
+.sb-brand-text{{display:flex;flex-direction:column;gap:0}}
+.sb-brand-name{{font-family:'Space Grotesk',sans-serif;font-size:13px;
+  font-weight:700;color:{txt};letter-spacing:-.01em}}
+.sb-brand-sub{{font-size:8.5px;color:{sub};opacity:.6;letter-spacing:.06em;text-transform:uppercase}}
+/* حالة الذكاء الاصطناعي */
+.sb-ai-row{{display:flex;align-items:center;justify-content:space-between;gap:.4rem}}
+.sb-ai-pill{{
+  display:flex;align-items:center;gap:.3rem;
+  background:{'rgba(78,203,160,.1)' if dk else 'rgba(26,158,112,.1)'};
+  border:1px solid {'rgba(78,203,160,.2)' if dk else 'rgba(26,158,112,.2)'};
+  border-radius:20px;padding:3px 9px;font-size:10px;font-weight:700;color:{sub}}}
+.sb-ai-dot{{width:5px;height:5px;border-radius:50%;flex-shrink:0}}
+.sb-ai-dot.on{{background:{ac};box-shadow:0 0 5px {ac};animation:sb-pulse 2s infinite}}
+.sb-ai-dot.off{{background:#888}}
+@keyframes sb-pulse{{0%,100%{{opacity:1}}50%{{opacity:.4}}}}
+/* عنوان السجل */
+.sb-hist-hd{{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.3rem .9rem .15rem;margin:.1rem 0}}
+.sb-hist-title{{font-size:9px;font-weight:800;letter-spacing:.15em;
+  text-transform:uppercase;color:{sub};opacity:.55;
+  display:flex;align-items:center;gap:.35rem}}
+.sb-hist-count{{
+  background:{card};border:1px solid {brd};
+  border-radius:20px;padding:1px 7px;font-size:8.5px;
+  font-weight:700;color:{ac};letter-spacing:.04em}}
+/* بطاقات التاريخ — تايم لاين */
+.htl-wrap{{padding:0 .5rem 0 1.2rem;position:relative}}
+.htl-wrap::before{{content:'';position:absolute;left:1.65rem;top:.3rem;bottom:.3rem;
+  width:1.5px;background:linear-gradient(180deg,{brd}88,transparent);pointer-events:none}}
+.htl{{
+  position:relative;margin-bottom:.55rem;
+  padding:.6rem .75rem .55rem .9rem;
+  background:{'linear-gradient(135deg,rgba(78,203,160,.06) 0%,rgba(78,203,160,.02) 100%)' if dk else 'linear-gradient(135deg,rgba(26,158,112,.05) 0%,rgba(26,158,112,.02) 100%)'};
+  border:1px solid {brd};border-left:3px solid var(--dot,{ac});
+  border-radius:0 12px 12px 0;
+  transition:all .2s cubic-bezier(.4,0,.2,1);overflow:hidden;cursor:default}}
+/* نقطة التايم لاين */
+.htl::before{{
+  content:'';position:absolute;left:-1.1rem;top:.75rem;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--dot,{ac});
+  box-shadow:0 0 0 2.5px {'#06061a' if dk else '#f0f7f4'},0 0 8px var(--dot,{ac});z-index:2}}
+/* خط أفقي صغير يربط النقطة بالبطاقة */
+.htl::after{{
+  content:'';position:absolute;left:-.75rem;top:1.1rem;
+  width:.75rem;height:1.5px;background:var(--dot,{ac});opacity:.35}}
+.htl:hover{{
+  transform:translateX(-2px);
+  border-color:var(--dot,{ac});
+  box-shadow:-3px 4px 16px var(--dot,{ac})28,inset 0 0 20px var(--dot,{ac})06}}
+/* داخل البطاقة */
+.htl-top{{display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem;gap:.3rem}}
+.htl-tag{{
+  font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dot,{ac});display:flex;align-items:center;gap:.25rem}}
+.htl-time{{font-size:8px;color:{sub};opacity:.38;font-family:monospace;white-space:nowrap}}
+.htl-o{{
+  color:{txt};font-size:11.5px;line-height:1.45;opacity:.6;
+  font-family:'Tajawal','Space Grotesk',sans-serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}}
+.htl-sep{{
+  display:flex;align-items:center;gap:.3rem;margin:.18rem 0;
+  font-size:9px;color:var(--dot,{ac});opacity:.5}}
+.htl-sep-line{{flex:1;height:1px;background:linear-gradient(90deg,var(--dot,{ac})30,transparent)}}
+.htl-tr{{
+  color:{txt};font-size:12.5px;font-weight:700;line-height:1.45;
+  font-family:'Tajawal','Space Grotesk',sans-serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}}
+.htl-foot{{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:.3rem;padding-top:.28rem;
+  border-top:1px solid {brd}40}}
+.htl-lang{{
+  font-size:8px;font-weight:700;padding:1px 7px;border-radius:20px;
+  background:var(--dot,{ac})16;color:var(--dot,{ac});letter-spacing:.04em}}
+.htl-emo{{font-size:10px;opacity:.6}}
+/* حذف */
+[data-testid="stSidebar"] button[kind="secondary"]{{
+  background:transparent !important;border:1px solid {brd}55 !important;
+  color:{sub} !important;font-size:10px !important;
+  border-radius:6px !important;height:20px !important;
+  min-height:0 !important;width:20px !important;
+  box-shadow:none !important;opacity:.45;padding:0 !important}}
+[data-testid="stSidebar"] button[kind="secondary"]:hover{{
+  background:{'rgba(255,80,80,.15)' if dk else 'rgba(255,80,80,.1)'} !important;
+  border-color:#e55 !important;color:#e55 !important;opacity:1 !important}}
+/* زر مسح وتصدير */
+.sb-actions{{display:flex;gap:.4rem;padding:0 .5rem;margin:.35rem 0 .2rem}}
+.sb-btn{{
+  flex:1;padding:.35rem .5rem;border-radius:9px;border:1px solid {brd};
+  background:{card};color:{sub};font-size:11px;font-weight:600;
+  cursor:pointer;text-align:center;transition:all .15s;text-decoration:none;display:block}}
+.sb-btn:hover{{border-color:{ac}55;color:{ac};background:{card}}}
+/* حالة فارغة */
+.sb-empty{{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:2.5rem .5rem 2rem;
+  opacity:.22;gap:.4rem;text-align:center}}
+.sb-empty-icon{{font-size:40px;line-height:1}}
+.sb-empty-text{{font-size:11px;font-weight:600;color:{txt}}}
+.sb-empty-sub{{font-size:9px;color:{sub}}}
 div[data-testid="stAudioInput"]>div{{background:{card} !important;
   border:2px solid {brd} !important;border-radius:60px !important}}
 div[data-testid="stAudioInput"]>div:hover{{border-color:{ac} !important}}
@@ -807,69 +896,119 @@ st.markdown("""<div class="hdr">
 #  SIDEBAR
 # ═══════════════════════════════════════════════════════════
 with st.sidebar:
-    # ── زر تبديل المظهر ──
-    theme_lbl = "☀️ الوضع الفاتح" if st.session_state.theme == "dark" else "🌙 الوضع الداكن"
+    # ─── رأس السايدبار (Branding + AI Status) ──────────────
+    ai_on = bool(_gk())
+    ai_label = "الذكاء الاصطناعي نشط" if ai_on else "Google Translate"
+    st.markdown(f"""
+<div class="sb-top">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">🌐</div>
+    <div class="sb-brand-text">
+      <span class="sb-brand-name">HN Translator</span>
+      <span class="sb-brand-sub">Smart AI · v5</span>
+    </div>
+  </div>
+  <div class="sb-ai-row">
+    <div class="sb-ai-pill">
+      <span class="sb-ai-dot {'on' if ai_on else 'off'}"></span>
+      {ai_label}
+    </div>
+    <span style="font-size:9px;opacity:.35">{"Groq ✦" if ai_on else "fallback"}</span>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+    # ─── زر تبديل المظهر ────────────────────────────────────
+    theme_lbl = "☀️ فاتح" if st.session_state.theme == "dark" else "🌙 داكن"
     if st.button(theme_lbl, use_container_width=True, key="_theme_btn"):
         st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
         st.rerun()
 
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-
-    # ── عنوان المحفوظات ──
-    st.markdown("""
-<div style="display:flex;align-items:center;gap:8px;padding:.5rem 0 .3rem">
-  <span style="font-size:15px">🕘</span>
-  <span style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.7">سجل المحفوظات</span>
-</div>""", unsafe_allow_html=True)
-
+    # ─── سجل المحفوظات ──────────────────────────────────────
     hist = get_hist(60)
 
+    # إحصاء سريع
+    n_ai = sum(1 for x in hist if "AI" in x.get("engine",""))
+    n_tot = len(hist)
+
+    st.markdown(f"""
+<div class="sb-hist-hd">
+  <span class="sb-hist-title">
+    <span>🕘</span>
+    <span>سجل المحفوظات</span>
+  </span>
+  <span class="sb-hist-count">{n_tot}</span>
+</div>""", unsafe_allow_html=True)
+
     if hist:
-        ca, cb = st.columns(2)
-        with ca:
-            if st.button("🗑️ مسح", use_container_width=True, key="_clr"):
+        # أزرار المسح والتصدير
+        b64h = base64.b64encode(
+            json.dumps(hist, ensure_ascii=False, indent=2).encode()).decode()
+        st.markdown(f"""
+<div class="sb-actions">
+  <a href="data:application/json;base64,{b64h}" download="history.json" class="sb-btn">📥 تصدير</a>
+</div>""", unsafe_allow_html=True)
+
+        ca_btn, cb_btn = st.columns(2)
+        with ca_btn:
+            if st.button("🗑️ مسح الكل", use_container_width=True, key="_clr"):
                 clr_hist(); st.rerun()
-        with cb:
-            b64h = base64.b64encode(json.dumps(hist, ensure_ascii=False, indent=2).encode()).decode()
-            st.markdown(f'<a href="data:application/json;base64,{b64h}" download="history.json">📥 تصدير</a>',
-                        unsafe_allow_html=True)
+        with cb_btn:
+            if st.button("💬 مسح المحادثة", use_container_width=True, key="_clr_chat"):
+                st.session_state["chat_hist"] = []; st.rerun()
+
+        # ── البطاقات ─────────────────────────────────────────
+        st.markdown('<div class="htl-wrap">', unsafe_allow_html=True)
 
         for i, it in enumerate(hist):
-            orig_full  = it.get('original', '')
-            trans_full = it.get('translated', '')
-            eng   = it.get('engine', '')
-            tgt   = it.get('target_lang', '')
-            ts    = it.get('time', '')
-            orig  = orig_full[:50]  + ("…" if len(orig_full)  > 50 else "")
-            trans = trans_full[:50] + ("…" if len(trans_full) > 50 else "")
+            orig_f = it.get("original",""); trans_f = it.get("translated","")
+            eng    = it.get("engine","");   tgt_l   = it.get("target_lang","")
+            ts     = it.get("time","");     emo     = it.get("emotion","")
+            orig   = orig_f[:48]  + ("…" if len(orig_f)>48  else "")
+            trans  = trans_f[:48] + ("…" if len(trans_f)>48 else "")
 
             if "AI" in eng:
-                dot = "#4ECBA0"; tag = "✦ AI"
+                dot="var(--c-ai,#4ECBA0)";   tag="✦ AI";      icon="🤖"
             elif "DeepL" in eng:
-                dot = "#6ea8fe"; tag = "⬡ DeepL"
+                dot="var(--c-dl,#6ea8fe)";   tag="⬡ DeepL";   icon="⚡"
             else:
-                dot = "#f4a261"; tag = "◎ Google"
+                dot="var(--c-go,#f4a261)";   tag="◎ Google";   icon="🌐"
 
-            col_card, col_del = st.columns([11, 1])
-            with col_card:
-                st.markdown(f"""<div class="htl" style="--dot:{dot}">
+            emo_icon = emo.split()[0] if emo else ""
+
+            col_c, col_d = st.columns([12, 1])
+            with col_c:
+                st.markdown(f"""
+<div class="htl" style="--dot:{dot}">
   <div class="htl-top">
-    <span class="htl-tag">{tag}</span>
+    <span class="htl-tag">{icon} {tag}</span>
     <span class="htl-time">{ts}</span>
   </div>
   <div class="htl-o">{orig}</div>
-  <div class="htl-arrow">↓</div>
+  <div class="htl-sep">
+    <div class="htl-sep-line"></div>
+    <span>↓</span>
+    <div class="htl-sep-line" style="background:linear-gradient(90deg,transparent,var(--dot))"></div>
+  </div>
   <div class="htl-tr">{trans}</div>
-  <span class="htl-lang">{tgt}</span>
+  <div class="htl-foot">
+    <span class="htl-lang">{tgt_l}</span>
+    <span class="htl-emo">{emo_icon}</span>
+  </div>
 </div>""", unsafe_allow_html=True)
-            with col_del:
-                st.markdown("<div style='height:26px'></div>", unsafe_allow_html=True)
+            with col_d:
+                st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
                 if st.button("✕", key=f"_del_{i}", help="حذف"):
-                    del_hist_item(orig_full, ts)
-                    st.rerun()
+                    del_hist_item(orig_f, ts); st.rerun()
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
     else:
-        st.markdown("<div style='text-align:center;font-size:28px;opacity:.2;padding:1rem'>📭</div>",
-                    unsafe_allow_html=True)
+        st.markdown("""
+<div class="sb-empty">
+  <span class="sb-empty-icon">📭</span>
+  <span class="sb-empty-text">لا توجد محفوظات</span>
+  <span class="sb-empty-sub">ستظهر ترجماتك هنا</span>
+</div>""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
 #  LANGUAGE SELECTOR
@@ -1088,7 +1227,7 @@ try:
             if up: img_bytes=up.read()
 
         if img_bytes:
-            st.image(img_bytes,use_column_width=True)
+            st.image(img_bytes,use_container_width=True)
             with st.spinner("⏳ استخراج النص..."):
                 ocr_txt,ocr_err=ocr_image(img_bytes)
             if ocr_err: st.error(f"❌ {ocr_err}")
