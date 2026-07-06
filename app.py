@@ -727,37 +727,26 @@ textarea::placeholder{{color:{ph} !important;opacity:.6 !important;font-weight:4
   font-family:'Tajawal','Space Grotesk',sans-serif}}
 .cb-eng{{font-size:9px;color:{sub};opacity:.42;margin-top:3px}}
 [data-testid="stSidebar"]{{background:{sbg} !important;border-right:1px solid {brd} !important}}
-.hist-card{{
-  background:linear-gradient(135deg,{card} 0%,rgba(78,203,160,.04) 100%);
-  border:1px solid {brd};border-radius:14px;
-  padding:.7rem .9rem;margin-bottom:.45rem;
-  transition:all .2s cubic-bezier(.4,0,.2,1);
-  position:relative;overflow:hidden}}
-.hist-card::before{{content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,{ac},transparent);opacity:.6}}
-.hist-card::after{{content:'';position:absolute;top:0;right:0;width:3px;
-  height:100%;background:linear-gradient(180deg,{ac}44,transparent);border-radius:0 14px 14px 0}}
-.hist-card:hover{{
-  border-color:{ac}55;transform:translateX(3px);
-  box-shadow:0 4px 20px {ac}18,inset 0 0 20px {ac}05;
-  background:linear-gradient(135deg,{card} 0%,rgba(78,203,160,.07) 100%)}}
-.hist-num{{position:absolute;top:.45rem;left:.6rem;font-size:8px;
-  font-weight:800;color:{ac};opacity:.25;font-family:monospace;letter-spacing:.05em}}
-.hist-orig{{font-size:12px;color:{txt};font-weight:600;line-height:1.5;
-  font-family:'Tajawal','Space Grotesk',sans-serif;opacity:.9;
-  padding-right:.3rem;border-right:2px solid {brd};margin-right:.1rem}}
-.hist-divider{{display:flex;align-items:center;gap:.3rem;margin:.25rem 0}}
-.hist-divider-line{{flex:1;height:1px;background:linear-gradient(90deg,{brd},transparent)}}
-.hist-divider-icon{{font-size:9px;color:{ac};opacity:.6}}
-.hist-trans{{font-size:12.5px;color:{ac};font-weight:700;line-height:1.5;
-  font-family:'Tajawal','Space Grotesk',sans-serif;
-  text-shadow:0 0 20px {ac}30}}
-.hist-foot{{display:flex;align-items:center;justify-content:space-between;
-  margin-top:.4rem;padding-top:.35rem;
-  border-top:1px solid {brd}44;gap:.4rem}}
-.hist-badge{{font-size:8.5px;font-weight:800;padding:2px 8px;border-radius:20px;
-  border:1px solid;letter-spacing:.05em;white-space:nowrap;text-transform:uppercase}}
-.hist-meta{{font-size:8.5px;color:{sub};opacity:.45;text-align:right;flex:1;font-family:monospace}}
+.htl{{position:relative;margin:0 0 .55rem 14px;padding:.55rem .7rem .5rem .85rem;
+  background:{card};border-radius:0 12px 12px 0;border-left:3px solid var(--dot,{ac});
+  transition:all .18s cubic-bezier(.4,0,.2,1);overflow:hidden}}
+.htl::before{{content:'';position:absolute;left:-14px;top:.7rem;width:9px;height:9px;
+  border-radius:50%;background:var(--dot,{ac});box-shadow:0 0 0 3px {sbg},0 0 8px var(--dot,{ac});z-index:2}}
+.htl::after{{content:'';position:absolute;left:-10.5px;top:1.5rem;bottom:-.55rem;width:1.5px;
+  background:linear-gradient(180deg,{brd},transparent)}}
+.htl:last-child::after{{display:none}}
+.htl:hover{{transform:translateX(-3px);box-shadow:-2px 3px 14px {ac}1c;background:{card}}}
+.htl-top{{display:flex;align-items:center;justify-content:space-between;margin-bottom:.15rem}}
+.htl-tag{{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--dot,{ac});opacity:.85}}
+.htl-time{{font-size:8px;color:{sub};opacity:.4;font-family:monospace}}
+.htl-o{{color:{txt};font-size:11.5px;line-height:1.45;opacity:.65;
+  font-family:'Tajawal','Space Grotesk',sans-serif}}
+.htl-arrow{{font-size:9px;color:var(--dot,{ac});opacity:.55;margin:.1rem 0}}
+.htl-tr{{color:{txt};font-size:12.5px;font-weight:700;line-height:1.45;
+  font-family:'Tajawal','Space Grotesk',sans-serif}}
+.htl-lang{{display:inline-block;margin-top:.3rem;font-size:8px;font-weight:700;
+  padding:1px 7px;border-radius:20px;background:var(--dot,{ac})16;color:var(--dot,{ac})}}
 [data-testid="stSidebar"] div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"]{{
   background:transparent !important;border:1px solid {brd} !important;
   color:{sub} !important;font-size:10px !important;padding:2px 5px !important;
@@ -836,70 +825,51 @@ with st.sidebar:
     hist = get_hist(60)
 
     if hist:
-        ca, cb = st.columns([1, 1])
+        ca, cb = st.columns(2)
         with ca:
-            if st.button("🗑️ مسح الكل", use_container_width=True, key="_clr"):
+            if st.button("🗑️ مسح", use_container_width=True, key="_clr"):
                 clr_hist(); st.rerun()
         with cb:
             b64h = base64.b64encode(json.dumps(hist, ensure_ascii=False, indent=2).encode()).decode()
-            st.markdown(
-                f'<a href="data:application/json;base64,{b64h}" download="history.json">'
-                f'<button style="width:100%;padding:.38rem .5rem;border-radius:10px;'
-                f'border:1px solid rgba(78,203,160,.3);background:rgba(78,203,160,.08);'
-                f'color:inherit;font-size:12px;font-weight:600;cursor:pointer;">📥 تصدير</button></a>',
-                unsafe_allow_html=True)
-
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+            st.markdown(f'<a href="data:application/json;base64,{b64h}" download="history.json">📥 تصدير</a>',
+                        unsafe_allow_html=True)
 
         for i, it in enumerate(hist):
             orig_full  = it.get('original', '')
             trans_full = it.get('translated', '')
-            orig  = orig_full[:55]  + ("…" if len(orig_full)  > 55 else "")
-            trans = trans_full[:55] + ("…" if len(trans_full) > 55 else "")
             eng   = it.get('engine', '')
             tgt   = it.get('target_lang', '')
             ts    = it.get('time', '')
-            emo   = it.get('emotion', '')
-            num   = f"#{len(hist)-i:02d}"
+            orig  = orig_full[:50]  + ("…" if len(orig_full)  > 50 else "")
+            trans = trans_full[:50] + ("…" if len(trans_full) > 50 else "")
 
             if "AI" in eng:
-                badge_color = "#4ECBA0"; eng_label = "✦ AI"
+                dot = "#4ECBA0"; tag = "✦ AI"
             elif "DeepL" in eng:
-                badge_color = "#6ea8fe"; eng_label = "⬡ DeepL"
+                dot = "#6ea8fe"; tag = "⬡ DeepL"
             else:
-                badge_color = "#f4a261"; eng_label = "◎ Google"
-
-            emo_icon = emo.split()[0] if emo else "·"
+                dot = "#f4a261"; tag = "◎ Google"
 
             col_card, col_del = st.columns([11, 1])
             with col_card:
-                st.markdown(f"""
-<div class="hist-card">
-  <span class="hist-num">{num}</span>
-  <div class="hist-orig">{orig}</div>
-  <div class="hist-divider">
-    <div class="hist-divider-line"></div>
-    <span class="hist-divider-icon">{emo_icon} ↓</span>
-    <div class="hist-divider-line"></div>
+                st.markdown(f"""<div class="htl" style="--dot:{dot}">
+  <div class="htl-top">
+    <span class="htl-tag">{tag}</span>
+    <span class="htl-time">{ts}</span>
   </div>
-  <div class="hist-trans">{trans}</div>
-  <div class="hist-foot">
-    <span class="hist-badge" style="background:{badge_color}18;color:{badge_color};border-color:{badge_color}40">{eng_label}</span>
-    <span class="hist-meta">{tgt} · {ts}</span>
-  </div>
+  <div class="htl-o">{orig}</div>
+  <div class="htl-arrow">↓</div>
+  <div class="htl-tr">{trans}</div>
+  <span class="htl-lang">{tgt}</span>
 </div>""", unsafe_allow_html=True)
             with col_del:
-                st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='height:26px'></div>", unsafe_allow_html=True)
                 if st.button("✕", key=f"_del_{i}", help="حذف"):
                     del_hist_item(orig_full, ts)
                     st.rerun()
     else:
-        st.markdown("""
-<div style="display:flex;flex-direction:column;align-items:center;
-     justify-content:center;padding:2.5rem 1rem;opacity:.3;gap:.5rem">
-  <span style="font-size:36px">📭</span>
-  <span style="font-size:12px;font-weight:600">لا توجد محفوظات بعد</span>
-</div>""", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center;font-size:28px;opacity:.2;padding:1rem'>📭</div>",
+                    unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
 #  LANGUAGE SELECTOR
