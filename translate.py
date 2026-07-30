@@ -1,299 +1,491 @@
-"""
-HN Translator — Vercel Serverless Backend
-All endpoints in one file (Flask / WSGI)
-"""
-import os, json, base64, re
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+import os
+import io
+import json
+import tempfile
+import urllib.parse
+import base64
+import re
+import time
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import requests
+from requests_toolbelt.multipart.encoder import MultipartEncoder
+from gtts import gTTS
+from deep_translator import GoogleTranslator, MyMemoryTranslator
+import pdfplumber
+import docx
+import openpyxl
+from PIL import Image
+import numpy as np
 
-app = Flask(__name__)
-CORS(app, origins="*")
+# ===== CONFIG =====
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ═══════════════════════════════════════════════════════
-#  API KEYS — set in Vercel Environment Variables
-# ═══════════════════════════════════════════════════════
-GROQ_KEY  = os.environ.get("GROQ_API_KEY", "")
-DEEPL_KEY = os.environ.get("DEEPL_API_KEY", "")
+# ===== SECRETS from environment =====
+GROQ_KEY = os.getenv("GROQ_API_KEY", "").strip()
+DEEPL_KEY = os.getenv("DEEPL_API_KEY", "").strip()
+COHERE_KEY = os.getenv("COHERE_API_KEY", "").strip()
 
-_M_FAST  = "llama-3.1-8b-instant"
-_M_SMART = "llama-3.3-70b-versatile"
-
-LANGS = {
-    "Auto-Detect":{"g":"auto","d":None}, "Arabic":{"g":"ar","d":"AR"},
-    "English":{"g":"en","d":"EN-US"}, "Russian":{"g":"ru","d":"RU"},
-    "Chinese":{"g":"zh-CN","d":"ZH"}, "German":{"g":"de","d":"DE"},
-    "Spanish":{"g":"es","d":"ES"}, "French":{"g":"fr","d":"FR"},
-    "Portuguese":{"g":"pt","d":"PT-PT"}, "Italian":{"g":"it","d":"IT"},
-    "Japanese":{"g":"ja","d":"JA"}, "Korean":{"g":"ko","d":"KO"},
-    "Turkish":{"g":"tr","d":"TR"}, "Dutch":{"g":"nl","d":"NL"},
-    "Polish":{"g":"pl","d":"PL"}, "Ukrainian":{"g":"uk","d":"UK"},
-    "Swedish":{"g":"sv","d":"SV"}, "Danish":{"g":"da","d":"DA"},
-    "Finnish":{"g":"fi","d":"FI"}, "Romanian":{"g":"ro","d":"RO"},
-    "Hungarian":{"g":"hu","d":"HU"}, "Czech":{"g":"cs","d":"CS"},
-    "Bulgarian":{"g":"bg","d":"BG"}, "Greek":{"g":"el","d":"EL"},
-    "Indonesian":{"g":"id","d":"ID"}, "Hindi":{"g":"hi","d":None},
-    "Persian":{"g":"fa","d":None}, "Hebrew":{"g":"iw","d":None},
-    "Urdu":{"g":"ur","d":None},
+# ===== LANGUAGES (same as original) =====
+LANGUAGES = {
+    "Auto-Detect": {"g": "auto", "d": None, "tts": "en"},
+    "Arabic": {"g": "ar", "d": "AR", "tts": "ar"},
+    "English": {"g": "en", "d": "EN-US", "tts": "en"},
+    "Russian": {"g": "ru", "d": "RU", "tts": "ru"},
+    "Chinese": {"g": "zh-CN", "d": "ZH", "tts": "zh-cn"},
+    "German": {"g": "de", "d": "DE", "tts": "de"},
+    "Spanish": {"g": "es", "d": "ES", "tts": "es"},
+    "French": {"g": "fr", "d": "FR", "tts": "fr"},
+    "Portuguese": {"g": "pt", "d": "PT-PT", "tts": "pt"},
+    "Italian": {"g": "it", "d": "IT", "tts": "it"},
+    "Japanese": {"g": "ja", "d": "JA", "tts": "ja"},
+    "Korean": {"g": "ko", "d": "KO", "tts": "ko"},
+    "Turkish": {"g": "tr", "d": "TR", "tts": "tr"},
+    "Dutch": {"g": "nl", "d": "NL", "tts": "nl"},
+    "Polish": {"g": "pl", "d": "PL", "tts": "pl"},
+    "Ukrainian": {"g": "uk", "d": "UK", "tts": "uk"},
+    "Swedish": {"g": "sv", "d": "SV", "tts": "sv"},
+    "Danish": {"g": "da", "d": "DA", "tts": "da"},
+    "Finnish": {"g": "fi", "d": "FI", "tts": "fi"},
+    "Romanian": {"g": "ro", "d": "RO", "tts": "ro"},
+    "Hungarian": {"g": "hu", "d": "HU", "tts": "hu"},
+    "Czech": {"g": "cs", "d": "CS", "tts": "cs"},
+    "Bulgarian": {"g": "bg", "d": "BG", "tts": "bg"},
+    "Greek": {"g": "el", "d": "EL", "tts": "el"},
+    "Indonesian": {"g": "id", "d": "ID", "tts": "id"},
+    "Hindi": {"g": "hi", "d": None, "tts": "hi"},
+    "Persian": {"g": "fa", "d": None, "tts": "fa"},
+    "Hebrew": {"g": "iw", "d": None, "tts": "iw"},
+    "Urdu": {"g": "ur", "d": None, "tts": "ur"},
+}
+LANG_NAMES = list(LANGUAGES.keys())
+LANG_NO_AUTO = [k for k in LANG_NAMES if k != "Auto-Detect"]
+LC2N = {
+    "ar": "Arabic", "en": "English", "ru": "Russian", "zh-cn": "Chinese", "zh": "Chinese",
+    "de": "German", "es": "Spanish", "fr": "French", "pt": "Portuguese", "it": "Italian",
+    "ja": "Japanese", "ko": "Korean", "tr": "Turkish", "nl": "Dutch", "pl": "Polish",
+    "uk": "Ukrainian", "sv": "Swedish", "da": "Danish", "fi": "Finnish", "ro": "Romanian",
+    "hu": "Hungarian", "cs": "Czech", "bg": "Bulgarian", "el": "Greek", "id": "Indonesian",
+    "hi": "Hindi", "fa": "Persian", "he": "Hebrew", "ur": "Urdu",
 }
 
-# ── CORS preflight ──────────────────────────────────────
-@app.route("/api/<path:path>", methods=["OPTIONS"])
-def options(path):
-    r = jsonify({"ok": True})
-    r.headers["Access-Control-Allow-Origin"]  = "*"
-    r.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-    r.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    return r
+# ===== HELPERS =====
+def _gk(): return GROQ_KEY
+def _dk(): return DEEPL_KEY
+def _ck(): return COHERE_KEY
 
-# ═══════════════════════════════════════════════════════
-#  /api/translate
-# ═══════════════════════════════════════════════════════
-@app.route("/api/translate", methods=["POST"])
-def translate():
-    data   = request.get_json(force=True)
-    text   = (data.get("text") or "").strip()
-    target = data.get("target", "Arabic")
-    source = data.get("source", "Auto-Detect")
-    if not text: return jsonify({"error":"no text"}),400
+def detect_lang(text):
+    if not text: return "en", "English"
+    # simple heuristic
+    ar = sum(1 for c in text if "\u0600" <= c <= "\u06FF") / max(len(text), 1)
+    cy = sum(1 for c in text if "\u0400" <= c <= "\u04FF") / max(len(text), 1)
+    cj = sum(1 for c in text if "\u4E00" <= c <= "\u9FFF") / max(len(text), 1)
+    if ar > 0.12: return "ar", "Arabic"
+    if cy > 0.12: return "ru", "Russian"
+    if cj > 0.12: return "zh", "Chinese"
+    return "en", "English"
 
-    info  = LANGS.get(target,{})
-    src_g = LANGS.get(source,{}).get("g","auto")
+def emotion(text):
+    pos = {"شكر", "ممتاز", "رائع", "سعيد", "فرح", "أحب", "جميل", "موافق", "تمام", "حلو",
+           "happy", "good", "great", "excellent", "love", "wonderful", "amazing", "joy", "perfect"}
+    neg = {"حزين", "سيء", "كره", "غضب", "ألم", "خطأ", "فشل", "مزعج", "خطير", "قلق",
+           "sad", "bad", "hate", "angry", "pain", "fail", "dangerous", "terrible", "horrible"}
+    tl = text.lower()
+    p = sum(1 for w in pos if w in tl)
+    n = sum(1 for w in neg if w in tl)
+    return "😊 إيجابي" if p > n else ("😢 سلبي" if n > p else "😐 محايد")
 
-    # 1. DeepL
-    if DEEPL_KEY and info.get("d"):
-        ep = ("https://api-free.deepl.com/v2/translate"
-              if DEEPL_KEY.endswith(":fx") else "https://api.deepl.com/v2/translate")
+def quick_domain(text):
+    domains = {
+        "medical": {"icon": "🏥", "name": "طبي", "keywords": ["doctor", "hospital", "طبيب", "مستشفى", "علاج"]},
+        "legal": {"icon": "⚖️", "name": "قانوني", "keywords": ["contract", "court", "law", "عقد", "قانون"]},
+        "political": {"icon": "🏛️", "name": "سياسي", "keywords": ["minister", "government", "رئيس", "وزير", "برلمان"]},
+        "economic": {"icon": "📈", "name": "اقتصادي", "keywords": ["economic", "investment", "اقتصاد", "استثمار"]},
+        "scientific": {"icon": "🔬", "name": "علمي", "keywords": ["research", "experiment", "بحث", "تجربة"]},
+        "military": {"icon": "🎖️", "name": "عسكري", "keywords": ["military", "army", "جيش", "عسكري", "سلاح"]},
+        "sports": {"icon": "⚽", "name": "رياضي", "keywords": ["football", "stadium", "كرة", "ملعب", "فريق"]},
+        "it": {"icon": "💻", "name": "تقني", "keywords": ["programming", "software", "برمجة", "تطبيق"]},
+        "religious": {"icon": "🕌", "name": "ديني", "keywords": ["mosque", "prayer", "مسجد", "صلاة", "قرآن"]},
+        "literary": {"icon": "📖", "name": "أدبي", "keywords": ["story", "poem", "قصة", "شعر", "رواية"]},
+    }
+    tl = text.lower()
+    result = []
+    for d, v in domains.items():
+        score = sum(tl.count(kw) for kw in v["keywords"])
+        if score > 0:
+            result.append((d, score))
+    result.sort(key=lambda x: -x[1])
+    return [f"{domains[d]['icon']} {domains[d]['name']}" for d, _ in result[:2]]
+
+# ===== TRANSLATION ENGINE =====
+def smart_translate(text, target, source="Auto-Detect"):
+    if not text or not text.strip():
+        return None, "no text"
+    # 1) DeepL
+    if _dk():
+        info = LANGUAGES.get(target, {})
+        if info.get("d"):
+            ep = ("https://api-free.deepl.com/v2/translate" if _dk().endswith(":fx")
+                  else "https://api.deepl.com/v2/translate")
+            try:
+                r = requests.post(ep,
+                    headers={"Authorization": f"DeepL-Auth-Key {_dk()}"},
+                    data={"text": text, "target_lang": info["d"]},
+                    timeout=15)
+                if r.status_code == 200:
+                    return r.json()["translations"][0]["text"], "DeepL ✦"
+            except: pass
+    # 2) Groq AI (if DeepL not available or fails)
+    if _gk() and len(text) <= 1500:
+        system = (
+            "You are an expert multilingual translator with deep cultural knowledge.\n"
+            "RULES:\n"
+            "1. NEVER translate word-for-word — translate MEANING and INTENT\n"
+            "2. Proverbs & idioms: find the CULTURAL EQUIVALENT in target language\n"
+            "3. Dialects/colloquial: fully understand first, then translate naturally\n"
+            "4. Preserve register: formal stays formal, casual stays casual\n"
+            "5. Return ONLY the translation — no explanations, no quotes"
+        )
+        prompt = f"Translate from {source} to {target}:\n\n{text}"
         try:
-            r=requests.post(ep,headers={"Authorization":f"DeepL-Auth-Key {DEEPL_KEY}"},
-                            data={"text":text,"target_lang":info["d"]},timeout=12)
-            if r.status_code==200:
-                return jsonify({"translated":r.json()["translations"][0]["text"],"engine":"DeepL ✦"})
-        except Exception: pass
-
-    # 2. Google
+            model = "llama-3.1-8b-instant" if len(text) < 300 else "llama-3.3-70b-versatile"
+            r = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {_gk()}", "Content-Type": "application/json"},
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 800,
+                    "temperature": 0.4,
+                },
+                timeout=30
+            )
+            if r.status_code == 200:
+                return r.json()["choices"][0]["message"]["content"].strip(), "AI Contextual ✦"
+        except: pass
+    # 3) Google fallback
+    src_g = LANGUAGES.get(source, {}).get("g", "auto")
+    tgt_g = LANGUAGES.get(target, {}).get("g", "en")
     try:
-        from deep_translator import GoogleTranslator
-        res=GoogleTranslator(source=src_g or "auto",target=info.get("g","en")).translate(text)
-        if res: return jsonify({"translated":res,"engine":"Google"})
-    except Exception: pass
-
-    # 3. MyMemory
-    try:
-        from deep_translator import MyMemoryTranslator
-        s="en" if (not src_g or src_g=="auto") else src_g
-        res=MyMemoryTranslator(source=s,target=info.get("g","en")).translate(text)
-        if res: return jsonify({"translated":res,"engine":"MyMemory"})
-    except Exception: pass
-
-    return jsonify({"error":"All translation engines failed"}),502
-
-# ═══════════════════════════════════════════════════════
-#  /api/ocr — Groq Vision (FIXED — tries 4 models)
-# ═══════════════════════════════════════════════════════
-@app.route("/api/ocr", methods=["POST"])
-def ocr():
-    if not GROQ_KEY: return jsonify({"error":"GROQ_API_KEY not set"}),503
-    data   = request.get_json(force=True)
-    img_b64= data.get("image","")
-    if "," in img_b64:
-        hdr,img_b64=img_b64.split(",",1)
-        mime=hdr.split(":")[1].split(";")[0] if ":" in hdr else "image/jpeg"
-    else: mime="image/jpeg"
-    if not img_b64: return jsonify({"error":"no image"}),400
-
-    prompt=("Extract ALL text from this image exactly as written. "
-            "Preserve the original language. Return ONLY the raw text.")
-    models=["meta-llama/llama-4-scout-17b-16e-instruct",
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "llama-3.2-90b-vision-preview",
-            "llama-3.2-11b-vision-preview"]
-    for model in models:
+        res = GoogleTranslator(source=src_g or "auto", target=tgt_g).translate(text)
+        if res:
+            return res, "Google"
+    except:
         try:
-            r=requests.post("https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization":f"Bearer {GROQ_KEY}","Content-Type":"application/json"},
-                json={"model":model,"temperature":0,"max_tokens":2048,
-                      "messages":[{"role":"user","content":[
-                          {"type":"image_url","image_url":{"url":f"data:{mime};base64,{img_b64}","detail":"high"}},
-                          {"type":"text","text":prompt}]}]},timeout=30)
-            if r.status_code==200:
-                txt=r.json()["choices"][0]["message"]["content"].strip()
-                if txt: return jsonify({"text":txt,"model":model})
-                continue
-            if r.status_code in (404,400,422): continue
-            return jsonify({"error":f"Groq {r.status_code}: {r.text[:100]}"}),502
-        except Exception: continue
-    return jsonify({"error":"No Groq Vision model responded — check API key permissions"}),502
+            s = "en" if (not src_g or src_g == "auto") else src_g
+            res = MyMemoryTranslator(source=s, target=tgt_g).translate(text)
+            if res:
+                return res, "Google"
+        except: pass
+    return None, "فشلت الترجمة"
 
-# ═══════════════════════════════════════════════════════
-#  /api/stt — Groq Whisper STT
-# ═══════════════════════════════════════════════════════
-def _wl(c):
-    if not c or c in ("auto","Auto-Detect"): return None
-    return {"zh-CN":"zh","zh-cn":"zh","iw":"he"}.get(c,c[:2])
-
-def _amime(fn):
-    ext=fn.rsplit(".",1)[-1].lower()
-    return {"wav":"audio/wav","mp3":"audio/mpeg","mp4":"video/mp4",
-            "m4a":"audio/mp4","ogg":"audio/ogg","webm":"audio/webm",
-            "mov":"video/quicktime"}.get(ext,"audio/wav")
-
-@app.route("/api/stt", methods=["POST"])
-def stt():
-    if not GROQ_KEY: return jsonify({"error":"GROQ_API_KEY not set"}),503
-    verbose = request.form.get("verbose","false").lower()=="true"
-    audio_file=request.files.get("audio")
-    if audio_file:
-        audio_bytes=audio_file.read(); fn=audio_file.filename or "audio.wav"
-    else:
-        d=request.get_json(force=True,silent=True) or {}
-        b64=d.get("audio_b64","")
-        if not b64: return jsonify({"error":"no audio"}),400
-        audio_bytes=base64.b64decode(b64); fn="audio.wav"
-    lc=_wl(request.form.get("lang","auto") or (request.get_json(force=True,silent=True) or {}).get("lang","auto"))
-    files={"file":(fn,audio_bytes,_amime(fn)),"model":(None,"whisper-large-v3-turbo"),
-           "response_format":(None,"verbose_json" if verbose else "json")}
-    if verbose: files["timestamp_granularities[]"]=(None,"segment")
-    if lc: files["language"]=(None,lc)
+# ===== TTS =====
+def make_tts(text, lang="en"):
+    if not text or not text.strip():
+        return None
     try:
-        r=requests.post("https://api.groq.com/openai/v1/audio/transcriptions",
-                        headers={"Authorization":f"Bearer {GROQ_KEY}"},files=files,timeout=90)
-        if r.status_code==200:
-            d=r.json()
-            if verbose: return jsonify(d)
-            txt=d.get("text","").strip()
-            return jsonify({"text":txt}) if txt else jsonify({"error":"No speech detected"})
-        return jsonify({"error":f"Groq STT {r.status_code}: {r.text[:150]}"}),502
-    except Exception as e: return jsonify({"error":str(e)}),500
+        buf = io.BytesIO()
+        gTTS(text=text[:500], lang=lang, slow=False).write_to_fp(buf)
+        buf.seek(0)
+        return buf
+    except:
+        return None
 
-# ═══════════════════════════════════════════════════════
-#  /api/subtitle — Audio/Video → translated SRT (FIXED)
-# ═══════════════════════════════════════════════════════
-def _s2srt(s):
-    h=int(s//3600); m=int((s%3600)//60); sc=int(s%60); ms=int((s%1)*1000)
+# ===== STT (Groq Whisper) =====
+def groq_stt(audio_bytes, lang="auto"):
+    if not _gk():
+        return None, "No Groq key"
+    # map language code
+    lc = None
+    if lang and lang != "auto":
+        lc = {"zh-CN": "zh", "zh-cn": "zh", "iw": "he"}.get(lang, lang[:2])
+    files = {
+        "file": ("audio.wav", audio_bytes, "audio/wav"),
+        "model": (None, "whisper-large-v3-turbo"),
+        "response_format": (None, "verbose_json")
+    }
+    if lc:
+        files["language"] = (None, lc)
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {_gk()}"},
+            files=files,
+            timeout=60
+        )
+        if r.status_code == 200:
+            data = r.json()
+            return data, None
+        return None, f"Groq STT {r.status_code}"
+    except Exception as e:
+        return None, str(e)
+
+# ===== OCR (Groq Vision) =====
+def ocr_image(image_bytes):
+    if not _gk():
+        return None, "No Groq key"
+    try:
+        mime = "image/jpeg"
+        try:
+            fmt = Image.open(io.BytesIO(image_bytes)).format or "JPEG"
+            mime = f"image/{'jpeg' if fmt.upper() in ('JPG','JPEG') else fmt.lower()}"
+        except:
+            pass
+        b64 = base64.b64encode(image_bytes).decode()
+        # Use Llama 3.2 Vision
+        model = "llama-3.2-11b-vision-preview"
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {_gk()}", "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "temperature": 0,
+                "max_tokens": 2048,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                        {"type": "text", "text": "Extract ALL text from this image exactly as written. Preserve original language. Return ONLY the raw text."}
+                    ]
+                }]
+            },
+            timeout=30
+        )
+        if r.status_code == 200:
+            txt = r.json()["choices"][0]["message"]["content"].strip()
+            return (txt, None) if txt else (None, "No text found")
+        # fallback to Llama 4 if available (optional)
+        return None, f"Groq Vision {r.status_code}"
+    except Exception as e:
+        return None, str(e)
+
+# ===== FILE EXTRACTION =====
+def extract_file(file_bytes, filename):
+    ext = os.path.splitext(filename)[1].lower()
+    if ext == ".pdf":
+        try:
+            txt = ""
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                for pg in pdf.pages:
+                    t = pg.extract_text()
+                    if t:
+                        txt += t + "\n"
+            return txt.strip() if txt.strip() else None, None
+        except Exception as e:
+            return None, str(e)
+    elif ext == ".docx":
+        try:
+            d = docx.Document(io.BytesIO(file_bytes))
+            txt = "\n".join(p.text for p in d.paragraphs)
+            return txt.strip() if txt.strip() else None, None
+        except Exception as e:
+            return None, str(e)
+    elif ext in (".xlsx", ".xls"):
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+            parts = []
+            for sh in wb.worksheets:
+                for row in sh.iter_rows():
+                    for cell in row:
+                        if cell.value is not None:
+                            parts.append(str(cell.value))
+            txt = "\n".join(parts)
+            return txt.strip() if txt.strip() else None, None
+        except Exception as e:
+            return None, str(e)
+    elif ext == ".txt":
+        for enc in ("utf-8", "windows-1256", "latin-1"):
+            try:
+                t = file_bytes.decode(enc)
+                if t.strip():
+                    return t.strip(), None
+            except:
+                pass
+    return None, f"Unsupported file type: {ext}"
+
+# ===== SUBTITLE GENERATION (Whisper + translation) =====
+def seconds_to_srt(s):
+    h = int(s // 3600)
+    m = int((s % 3600) // 60)
+    sc = int(s % 60)
+    ms = int((s % 1) * 1000)
     return f"{h:02d}:{m:02d}:{sc:02d},{ms:03d}"
-def _b2srt(blocks):
-    return "\n\n".join(f"{b['num']}\n{b['start']} --> {b['end']}\n{b['text']}" for b in blocks)
-def _b2bi(orig,trans):
-    return "\n\n".join(f"{o['num']}\n{o['start']} --> {o['end']}\n{o['text']}\n{t['text']}" for o,t in zip(orig,trans))
 
-@app.route("/api/subtitle", methods=["POST"])
-def subtitle():
-    if not GROQ_KEY: return jsonify({"error":"GROQ_API_KEY not set"}),503
-    audio_file=request.files.get("audio")
-    if not audio_file: return jsonify({"error":"no audio file"}),400
-    audio_bytes=audio_file.read(); fn=audio_file.filename or "audio.wav"
-    target_lang=request.form.get("target_lang","Arabic")
-    src_lang=request.form.get("source_lang","Auto-Detect")
+def generate_subtitles(audio_bytes, target_lang):
+    # get segments via Groq Whisper
+    data, err = groq_stt(audio_bytes, "auto")
+    if err:
+        return None, err
+    segments = data.get("segments", [])
+    if not segments:
+        return None, "No speech detected"
+    orig_blocks = []
+    trans_blocks = []
+    for i, seg in enumerate(segments, 1):
+        start = seconds_to_srt(seg.get("start", 0))
+        end = seconds_to_srt(seg.get("end", 0))
+        text = seg.get("text", "").strip()
+        orig_blocks.append({"index": i, "start": start, "end": end, "text": text})
+        # translate each segment
+        translated, _ = smart_translate(text, target_lang, "Auto-Detect")
+        trans_blocks.append({"index": i, "start": start, "end": end, "text": translated or text})
+    # build SRT strings
+    def to_srt(blocks):
+        return "\n\n".join(
+            f"{b['index']}\n{b['start']} --> {b['end']}\n{b['text']}" for b in blocks
+        )
+    return {
+        "segments": trans_blocks,
+        "srt_original": to_srt(orig_blocks),
+        "srt_translated": to_srt(trans_blocks)
+    }, None
 
-    # STT with segments
-    files={"file":(fn,audio_bytes,_amime(fn)),"model":(None,"whisper-large-v3-turbo"),
-           "response_format":(None,"verbose_json"),
-           "timestamp_granularities[]":(None,"segment")}
-    try:
-        r=requests.post("https://api.groq.com/openai/v1/audio/transcriptions",
-                        headers={"Authorization":f"Bearer {GROQ_KEY}"},files=files,timeout=120)
-        if r.status_code!=200: return jsonify({"error":f"STT {r.status_code}: {r.text[:150]}"}),502
-        data=r.json()
-    except Exception as e: return jsonify({"error":str(e)}),500
-
-    segments=data.get("segments",[])
-    if not segments: return jsonify({"error":"No speech segments found"}),400
-
-    info=LANGS.get(target_lang,{}); src_g=LANGS.get(src_lang,{}).get("g","auto")
-    orig_b=[]; trans_b=[]
-
-    for i,seg in enumerate(segments,1):
-        txt=seg.get("text","").strip()
-        b={"num":str(i),"start":_s2srt(seg.get("start",0)),"end":_s2srt(seg.get("end",0)),"text":txt}
-        orig_b.append(b)
-        tr=txt
-        # Translate
-        if DEEPL_KEY and info.get("d"):
-            ep=("https://api-free.deepl.com/v2/translate" if DEEPL_KEY.endswith(":fx")
-                else "https://api.deepl.com/v2/translate")
-            try:
-                resp=requests.post(ep,headers={"Authorization":f"DeepL-Auth-Key {DEEPL_KEY}"},
-                                   data={"text":txt,"target_lang":info["d"]},timeout=8)
-                if resp.status_code==200: tr=resp.json()["translations"][0]["text"]
-            except Exception: pass
+# ===== GROUP CHAT (simplified speaker segmentation) =====
+def group_chat(audio_bytes, target_lang):
+    data, err = groq_stt(audio_bytes, "auto")
+    if err:
+        return None, err
+    segments = data.get("segments", [])
+    if not segments:
+        return None, "No speech detected"
+    # group segments by time gaps > 0.6s and assign speaker IDs
+    groups = []
+    cur = []
+    for seg in segments:
+        if not cur:
+            cur.append(seg)
         else:
-            try:
-                from deep_translator import GoogleTranslator
-                tr=GoogleTranslator(source=src_g or "auto",target=info.get("g","en")).translate(txt) or txt
-            except Exception: pass
-        trans_b.append({**b,"text":tr})
+            gap = seg.get("start", 0) - cur[-1].get("end", 0)
+            if gap >= 0.6:
+                groups.append(cur)
+                cur = []
+            cur.append(seg)
+    if cur:
+        groups.append(cur)
+    # for each group, detect language and translate
+    results = []
+    speaker_map = {}
+    speaker_count = 1
+    icons = ["🧑", "👤", "👩", "👱", "🧔", "🧕", "👲", "🧑‍💼", "👩‍💼", "🙍"]
+    for grp in groups:
+        text = " ".join(s.get("text", "").strip() for s in grp).strip()
+        if not text:
+            continue
+        lang_code, lang_name = detect_lang(text)
+        if lang_code not in speaker_map:
+            speaker_map[lang_code] = speaker_count
+            speaker_count += 1
+        spk = speaker_map[lang_code]
+        translated, engine = smart_translate(text, target_lang, lang_name)
+        start = grp[0].get("start", 0)
+        end = grp[-1].get("end", 0)
+        results.append({
+            "speaker": spk,
+            "icon": icons[(spk - 1) % len(icons)],
+            "language": lang_name,
+            "original": text,
+            "translated": translated or text,
+            "engine": engine,
+            "timestamp": f"{start:.1f}s – {end:.1f}s",
+            "color": f"hsl({(spk*83+140)%360}, 65%, 50%)"
+        })
+    return {"segments": results}, None
 
-    return jsonify({
-        "original_srt":_b2srt(orig_b),"translated_srt":_b2srt(trans_b),
-        "bilingual_srt":_b2bi(orig_b,trans_b),"count":len(segments),"segments":trans_b
-    })
+# ===== API MODELS =====
+class TranslateRequest(BaseModel):
+    text: str
+    source: str = "Auto-Detect"
+    target: str = "Arabic"
 
-# ═══════════════════════════════════════════════════════
-#  /api/chat — AI Chat
-# ═══════════════════════════════════════════════════════
-_SYS="""أنت مساعد ترجمة ذكي محترف في HN Translator.
-قدراتك: ترجمة ذكية بالمعنى والسياق — الأمثال بمقابلها الثقافي — اللهجات العربية وكل عاميات العالم — تصحيح إملاء ونحو وإعراب — تلخيص وشرح مصطلحات — تغيير الأسلوب.
-القاعدة الذهبية: افهم القصد دائماً — ردودك مباشرة بلا مقدمات زائدة."""
+class TTSRequest(BaseModel):
+    text: str
+    lang: str = "en"
 
-@app.route("/api/chat", methods=["POST"])
-def chat():
-    if not GROQ_KEY: return jsonify({"error":"GROQ_API_KEY not set"}),503
-    d=request.get_json(force=True)
-    msg=(d.get("message") or "").strip()
-    if not msg: return jsonify({"error":"no message"}),400
-    src=d.get("source_text","")[:600]; cur=d.get("current_translation","")[:400]
-    sl=d.get("source_lang","Auto-Detect"); tl=d.get("target_lang","Arabic")
-    hist=d.get("history",[])[-8:]
-    ctx=(f"السياق:\n- النص الأصلي ({sl}): {src or 'لا يوجد'}\n"
-         f"- الترجمة الحالية ({tl}): {cur or 'لا يوجد'}\n"
-         f"- الاتجاه: {sl} → {tl}\n\nطلب المستخدم: {msg}")
-    msgs=[{"role":"system","content":_SYS}]
-    for h in hist:
-        if h.get("role") in ("user","assistant") and h.get("content"):
-            msgs.append({"role":h["role"],"content":h["content"]})
-    msgs.append({"role":"user","content":ctx})
-    for model in [_M_SMART,_M_FAST]:
-        try:
-            r=requests.post("https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization":f"Bearer {GROQ_KEY}","Content-Type":"application/json"},
-                json={"model":model,"messages":msgs,"max_tokens":900,"temperature":0.35},timeout=30)
-            if r.status_code==200:
-                return jsonify({"reply":r.json()["choices"][0]["message"]["content"].strip(),"model":model})
-            if r.status_code==429: continue
-            return jsonify({"error":f"Groq {r.status_code}"}),502
-        except Exception as e: return jsonify({"error":str(e)}),500
-    return jsonify({"error":"Rate limit — try again in a moment"}),429
+# ===== ENDPOINTS =====
+@app.post("/api/translate")
+async def translate_endpoint(req: TranslateRequest):
+    if not req.text or not req.text.strip():
+        raise HTTPException(status_code=400, detail="نص فارغ")
+    translation, engine = smart_translate(req.text, req.target, req.source)
+    if translation is None:
+        raise HTTPException(status_code=500, detail="فشلت الترجمة")
+    emo = emotion(req.text)
+    domains = quick_domain(req.text)
+    return {
+        "translation": translation,
+        "emotion": emo,
+        "engine": engine,
+        "domains": domains
+    }
 
-# ═══════════════════════════════════════════════════════
-#  /api/spell — Spell check
-# ═══════════════════════════════════════════════════════
-@app.route("/api/spell", methods=["POST"])
-def spell():
-    if not GROQ_KEY: return jsonify({"suggestions":[]}),200
-    d=request.get_json(force=True)
-    text=(d.get("text") or "").strip(); lang=d.get("lang","Auto-Detect")
-    if len(text)<4: return jsonify({"suggestions":[]})
-    prompt=(f'Check this {lang} text for errors: "{text[:400]}"\n'
-            'Return JSON array only: [{"wrong":"...","correct":"...","reason":"..."}] Max 3. If no errors: []')
-    try:
-        r=requests.post("https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization":f"Bearer {GROQ_KEY}","Content-Type":"application/json"},
-            json={"model":_M_FAST,"messages":[{"role":"user","content":prompt}],"max_tokens":200,"temperature":0.1},
-            timeout=12)
-        if r.status_code==200:
-            raw=re.sub(r"```json|```","",r.json()["choices"][0]["message"]["content"].strip()).strip()
-            items=json.loads(raw)
-            return jsonify({"suggestions":[x for x in items if isinstance(x,dict) and x.get("wrong")!=x.get("correct")][:3]})
-    except Exception: pass
-    return jsonify({"suggestions":[]})
+@app.post("/api/tts")
+async def tts_endpoint(req: TTSRequest):
+    audio_bytes = make_tts(req.text, req.lang)
+    if audio_bytes is None:
+        raise HTTPException(status_code=500, detail="فشل توليد الصوت")
+    return StreamingResponse(audio_bytes, media_type="audio/mpeg")
 
-# ── helpers ──
-@app.route("/api/langs",methods=["GET"])
-def get_langs(): return jsonify({"languages":list(LANGS.keys())})
+@app.post("/api/stt")
+async def stt_endpoint(file: UploadFile = File(...), lang: str = Form("auto")):
+    audio = await file.read()
+    result, err = groq_stt(audio, lang)
+    if err:
+        raise HTTPException(status_code=500, detail=err)
+    return {"text": result.get("text", "") if result else ""}
 
-@app.route("/api/health",methods=["GET"])
-def health(): return jsonify({"status":"ok","groq":bool(GROQ_KEY),"deepl":bool(DEEPL_KEY)})
+@app.post("/api/ocr")
+async def ocr_endpoint(image: UploadFile = File(...)):
+    img = await image.read()
+    text, err = ocr_image(img)
+    if err:
+        raise HTTPException(status_code=500, detail=err)
+    return {"text": text}
 
-# ── Vercel WSGI handler ──
-handler = app
+@app.post("/api/extract")
+async def extract_endpoint(file: UploadFile = File(...)):
+    content = await file.read()
+    text, err = extract_file(content, file.filename)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    if not text:
+        raise HTTPException(status_code=400, detail="لا يوجد نص في الملف")
+    return {"text": text}
+
+@app.post("/api/subtitle")
+async def subtitle_endpoint(file: UploadFile = File(...), target: str = Form("Arabic")):
+    audio = await file.read()
+    result, err = generate_subtitles(audio, target)
+    if err:
+        raise HTTPException(status_code=500, detail=err)
+    return result
+
+@app.post("/api/group")
+async def group_endpoint(file: UploadFile = File(...), target: str = Form("Arabic")):
+    audio = await file.read()
+    result, err = group_chat(audio, target)
+    if err:
+        raise HTTPException(status_code=500, detail=err)
+    return result
+
+# ===== Root health check =====
+@app.get("/")
+async def root():
+    return {"status": "HN Translator API is running"}
+
+# (Optional) For local development:
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
