@@ -1,18 +1,12 @@
 {
-  "builds": [
+  "rewrites": [
     {
-      "src": "api/translate.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "api/translate.py"
+      "source": "/api/(.*)",
+      "destination": "/api/translate.py"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
