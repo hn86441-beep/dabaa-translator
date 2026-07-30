@@ -1,0 +1,27 @@
+{
+  "builds": [
+    {
+      "src": "translate.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "translate.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "index.html"
+    }
+  ],
+  "env": {
+    "GROQ_API_KEY": "@groq_api_key",
+    "DEEPL_API_KEY": "@deepl_api_key",
+    "COHERE_API_KEY": "@cohere_api_key"
+  }
+}
