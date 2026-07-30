@@ -1,14 +1,14 @@
 {
-  "functions": {
-    "api/translate.py": {
-      "runtime": "python3.12",
-      "maxDuration": 10
+  "builds": [
+    {
+      "src": "api/translate.py",
+      "use": "@vercel/python"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/translate.py"
+      "dest": "api/translate.py"
     },
     {
       "src": "/(.*)",
