@@ -6,7 +6,6 @@
   <title>HN TRANSLATOR</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>" />
   <style>
-    /* ===== Reset & Base ===== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -28,341 +27,87 @@
       border: 1px solid rgba(78, 203, 160, 0.15);
       box-shadow: 0 20px 60px rgba(0,0,0,0.7);
     }
-    /* ===== Header ===== */
-    .header {
-      text-align: center;
-      margin-bottom: 1.8rem;
-    }
-    .header .brand {
-      font-size: 0.7rem;
-      letter-spacing: 0.4em;
-      color: rgba(78,203,160,0.6);
-      text-transform: uppercase;
-    }
-    .header h1 {
-      font-size: 2.6rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin: 0.2rem 0 0.4rem;
-    }
+    .header { text-align: center; margin-bottom: 1.8rem; }
+    .header .brand { font-size: 0.7rem; letter-spacing: 0.4em; color: rgba(78,203,160,0.6); text-transform: uppercase; }
+    .header h1 { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.02em; margin: 0.2rem 0 0.4rem; }
     .header h1 .accent { color: #4ECBA0; }
-    .header .tags {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.4rem;
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: rgba(78,203,160,0.8);
-    }
-    .header .tags span {
-      background: rgba(78,203,160,0.08);
-      border: 1px solid rgba(78,203,160,0.2);
-      border-radius: 20px;
-      padding: 0.15rem 0.8rem;
-    }
-    .divider {
-      width: 80px;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #4ECBA0, transparent);
-      margin: 0.5rem auto 0;
-    }
-
-    /* ===== Language Selector ===== */
-    .lang-row {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.8rem;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-    }
-    .lang-row select {
-      background: #0f1827;
-      color: #f0f4ff;
-      border: 2px solid rgba(78,203,160,0.25);
-      border-radius: 10px;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      outline: none;
-      min-width: 140px;
-      transition: border 0.2s;
-    }
+    .header .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; font-size: 0.7rem; font-weight: 600; color: rgba(78,203,160,0.8); }
+    .header .tags span { background: rgba(78,203,160,0.08); border: 1px solid rgba(78,203,160,0.2); border-radius: 20px; padding: 0.15rem 0.8rem; }
+    .divider { width: 80px; height: 2px; background: linear-gradient(90deg, transparent, #4ECBA0, transparent); margin: 0.5rem auto 0; }
+    
+    .lang-row { display: flex; align-items: center; justify-content: center; gap: 0.8rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .lang-row select { background: #0f1827; color: #f0f4ff; border: 2px solid rgba(78,203,160,0.25); border-radius: 10px; padding: 0.5rem 1rem; font-size: 1rem; font-weight: 600; cursor: pointer; outline: none; min-width: 140px; }
     .lang-row select:focus { border-color: #4ECBA0; }
-    .lang-row .swap-btn {
-      background: rgba(78,203,160,0.12);
-      border: 1px solid rgba(78,203,160,0.3);
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 1.2rem;
-      color: #4ECBA0;
-      cursor: pointer;
-      transition: 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .lang-row .swap-btn:hover {
-      background: rgba(78,203,160,0.25);
-      transform: rotate(180deg);
-    }
-    .lang-row label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      color: rgba(78,203,160,0.6);
-      letter-spacing: 0.1em;
-      margin-bottom: 0.2rem;
-      display: block;
-    }
-
-    /* ===== Input / Output ===== */
-    .io-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.2rem;
-      margin-top: 0.5rem;
-    }
+    .lang-row .swap-btn { background: rgba(78,203,160,0.12); border: 1px solid rgba(78,203,160,0.3); border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; color: #4ECBA0; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+    .lang-row .swap-btn:hover { background: rgba(78,203,160,0.25); transform: rotate(180deg); }
+    .lang-row label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: rgba(78,203,160,0.6); letter-spacing: 0.1em; display: block; margin-bottom: 0.2rem; }
+    
+    .io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-top: 0.5rem; }
     @media (max-width: 700px) { .io-grid { grid-template-columns: 1fr; } }
-
-    .io-box {
-      background: rgba(255,255,255,0.02);
-      border-radius: 16px;
-      border: 1.5px solid rgba(78,203,160,0.15);
-      padding: 0.8rem 1rem;
-      position: relative;
-      transition: border 0.3s;
-    }
+    .io-box { background: rgba(255,255,255,0.02); border-radius: 16px; border: 1.5px solid rgba(78,203,160,0.15); padding: 0.8rem 1rem; position: relative; transition: border 0.3s; }
     .io-box:focus-within { border-color: #4ECBA0; }
-    .io-box .label {
-      font-size: 0.65rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      color: rgba(78,203,160,0.5);
-      letter-spacing: 0.12em;
-      display: block;
-      margin-bottom: 0.3rem;
-    }
-    .io-box textarea {
-      width: 100%;
-      background: transparent;
-      border: none;
-      color: #f0f4ff;
-      font-size: 1.1rem;
-      font-weight: 500;
-      line-height: 1.7;
-      resize: vertical;
-      min-height: 120px;
-      outline: none;
-      font-family: inherit;
-    }
-    .io-box textarea::placeholder {
-      color: rgba(255,255,255,0.2);
-      font-weight: 400;
-    }
-    .io-box .output-text {
-      font-size: 1.1rem;
-      font-weight: 500;
-      line-height: 1.7;
-      min-height: 120px;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .io-box .output-text:empty::before {
-      content: "الترجمة ستظهر هنا...";
-      color: rgba(255,255,255,0.2);
-      font-weight: 400;
-    }
-    .io-box .meta {
-      display: flex;
-      gap: 0.8rem;
-      margin-top: 0.5rem;
-      font-size: 0.7rem;
-      color: rgba(78,203,160,0.5);
-      border-top: 1px solid rgba(78,203,160,0.08);
-      padding-top: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    /* ===== Buttons ===== */
-    .action-row {
-      display: flex;
-      gap: 0.8rem;
-      margin: 1.2rem 0 0.8rem;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .btn {
-      background: linear-gradient(135deg, #4ECBA0, #1a9d6a);
-      color: #041510;
-      font-weight: 700;
-      font-size: 0.9rem;
-      border: none;
-      border-radius: 12px;
-      padding: 0.6rem 1.8rem;
-      cursor: pointer;
-      transition: 0.2s;
-      box-shadow: 0 4px 16px rgba(78,203,160,0.25);
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
+    .io-box .label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: rgba(78,203,160,0.5); letter-spacing: 0.12em; display: block; margin-bottom: 0.3rem; }
+    .io-box textarea { width: 100%; background: transparent; border: none; color: #f0f4ff; font-size: 1.1rem; font-weight: 500; line-height: 1.7; resize: vertical; min-height: 120px; outline: none; font-family: inherit; }
+    .io-box textarea::placeholder { color: rgba(255,255,255,0.2); font-weight: 400; }
+    .io-box .output-text { font-size: 1.1rem; font-weight: 500; line-height: 1.7; min-height: 120px; white-space: pre-wrap; word-break: break-word; }
+    .io-box .output-text:empty::before { content: "الترجمة ستظهر هنا..."; color: rgba(255,255,255,0.2); font-weight: 400; }
+    .io-box .meta { display: flex; gap: 0.8rem; margin-top: 0.5rem; font-size: 0.7rem; color: rgba(78,203,160,0.5); border-top: 1px solid rgba(78,203,160,0.08); padding-top: 0.5rem; flex-wrap: wrap; }
+    
+    .action-row { display: flex; gap: 0.8rem; margin: 1.2rem 0 0.8rem; flex-wrap: wrap; justify-content: center; }
+    .btn { background: linear-gradient(135deg, #4ECBA0, #1a9d6a); color: #041510; font-weight: 700; font-size: 0.9rem; border: none; border-radius: 12px; padding: 0.6rem 1.8rem; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 16px rgba(78,203,160,0.25); display: inline-flex; align-items: center; gap: 0.4rem; }
     .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
-    .btn-secondary {
-      background: rgba(78,203,160,0.08);
-      color: #4ECBA0;
-      box-shadow: none;
-      border: 1px solid rgba(78,203,160,0.2);
-    }
+    .btn-secondary { background: rgba(78,203,160,0.08); color: #4ECBA0; box-shadow: none; border: 1px solid rgba(78,203,160,0.2); }
     .btn-secondary:hover { background: rgba(78,203,160,0.15); }
-    .btn-icon {
-      background: transparent;
-      border: none;
-      color: rgba(78,203,160,0.6);
-      font-size: 1.2rem;
-      cursor: pointer;
-      transition: 0.2s;
-      padding: 0.2rem;
-    }
-    .btn-icon:hover { color: #4ECBA0; transform: scale(1.1); }
-
-    /* ===== Tabs ===== */
-    .tabs {
-      display: flex;
-      gap: 0.2rem;
-      margin: 1.5rem 0 1rem;
-      border-bottom: 1px solid rgba(78,203,160,0.1);
-      overflow-x: auto;
-      padding-bottom: 0.2rem;
-    }
-    .tab-btn {
-      background: transparent;
-      border: none;
-      color: rgba(255,255,255,0.4);
-      padding: 0.5rem 1.2rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      border-radius: 8px 8px 0 0;
-      transition: 0.2s;
-      white-space: nowrap;
-    }
-    .tab-btn.active {
-      color: #4ECBA0;
-      background: rgba(78,203,160,0.08);
-      border-bottom: 2px solid #4ECBA0;
-    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
+    
+    .status { margin: 0.5rem 0; padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.9rem; display: none; }
+    .status.error { background: rgba(255,80,80,0.12); color: #ff6b6b; border: 1px solid rgba(255,80,80,0.2); display: block; }
+    .status.success { background: rgba(78,203,160,0.12); color: #4ECBA0; border: 1px solid rgba(78,203,160,0.2); display: block; }
+    .status.info { background: rgba(78,203,160,0.05); color: #a0d4c0; border: 1px solid rgba(78,203,160,0.1); display: block; }
+    
+    .tabs { display: flex; gap: 0.2rem; margin: 1.5rem 0 1rem; border-bottom: 1px solid rgba(78,203,160,0.1); overflow-x: auto; padding-bottom: 0.2rem; }
+    .tab-btn { background: transparent; border: none; color: rgba(255,255,255,0.4); padding: 0.5rem 1.2rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: 8px 8px 0 0; transition: 0.2s; white-space: nowrap; }
+    .tab-btn.active { color: #4ECBA0; background: rgba(78,203,160,0.08); border-bottom: 2px solid #4ECBA0; }
     .tab-btn:hover { color: #fff; background: rgba(255,255,255,0.03); }
     .tab-content { display: none; margin-top: 1rem; }
     .tab-content.active { display: block; }
-
-    /* ===== File / Camera / Subtitle ===== */
-    .dropzone {
-      border: 2px dashed rgba(78,203,160,0.25);
-      border-radius: 16px;
-      padding: 2.5rem 1rem;
-      text-align: center;
-      color: rgba(255,255,255,0.3);
-      cursor: pointer;
-      transition: 0.3s;
-      margin-bottom: 1rem;
-    }
+    
+    .dropzone { border: 2px dashed rgba(78,203,160,0.25); border-radius: 16px; padding: 2.5rem 1rem; text-align: center; color: rgba(255,255,255,0.3); cursor: pointer; transition: 0.3s; margin-bottom: 1rem; }
     .dropzone:hover { border-color: #4ECBA0; background: rgba(78,203,160,0.03); }
     .dropzone input { display: none; }
     .preview-img { max-width: 100%; max-height: 300px; border-radius: 12px; margin: 0.5rem 0; }
-
-    /* ===== Subtitle lines ===== */
-    .srt-line {
-      display: flex;
-      gap: 0.5rem;
-      padding: 0.3rem 0;
-      border-bottom: 1px solid rgba(78,203,160,0.05);
-      font-size: 0.85rem;
-      align-items: flex-start;
-    }
+    
+    .srt-line { display: flex; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(78,203,160,0.05); font-size: 0.85rem; align-items: flex-start; }
     .srt-num { color: rgba(255,255,255,0.25); min-width: 30px; }
     .srt-time { color: rgba(255,255,255,0.35); min-width: 90px; font-family: monospace; }
     .srt-text { flex: 1; }
     .srt-trans { color: #4ECBA0; }
-
-    /* ===== Group chat bubble ===== */
-    .cb {
-      background: rgba(78,203,160,0.04);
-      border: 1px solid rgba(78,203,160,0.08);
-      border-radius: 14px;
-      padding: 0.8rem 1rem;
-      margin-bottom: 0.6rem;
-      border-left: 3px solid #4ECBA0;
-    }
+    
+    .cb { background: rgba(78,203,160,0.04); border: 1px solid rgba(78,203,160,0.08); border-radius: 14px; padding: 0.8rem 1rem; margin-bottom: 0.6rem; border-left: 3px solid #4ECBA0; }
     .cb-hd { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem; }
     .cb-spk { font-weight: 700; color: #4ECBA0; }
     .cb-lang { font-size: 0.7rem; color: rgba(255,255,255,0.4); }
     .cb-orig { font-size: 0.85rem; color: rgba(255,255,255,0.5); font-style: italic; }
     .cb-trans { font-size: 1rem; font-weight: 600; margin-top: 0.2rem; }
-    .cb-eng { font-size: 0.65rem; color: rgba(255,255,255,0.25); }
-
-    /* ===== Status / Loading ===== */
-    .spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 2px solid rgba(78,203,160,0.15);
-      border-top: 2px solid #4ECBA0;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      vertical-align: middle;
-      margin-left: 0.5rem;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .status {
-      margin: 0.5rem 0;
-      padding: 0.4rem 1rem;
-      border-radius: 8px;
-      font-size: 0.9rem;
-    }
-    .status.error { background: rgba(255,80,80,0.12); color: #ff6b6b; border: 1px solid rgba(255,80,80,0.2); }
-    .status.success { background: rgba(78,203,160,0.12); color: #4ECBA0; border: 1px solid rgba(78,203,160,0.2); }
-    .status.info { background: rgba(78,203,160,0.05); color: #a0d4c0; border: 1px solid rgba(78,203,160,0.1); }
-
-    /* ===== Responsive tweaks ===== */
-    @media (max-width: 480px) {
-      .container { padding: 1rem; }
-      .header h1 { font-size: 1.8rem; }
-      .lang-row select { min-width: 100px; font-size: 0.9rem; }
-    }
+    
+    @media (max-width: 480px) { .container { padding: 1rem; } .header h1 { font-size: 1.8rem; } }
   </style>
 </head>
 <body>
-
 <div class="container">
-  <!-- HEADER -->
   <div class="header">
     <div class="brand">✦ SMART VOICE TRANSLATOR ✦</div>
     <h1>HN <span class="accent">TRANSLATOR</span></h1>
-    <div class="tags">
-      <span>🎙️ صوت</span><span>✍️ نص + ذكاء</span><span>📸 رؤية</span>
-      <span>🎬 ترجمات</span><span>🌍 مجموعات</span>
-    </div>
+    <div class="tags"><span>🎙️ صوت</span><span>✍️ نص</span><span>📸 رؤية</span><span>🎬 ترجمات</span><span>🌍 مجموعات</span></div>
     <div class="divider"></div>
   </div>
 
-  <!-- LANGUAGE SELECTOR -->
   <div class="lang-row">
-    <div>
-      <label>من</label>
-      <select id="srcLang"></select>
-    </div>
-    <button class="swap-btn" id="swapBtn" title="تبديل">⇄</button>
-    <div>
-      <label>إلى</label>
-      <select id="tgtLang"></select>
-    </div>
+    <div><label>من</label><select id="srcLang"></select></div>
+    <button class="swap-btn" id="swapBtn">⇄</button>
+    <div><label>إلى</label><select id="tgtLang"></select></div>
   </div>
 
-  <!-- INPUT / OUTPUT -->
   <div class="io-grid">
     <div class="io-box">
       <span class="label">📝 النص الأصلي</span>
@@ -379,18 +124,14 @@
     </div>
   </div>
 
-  <!-- ACTION BUTTONS -->
   <div class="action-row">
     <button class="btn" id="translateBtn">🔄 ترجمة</button>
     <button class="btn btn-secondary" id="speakBtn">🔊 استماع</button>
     <button class="btn btn-secondary" id="copyBtn">📋 نسخ</button>
     <button class="btn btn-secondary" id="clearBtn">🗑️ مسح</button>
   </div>
+  <div id="status" class="status"></div>
 
-  <!-- STATUS -->
-  <div id="status" class="status" style="display:none;"></div>
-
-  <!-- TABS -->
   <div class="tabs">
     <button class="tab-btn active" data-tab="voice">🎙️ صوت</button>
     <button class="tab-btn" data-tab="file">📄 ملف</button>
@@ -399,70 +140,43 @@
     <button class="tab-btn" data-tab="group">🌍 مجموعة</button>
   </div>
 
-  <!-- TAB CONTENTS -->
-  <!-- Voice -->
   <div id="tab-voice" class="tab-content active">
     <button class="btn" id="recordBtn">🎙️ سجّل الآن</button>
     <div id="recordingStatus" style="margin-top:0.5rem;font-size:0.9rem;color:rgba(255,255,255,0.4);"></div>
     <div id="voiceTranscript" style="margin-top:0.5rem;padding:0.5rem;background:rgba(255,255,255,0.02);border-radius:8px;"></div>
   </div>
 
-  <!-- File -->
   <div id="tab-file" class="tab-content">
-    <div class="dropzone" id="fileDropzone">
-      <p>📎 اسحب ملفك هنا أو انقر للاختيار</p>
-      <p style="font-size:0.8rem;opacity:0.5;">يدعم: PDF, DOCX, XLSX, TXT</p>
-      <input type="file" id="fileInput" accept=".pdf,.docx,.xlsx,.xls,.txt" />
-    </div>
-    <div id="fileStatus"></div>
-    <div id="fileOutput" style="margin-top:0.5rem;"></div>
+    <div class="dropzone" id="fileDropzone"><p>📎 اسحب ملفك هنا أو انقر للاختيار</p><p style="font-size:0.8rem;opacity:0.5;">PDF, DOCX, XLSX, TXT</p><input type="file" id="fileInput" accept=".pdf,.docx,.xlsx,.xls,.txt" /></div>
+    <div id="fileStatus"></div><div id="fileOutput"></div>
   </div>
 
-  <!-- Camera -->
   <div id="tab-camera" class="tab-content">
     <button class="btn" id="cameraBtn">📷 التقاط صورة</button>
     <input type="file" accept="image/*" id="imageUpload" style="display:block;margin-top:0.5rem;" />
-    <div id="cameraPreview" style="margin-top:0.5rem;"></div>
-    <div id="cameraStatus"></div>
-    <div id="cameraOutput" style="margin-top:0.5rem;"></div>
+    <div id="cameraPreview"></div><div id="cameraStatus"></div><div id="cameraOutput"></div>
   </div>
 
-  <!-- Subtitle -->
   <div id="tab-subtitle" class="tab-content">
-    <div class="dropzone" id="subDropzone">
-      <p>🎬 ارفع ملف صوتي أو فيديو لاستخراج الترجمات</p>
-      <p style="font-size:0.8rem;opacity:0.5;">MP3, WAV, MP4, M4A, OGG</p>
-      <input type="file" id="subInput" accept="audio/*,video/*" />
-    </div>
+    <div class="dropzone" id="subDropzone"><p>🎬 ارفع ملف صوتي/فيديو</p><p style="font-size:0.8rem;opacity:0.5;">MP3, WAV, MP4</p><input type="file" id="subInput" accept="audio/*,video/*" /></div>
     <button class="btn" id="subBtn">🚀 إنشاء الترجمات</button>
-    <div id="subStatus"></div>
-    <div id="subOutput" style="margin-top:0.5rem;"></div>
+    <div id="subStatus"></div><div id="subOutput"></div>
   </div>
 
-  <!-- Group Chat -->
   <div id="tab-group" class="tab-content">
-    <div class="dropzone" id="groupDropzone">
-      <p>👥 ارفع تسجيلاً صوتياً لمحادثة جماعية</p>
-      <p style="font-size:0.8rem;opacity:0.5;">MP3, WAV, M4A</p>
-      <input type="file" id="groupInput" accept="audio/*" />
-    </div>
+    <div class="dropzone" id="groupDropzone"><p>👥 ارفع تسجيلاً صوتياً للمجموعة</p><p style="font-size:0.8rem;opacity:0.5;">MP3, WAV</p><input type="file" id="groupInput" accept="audio/*" /></div>
     <button class="btn" id="groupBtn">🚀 تحليل وترجمة</button>
-    <div id="groupStatus"></div>
-    <div id="groupOutput" style="margin-top:0.5rem;"></div>
+    <div id="groupStatus"></div><div id="groupOutput"></div>
   </div>
-
 </div>
 
 <script>
-  // ===== LANGUAGES (same as original) =====
-  const LANGUAGES = [
-    "Auto-Detect","Arabic","English","Russian","Chinese","German","Spanish","French",
+  // ===== اللغات =====
+  const LANGS = ["Auto-Detect","Arabic","English","Russian","Chinese","German","Spanish","French",
     "Portuguese","Italian","Japanese","Korean","Turkish","Dutch","Polish","Ukrainian",
     "Swedish","Danish","Finnish","Romanian","Hungarian","Czech","Bulgarian","Greek",
-    "Indonesian","Hindi","Persian","Hebrew","Urdu"
-  ];
+    "Indonesian","Hindi","Persian","Hebrew","Urdu"];
 
-  // ===== DOM refs =====
   const srcSel = document.getElementById('srcLang');
   const tgtSel = document.getElementById('tgtLang');
   const swapBtn = document.getElementById('swapBtn');
@@ -477,392 +191,221 @@
   const engineSpan = document.getElementById('engineDisplay');
   const domainSpan = document.getElementById('domainDisplay');
 
-  // populate selects
-  LANGUAGES.forEach(l => {
-    const opt1 = document.createElement('option');
-    opt1.value = l;
-    opt1.textContent = l;
-    srcSel.appendChild(opt1);
-    const opt2 = document.createElement('option');
-    opt2.value = l;
-    opt2.textContent = l;
-    tgtSel.appendChild(opt2);
+  LANGS.forEach(l => {
+    const o1 = document.createElement('option'); o1.value = l; o1.textContent = l; srcSel.appendChild(o1);
+    const o2 = document.createElement('option'); o2.value = l; o2.textContent = l; tgtSel.appendChild(o2);
   });
-  srcSel.value = 'Auto-Detect';
-  tgtSel.value = 'Arabic';
+  srcSel.value = 'Auto-Detect'; tgtSel.value = 'Arabic';
 
-  // ===== Tabs =====
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-      document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-    });
-  });
+  // ===== تبويبات =====
+  document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+  }));
 
-  // ===== Swap =====
   swapBtn.addEventListener('click', () => {
-    const s = srcSel.value;
-    const t = tgtSel.value;
+    const s = srcSel.value, t = tgtSel.value;
     srcSel.value = t === 'Auto-Detect' ? 'Arabic' : t;
     tgtSel.value = s === 'Auto-Detect' ? 'Arabic' : s;
   });
 
-  // ===== Show status =====
   function setStatus(msg, type='info') {
     statusDiv.textContent = msg;
     statusDiv.className = 'status ' + type;
-    statusDiv.style.display = 'block';
-    setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+    if (!msg) { statusDiv.className = 'status'; statusDiv.style.display = 'none'; }
+    else { statusDiv.style.display = 'block'; }
+    setTimeout(() => { if (statusDiv.textContent === msg) { statusDiv.style.display = 'none'; } }, 7000);
   }
 
-  // ===== Translate =====
+  // ===== الترجمة الأساسية =====
   async function translate() {
-    const src = srcSel.value;
-    const tgt = tgtSel.value;
     const text = inputText.value.trim();
     if (!text) { setStatus('الرجاء إدخال نص', 'error'); return; }
-
     translateBtn.disabled = true;
-    translateBtn.innerHTML = '⏳ جارٍ الترجمة...';
+    translateBtn.innerHTML = '⏳ جارٍ...';
     setStatus('جاري الترجمة...', 'info');
 
     try {
       const res = await fetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, source: src, target: tgt })
+        body: JSON.stringify({ text, source: srcSel.value, target: tgtSel.value })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'فشل الترجمة');
-
+      const data = await res.json().catch(() => ({ detail: 'استجابة غير صالحة (غير JSON)' }));
+      if (!res.ok) throw new Error(data.detail || `خطأ ${res.status}`);
       outputText.textContent = data.translation;
       emotionSpan.textContent = data.emotion || '';
       engineSpan.textContent = data.engine || '';
       domainSpan.textContent = data.domains ? data.domains.join(' ') : '';
       setStatus('✅ تمت الترجمة', 'success');
     } catch (err) {
-      setStatus('❌ ' + err.message, 'error');
+      setStatus('❌ فشل: ' + err.message, 'error');
+      console.error(err);
     } finally {
       translateBtn.disabled = false;
       translateBtn.innerHTML = '🔄 ترجمة';
     }
   }
-
   translateBtn.addEventListener('click', translate);
 
-  // ===== TTS =====
+  // ===== استماع =====
   speakBtn.addEventListener('click', async () => {
     const text = outputText.textContent.trim();
     if (!text) { setStatus('لا يوجد نص مترجم للاستماع', 'error'); return; }
-    const tgt = tgtSel.value;
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, lang: tgt })
+        body: JSON.stringify({ text, lang: tgtSel.value })
       });
-      if (!res.ok) throw new Error('فشل تحويل النص إلى صوت');
+      if (!res.ok) throw new Error('فشل توليد الصوت');
       const blob = await res.blob();
-      const audioUrl = URL.createObjectURL(blob);
-      const audio = new Audio(audioUrl);
+      const audio = new Audio(URL.createObjectURL(blob));
       audio.play();
-    } catch (err) {
-      setStatus('❌ ' + err.message, 'error');
-    }
+    } catch (err) { setStatus('❌ ' + err.message, 'error'); }
   });
 
-  // ===== Copy =====
   copyBtn.addEventListener('click', () => {
-    const text = outputText.textContent.trim();
-    if (!text) { setStatus('لا يوجد نص للنسخ', 'error'); return; }
-    navigator.clipboard?.writeText(text).then(() => {
-      setStatus('📋 تم النسخ', 'success');
-    }).catch(() => setStatus('فشل النسخ', 'error'));
+    const t = outputText.textContent.trim();
+    if (!t) { setStatus('لا يوجد نص للنسخ', 'error'); return; }
+    navigator.clipboard?.writeText(t).then(() => setStatus('📋 تم النسخ', 'success'));
   });
+  clearBtn.addEventListener('click', () => { inputText.value = ''; outputText.textContent = ''; emotionSpan.textContent = ''; engineSpan.textContent = ''; domainSpan.textContent = ''; });
 
-  // ===== Clear =====
-  clearBtn.addEventListener('click', () => {
-    inputText.value = '';
-    outputText.textContent = '';
-    emotionSpan.textContent = '';
-    engineSpan.textContent = '';
-    domainSpan.textContent = '';
-  });
-
-  // ===== Voice Recording (Web Speech API) =====
+  // ===== صوت =====
   let recognition = null;
-  const recordBtn = document.getElementById('recordBtn');
-  const recordingStatus = document.getElementById('recordingStatus');
-  const voiceTranscript = document.getElementById('voiceTranscript');
-
-  recordBtn.addEventListener('click', () => {
+  document.getElementById('recordBtn').addEventListener('click', function() {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      setStatus('متصفحك لا يدعم التعرف الصوتي', 'error');
-      return;
+      setStatus('المتصفح لا يدعم الصوت', 'error'); return;
     }
-    if (recognition) {
-      recognition.stop();
-      recordBtn.textContent = '🎙️ سجّل الآن';
-      recordingStatus.textContent = 'تم الإيقاف';
-      return;
-    }
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.lang = srcSel.value === 'Auto-Detect' ? 'ar' : 'en'; // default
+    if (recognition) { recognition.stop(); this.textContent = '🎙️ سجّل الآن'; recognition = null; return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.lang = srcSel.value === 'Auto-Detect' ? 'ar' : 'en';
     recognition.continuous = false;
     recognition.interimResults = true;
-
-    recognition.onstart = () => {
-      recordBtn.textContent = '⏹️ إيقاف';
-      recordingStatus.textContent = '🎤 جارٍ الاستماع...';
-    };
-    recognition.onresult = (event) => {
+    recognition.onstart = () => { this.textContent = '⏹️ إيقاف'; document.getElementById('recordingStatus').textContent = '🎤 جارٍ الاستماع...'; };
+    recognition.onresult = (e) => {
       let final = '';
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) final += event.results[i][0].transcript;
-        else interim += event.results[i][0].transcript;
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) final += e.results[i][0].transcript;
       }
-      voiceTranscript.textContent = final || interim;
-      if (final) {
-        inputText.value = final;
-        translate(); // auto translate after speech
-      }
+      if (final) { document.getElementById('voiceTranscript').textContent = final; inputText.value = final; translate(); }
     };
-    recognition.onerror = (e) => {
-      setStatus('خطأ في الصوت: ' + e.error, 'error');
-      recordBtn.textContent = '🎙️ سجّل الآن';
-      recordingStatus.textContent = '';
-    };
-    recognition.onend = () => {
-      recordBtn.textContent = '🎙️ سجّل الآن';
-      recordingStatus.textContent = '✅ انتهى التسجيل';
-      recognition = null;
-    };
+    recognition.onerror = (e) => { setStatus('خطأ صوت: ' + e.error, 'error'); this.textContent = '🎙️ سجّل الآن'; recognition = null; };
+    recognition.onend = () => { this.textContent = '🎙️ سجّل الآن'; document.getElementById('recordingStatus').textContent = '✅ انتهى'; recognition = null; };
     recognition.start();
   });
 
-  // ===== File Upload =====
-  const fileDropzone = document.getElementById('fileDropzone');
+  // ===== ملفات =====
   const fileInput = document.getElementById('fileInput');
-  const fileStatus = document.getElementById('fileStatus');
-  const fileOutput = document.getElementById('fileOutput');
-
-  fileDropzone.addEventListener('click', () => fileInput.click());
-  fileDropzone.addEventListener('dragover', e => { e.preventDefault(); fileDropzone.style.borderColor = '#4ECBA0'; });
-  fileDropzone.addEventListener('dragleave', () => fileDropzone.style.borderColor = 'rgba(78,203,160,0.25)');
-  fileDropzone.addEventListener('drop', e => {
-    e.preventDefault();
-    fileDropzone.style.borderColor = 'rgba(78,203,160,0.25)';
-    if (e.dataTransfer.files.length) fileInput.files = e.dataTransfer.files;
-    handleFile(fileInput.files[0]);
-  });
-  fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
-
-  async function handleFile(file) {
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    fileStatus.innerHTML = '⏳ استخراج النص...';
+  document.getElementById('fileDropzone').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async function() {
+    if (!this.files[0]) return;
+    const fd = new FormData(); fd.append('file', this.files[0]);
+    document.getElementById('fileStatus').innerHTML = '⏳ جارٍ الاستخراج...';
     try {
-      const res = await fetch('/api/extract', { method: 'POST', body: formData });
+      const res = await fetch('/api/extract', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'فشل الاستخراج');
-      // Display extracted text and translate
+      if (!res.ok) throw new Error(data.detail);
       inputText.value = data.text;
-      fileStatus.innerHTML = '✅ تم استخراج النص';
+      document.getElementById('fileStatus').innerHTML = '✅ تم الاستخراج';
       translate();
-    } catch (err) {
-      fileStatus.innerHTML = '❌ ' + err.message;
-    }
-  }
-
-  // ===== Camera / Image OCR =====
-  const cameraBtn = document.getElementById('cameraBtn');
-  const imageUpload = document.getElementById('imageUpload');
-  const cameraPreview = document.getElementById('cameraPreview');
-  const cameraStatus = document.getElementById('cameraStatus');
-  const cameraOutput = document.getElementById('cameraOutput');
-
-  cameraBtn.addEventListener('click', () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setStatus('الكاميرا غير مدعومة', 'error');
-      return;
-    }
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => {
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.play();
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        stream.getTracks().forEach(t => t.stop());
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        cameraPreview.innerHTML = `<img src="${dataUrl}" class="preview-img" />`;
-        // Convert to blob and upload
-        fetch(dataUrl)
-          .then(res => res.blob())
-          .then(blob => {
-            const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
-            const formData = new FormData();
-            formData.append('image', file);
-            cameraStatus.innerHTML = '⏳ معالجة الصورة...';
-            fetch('/api/ocr', { method: 'POST', body: formData })
-              .then(res => res.json())
-              .then(data => {
-                if (!res.ok) throw new Error(data.detail || 'فشل OCR');
-                inputText.value = data.text;
-                cameraStatus.innerHTML = '✅ تم استخراج النص';
-                translate();
-              })
-              .catch(err => { cameraStatus.innerHTML = '❌ ' + err.message; });
-          });
-      })
-      .catch(err => setStatus('فشل الوصول للكاميرا: ' + err.message, 'error'));
+    } catch (e) { document.getElementById('fileStatus').innerHTML = '❌ ' + e.message; }
   });
 
-  imageUpload.addEventListener('change', () => {
-    const file = imageUpload.files[0];
-    if (!file) return;
+  // ===== كاميرا =====
+  document.getElementById('cameraBtn').addEventListener('click', () => {
+    if (!navigator.mediaDevices?.getUserMedia) { setStatus('الكاميرا غير مدعومة', 'error'); return; }
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+      const video = document.createElement('video'); video.srcObject = stream; video.play();
+      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 480;
+      canvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
+      stream.getTracks().forEach(t => t.stop());
+      canvas.toBlob(async (blob) => {
+        const fd = new FormData(); fd.append('image', blob, 'capture.jpg');
+        document.getElementById('cameraStatus').innerHTML = '⏳ معالجة الصورة...';
+        try {
+          const res = await fetch('/api/ocr', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail);
+          inputText.value = data.text;
+          document.getElementById('cameraStatus').innerHTML = '✅ تم الاستخراج';
+          document.getElementById('cameraPreview').innerHTML = `<img src="${canvas.toDataURL()}" class="preview-img" />`;
+          translate();
+        } catch (e) { document.getElementById('cameraStatus').innerHTML = '❌ ' + e.message; }
+      }, 'image/jpeg');
+    }).catch(e => setStatus('فشل الكاميرا: ' + e.message, 'error'));
+  });
+
+  document.getElementById('imageUpload').addEventListener('change', function() {
+    if (!this.files[0]) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      cameraPreview.innerHTML = `<img src="${e.target.result}" class="preview-img" />`;
-      const formData = new FormData();
-      formData.append('image', file);
-      cameraStatus.innerHTML = '⏳ معالجة الصورة...';
-      fetch('/api/ocr', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(data => {
-          if (!res.ok) throw new Error(data.detail || 'فشل OCR');
-          inputText.value = data.text;
-          cameraStatus.innerHTML = '✅ تم استخراج النص';
-          translate();
-        })
-        .catch(err => { cameraStatus.innerHTML = '❌ ' + err.message; });
+      document.getElementById('cameraPreview').innerHTML = `<img src="${e.target.result}" class="preview-img" />`;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(this.files[0]);
+    const fd = new FormData(); fd.append('image', this.files[0]);
+    document.getElementById('cameraStatus').innerHTML = '⏳ معالجة الصورة...';
+    fetch('/api/ocr', { method: 'POST', body: fd })
+      .then(res => res.json()).then(data => {
+        if (!res.ok) throw new Error(data.detail);
+        inputText.value = data.text; document.getElementById('cameraStatus').innerHTML = '✅ تم الاستخراج'; translate();
+      }).catch(e => document.getElementById('cameraStatus').innerHTML = '❌ ' + e.message);
   });
 
-  // ===== Subtitles =====
-  const subDropzone = document.getElementById('subDropzone');
-  const subInput = document.getElementById('subInput');
-  const subBtn = document.getElementById('subBtn');
-  const subStatus = document.getElementById('subStatus');
-  const subOutput = document.getElementById('subOutput');
-
-  subDropzone.addEventListener('click', () => subInput.click());
-  subDropzone.addEventListener('dragover', e => { e.preventDefault(); subDropzone.style.borderColor = '#4ECBA0'; });
-  subDropzone.addEventListener('dragleave', () => subDropzone.style.borderColor = 'rgba(78,203,160,0.25)');
-  subDropzone.addEventListener('drop', e => {
-    e.preventDefault();
-    subDropzone.style.borderColor = 'rgba(78,203,160,0.25)';
-    if (e.dataTransfer.files.length) subInput.files = e.dataTransfer.files;
-  });
-
-  subBtn.addEventListener('click', async () => {
-    const file = subInput.files[0];
-    if (!file) { setStatus('الرجاء رفع ملف صوتي/فيديو', 'error'); return; }
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('target', tgtSel.value);
-    subStatus.innerHTML = '⏳ جارٍ إنشاء الترجمات...';
+  // ===== ترجمات =====
+  document.getElementById('subBtn').addEventListener('click', async function() {
+    const file = document.getElementById('subInput').files[0];
+    if (!file) { setStatus('ارفع ملفاً أولاً', 'error'); return; }
+    const fd = new FormData(); fd.append('file', file); fd.append('target', tgtSel.value);
+    document.getElementById('subStatus').innerHTML = '⏳ جارٍ...';
     try {
-      const res = await fetch('/api/subtitle', { method: 'POST', body: formData });
+      const res = await fetch('/api/subtitle', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'فشل');
-      // Display preview
-      let html = `<div style="margin-bottom:0.5rem;">✅ ${data.segments?.length || 0} مقطع</div>`;
-      if (data.segments) {
-        data.segments.slice(0, 20).forEach(seg => {
-          html += `<div class="srt-line">
-            <span class="srt-num">${seg.index}</span>
-            <span class="srt-time">${seg.start} → ${seg.end}</span>
-            <span class="srt-text">${seg.original}</span>
-            <span class="srt-trans">${seg.translated}</span>
-          </div>`;
-        });
-        if (data.segments.length > 20) html += `<div>... وعرض ${data.segments.length - 20} مقطع آخر</div>`;
-      }
-      subOutput.innerHTML = html;
-      subStatus.innerHTML = '✅ تم الإنشاء';
-      // Provide download links
-      if (data.srt_original) {
-        const a = document.createElement('a');
-        a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(data.srt_original);
-        a.download = 'original.srt';
-        a.textContent = '📥 تحميل SRT أصلي';
-        subOutput.appendChild(a);
-        subOutput.appendChild(document.createElement('br'));
-      }
+      if (!res.ok) throw new Error(data.detail);
+      let html = `<div>✅ ${data.segments?.length || 0} مقطع</div>`;
+      if (data.segments) data.segments.slice(0, 30).forEach(s => {
+        html += `<div class="srt-line"><span class="srt-num">${s.index}</span><span class="srt-time">${s.start}</span><span class="srt-trans">${s.text}</span></div>`;
+      });
+      document.getElementById('subOutput').innerHTML = html;
       if (data.srt_translated) {
-        const a = document.createElement('a');
-        a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(data.srt_translated);
-        a.download = 'translated.srt';
-        a.textContent = '📥 تحميل SRT مترجم';
-        subOutput.appendChild(a);
+        const a = document.createElement('a'); a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(data.srt_translated);
+        a.download = 'translated.srt'; a.textContent = '📥 تحميل SRT'; a.style.display = 'block'; a.style.marginTop = '1rem';
+        document.getElementById('subOutput').appendChild(a);
       }
-    } catch (err) {
-      subStatus.innerHTML = '❌ ' + err.message;
-    }
+      document.getElementById('subStatus').innerHTML = '✅ تم';
+    } catch (e) { document.getElementById('subStatus').innerHTML = '❌ ' + e.message; }
   });
 
-  // ===== Group Chat =====
-  const groupDropzone = document.getElementById('groupDropzone');
-  const groupInput = document.getElementById('groupInput');
-  const groupBtn = document.getElementById('groupBtn');
-  const groupStatus = document.getElementById('groupStatus');
-  const groupOutput = document.getElementById('groupOutput');
-
-  groupDropzone.addEventListener('click', () => groupInput.click());
-  groupDropzone.addEventListener('dragover', e => { e.preventDefault(); groupDropzone.style.borderColor = '#4ECBA0'; });
-  groupDropzone.addEventListener('dragleave', () => groupDropzone.style.borderColor = 'rgba(78,203,160,0.25)');
-  groupDropzone.addEventListener('drop', e => {
-    e.preventDefault();
-    groupDropzone.style.borderColor = 'rgba(78,203,160,0.25)';
-    if (e.dataTransfer.files.length) groupInput.files = e.dataTransfer.files;
-  });
-
-  groupBtn.addEventListener('click', async () => {
-    const file = groupInput.files[0];
-    if (!file) { setStatus('الرجاء رفع تسجيل صوتي', 'error'); return; }
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('target', tgtSel.value);
-    groupStatus.innerHTML = '⏳ جارٍ تحليل المجموعة...';
+  // ===== مجموعة =====
+  document.getElementById('groupBtn').addEventListener('click', async function() {
+    const file = document.getElementById('groupInput').files[0];
+    if (!file) { setStatus('ارفع ملفاً صوتياً', 'error'); return; }
+    const fd = new FormData(); fd.append('file', file); fd.append('target', tgtSel.value);
+    document.getElementById('groupStatus').innerHTML = '⏳ جارٍ التحليل...';
     try {
-      const res = await fetch('/api/group', { method: 'POST', body: formData });
+      const res = await fetch('/api/group', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'فشل');
-      let html = `<div style="margin-bottom:0.5rem;">✅ ${data.segments?.length || 0} مقطع</div>`;
-      if (data.segments) {
-        data.segments.forEach(seg => {
-          html += `<div class="cb" style="border-left-color:${seg.color || '#4ECBA0'}">
-            <div class="cb-hd">
-              <span class="cb-spk">${seg.icon || '👤'} المتحدث ${seg.speaker}</span>
-              <span class="cb-lang">${seg.language || ''}</span>
-              <span style="font-size:0.65rem;color:rgba(255,255,255,0.25);">${seg.timestamp || ''}</span>
-            </div>
-            <div class="cb-orig">"${seg.original}"</div>
-            <div class="cb-trans">${seg.translated || '—'}</div>
-            <div class="cb-eng">${seg.engine || ''}</div>
-          </div>`;
-        });
-      }
-      groupOutput.innerHTML = html;
-      groupStatus.innerHTML = '✅ اكتمل التحليل';
-    } catch (err) {
-      groupStatus.innerHTML = '❌ ' + err.message;
-    }
+      if (!res.ok) throw new Error(data.detail);
+      let html = `<div>✅ ${data.segments?.length || 0} مقطع</div>`;
+      if (data.segments) data.segments.forEach(s => {
+        html += `<div class="cb" style="border-left-color:${s.color || '#4ECBA0'}">
+          <div class="cb-hd"><span class="cb-spk">${s.icon || '👤'} متحدث ${s.speaker}</span><span class="cb-lang">${s.language || ''}</span><span style="font-size:0.65rem;opacity:0.5;">${s.timestamp || ''}</span></div>
+          <div class="cb-orig">"${s.original}"</div>
+          <div class="cb-trans">${s.translated || '—'}</div>
+        </div>`;
+      });
+      document.getElementById('groupOutput').innerHTML = html;
+      document.getElementById('groupStatus').innerHTML = '✅ تم';
+    } catch (e) { document.getElementById('groupStatus').innerHTML = '❌ ' + e.message; }
   });
 
-  // ===== Initial translation on input change (optional) =====
-  // We'll keep manual translate button.
-
+  // ===== تشغيل سريع =====
+  // الترجمة عند الضغط على Enter في حقل النص
+  inputText.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); translate(); } });
 </script>
 </body>
 </html>
