@@ -1,412 +1,283 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HN TRANSLATOR</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: 'Segoe UI', sans-serif; background:#0a0a1a; color:#f0f4ff; padding:1rem; display:flex; justify-content:center; }
-    .container { max-width:1100px; width:100%; background:rgba(7,7,26,0.85); backdrop-filter:blur(8px); border-radius:28px; padding:1.8rem 2rem; border:1px solid rgba(78,203,160,0.15); }
-    .header { text-align:center; margin-bottom:1.8rem; }
-    .header .brand { font-size:0.7rem; letter-spacing:0.4em; color:rgba(78,203,160,0.6); text-transform:uppercase; }
-    .header h1 { font-size:2.6rem; font-weight:700; letter-spacing:-0.02em; }
-    .header h1 .accent { color:#4ECBA0; }
-    .header .tags { display:flex; flex-wrap:wrap; justify-content:center; gap:0.4rem; font-size:0.7rem; font-weight:600; color:rgba(78,203,160,0.8); }
-    .header .tags span { background:rgba(78,203,160,0.08); border:1px solid rgba(78,203,160,0.2); border-radius:20px; padding:0.15rem 0.8rem; }
-    .divider { width:80px; height:2px; background:linear-gradient(90deg,transparent,#4ECBA0,transparent); margin:0.5rem auto 0; }
-    .lang-row { display:flex; align-items:center; justify-content:center; gap:0.8rem; margin-bottom:1.5rem; flex-wrap:wrap; }
-    .lang-row select { background:#0f1827; color:#f0f4ff; border:2px solid rgba(78,203,160,0.25); border-radius:10px; padding:0.5rem 1rem; font-size:1rem; font-weight:600; cursor:pointer; outline:none; min-width:140px; }
-    .lang-row select:focus { border-color:#4ECBA0; }
-    .lang-row .swap-btn { background:rgba(78,203,160,0.12); border:1px solid rgba(78,203,160,0.3); border-radius:50%; width:40px; height:40px; font-size:1.2rem; color:#4ECBA0; cursor:pointer; transition:0.2s; display:flex; align-items:center; justify-content:center; }
-    .lang-row .swap-btn:hover { background:rgba(78,203,160,0.25); transform:rotate(180deg); }
-    .lang-row label { font-size:0.7rem; font-weight:700; text-transform:uppercase; color:rgba(78,203,160,0.6); letter-spacing:0.1em; display:block; margin-bottom:0.2rem; }
-    .io-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-top:0.5rem; }
-    @media(max-width:700px){ .io-grid{grid-template-columns:1fr;} }
-    .io-box { background:rgba(255,255,255,0.02); border-radius:16px; border:1.5px solid rgba(78,203,160,0.15); padding:0.8rem 1rem; transition:border 0.3s; }
-    .io-box:focus-within { border-color:#4ECBA0; }
-    .io-box .label { font-size:0.65rem; font-weight:700; text-transform:uppercase; color:rgba(78,203,160,0.5); letter-spacing:0.12em; display:block; margin-bottom:0.3rem; }
-    .io-box textarea { width:100%; background:transparent; border:none; color:#f0f4ff; font-size:1.1rem; font-weight:500; line-height:1.7; resize:vertical; min-height:120px; outline:none; font-family:inherit; }
-    .io-box textarea::placeholder { color:rgba(255,255,255,0.2); font-weight:400; }
-    .io-box .output-text { font-size:1.1rem; font-weight:500; line-height:1.7; min-height:120px; white-space:pre-wrap; word-break:break-word; }
-    .io-box .output-text:empty::before { content:"الترجمة ستظهر هنا..."; color:rgba(255,255,255,0.2); font-weight:400; }
-    .io-box .meta { display:flex; gap:0.8rem; margin-top:0.5rem; font-size:0.7rem; color:rgba(78,203,160,0.5); border-top:1px solid rgba(78,203,160,0.08); padding-top:0.5rem; flex-wrap:wrap; }
-    .action-row { display:flex; gap:0.8rem; margin:1.2rem 0 0.8rem; flex-wrap:wrap; justify-content:center; }
-    .btn { background:linear-gradient(135deg,#4ECBA0,#1a9d6a); color:#041510; font-weight:700; font-size:0.9rem; border:none; border-radius:12px; padding:0.6rem 1.8rem; cursor:pointer; transition:0.2s; box-shadow:0 4px 16px rgba(78,203,160,0.25); display:inline-flex; align-items:center; gap:0.4rem; }
-    .btn:hover { filter:brightness(1.1); transform:translateY(-2px); }
-    .btn-secondary { background:rgba(78,203,160,0.08); color:#4ECBA0; box-shadow:none; border:1px solid rgba(78,203,160,0.2); }
-    .btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; filter:none; }
-    .status { margin:0.5rem 0; padding:0.4rem 1rem; border-radius:8px; font-size:0.9rem; display:none; }
-    .status.error { background:rgba(255,80,80,0.12); color:#ff6b6b; border:1px solid rgba(255,80,80,0.2); display:block; }
-    .status.success { background:rgba(78,203,160,0.12); color:#4ECBA0; border:1px solid rgba(78,203,160,0.2); display:block; }
-    .status.info { background:rgba(78,203,160,0.05); color:#a0d4c0; border:1px solid rgba(78,203,160,0.1); display:block; }
-    .tabs { display:flex; gap:0.2rem; margin:1.5rem 0 1rem; border-bottom:1px solid rgba(78,203,160,0.1); overflow-x:auto; padding-bottom:0.2rem; }
-    .tab-btn { background:transparent; border:none; color:rgba(255,255,255,0.4); padding:0.5rem 1.2rem; font-size:0.8rem; font-weight:600; cursor:pointer; border-radius:8px 8px 0 0; transition:0.2s; white-space:nowrap; }
-    .tab-btn.active { color:#4ECBA0; background:rgba(78,203,160,0.08); border-bottom:2px solid #4ECBA0; }
-    .tab-btn:hover { color:#fff; background:rgba(255,255,255,0.03); }
-    .tab-content { display:none; margin-top:1rem; }
-    .tab-content.active { display:block; }
-    .dropzone { border:2px dashed rgba(78,203,160,0.25); border-radius:16px; padding:2.5rem 1rem; text-align:center; color:rgba(255,255,255,0.3); cursor:pointer; transition:0.3s; margin-bottom:1rem; }
-    .dropzone:hover { border-color:#4ECBA0; background:rgba(78,203,160,0.03); }
-    .dropzone input { display:none; }
-    .preview-img { max-width:100%; max-height:300px; border-radius:12px; margin:0.5rem 0; }
-    .srt-line { display:flex; gap:0.5rem; padding:0.3rem 0; border-bottom:1px solid rgba(78,203,160,0.05); font-size:0.85rem; align-items:flex-start; }
-    .srt-num { color:rgba(255,255,255,0.25); min-width:30px; }
-    .srt-time { color:rgba(255,255,255,0.35); min-width:90px; font-family:monospace; }
-    .srt-trans { color:#4ECBA0; }
-    .cb { background:rgba(78,203,160,0.04); border:1px solid rgba(78,203,160,0.08); border-radius:14px; padding:0.8rem 1rem; margin-bottom:0.6rem; border-left:3px solid #4ECBA0; }
-    .cb-hd { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.2rem; }
-    .cb-spk { font-weight:700; color:#4ECBA0; }
-    .cb-lang { font-size:0.7rem; color:rgba(255,255,255,0.4); }
-    .cb-orig { font-size:0.85rem; color:rgba(255,255,255,0.5); font-style:italic; }
-    .cb-trans { font-size:1rem; font-weight:600; margin-top:0.2rem; }
-    @media(max-width:480px){ .container{padding:1rem;} .header h1{font-size:1.8rem;} }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dabaa Translator | المترجم الذكي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
+        .dark-mode { background-color: #0f172a; color: #f8fafc; }
+        .dark-mode .glass { background: rgba(30, 41, 59, 0.9); border-color: #334155; }
+        .dark-mode textarea, .dark-mode select { background-color: #1e293b; color: white; border-color: #334155; }
+        .loader { border-top-color: #3b82f6; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
-<body>
-<div class="container">
-  <div class="header">
-    <div class="brand">✦ SMART VOICE TRANSLATOR ✦</div>
-    <h1>HN <span class="accent">TRANSLATOR</span></h1>
-    <div class="tags"><span>🎙️ صوت</span><span>✍️ نص</span><span>📸 رؤية</span><span>🎬 ترجمات</span><span>🌍 مجموعات</span></div>
-    <div class="divider"></div>
-  </div>
+<body class="transition-colors duration-300">
+    <div class="min-h-screen p-4 md:p-8">
+        <!-- Header -->
+        <header class="max-w-6xl mx-auto flex justify-between items-center mb-8">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-xl shadow-lg">
+                    <i data-lucide="languages" class="text-white w-6 h-6"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-800 dark:text-white">Dabaa <span class="text-blue-600">Translator</span></h1>
+            </div>
+            <button id="themeToggle" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <i data-lucide="moon" id="themeIcon" class="w-6 h-6"></i>
+            </button>
+        </header>
 
-  <div class="lang-row">
-    <div><label>من</label><select id="srcLang"></select></div>
-    <button class="swap-btn" id="swapBtn">⇄</button>
-    <div><label>إلى</label><select id="tgtLang"></select></div>
-  </div>
+        <main class="max-w-6xl mx-auto space-y-6">
+            <!-- Language Selection -->
+            <div class="glass p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-center gap-4">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-slate-500">من:</label>
+                    <select id="sourceLang" class="bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="auto">تعرف تلقائي</option>
+                        <option value="AR">العربية</option>
+                        <option value="EN">الإنجليزية</option>
+                        <option value="DE">الألمانية</option>
+                        <option value="FR">الفرنسية</option>
+                        <option value="ES">الإسبانية</option>
+                        <option value="IT">الإيطالية</option>
+                        <option value="JA">اليابانية</option>
+                        <option value="ZH">الصينية</option>
+                        <option value="RU">الروسية</option>
+                        <option value="TR">التركية</option>
+                    </select>
+                </div>
+                
+                <button id="swapLangs" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <i data-lucide="repeat-2" class="w-5 h-5 text-slate-400"></i>
+                </button>
 
-  <div class="io-grid">
-    <div class="io-box">
-      <span class="label">📝 النص الأصلي</span>
-      <textarea id="inputText" placeholder="اكتب النص هنا..." rows="5"></textarea>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-slate-500">إلى:</label>
+                    <select id="targetLang" class="bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="AR" selected>العربية</option>
+                        <option value="EN">الإنجليزية</option>
+                        <option value="DE">الألمانية</option>
+                        <option value="FR">الفرنسية</option>
+                        <option value="ES">الإسبانية</option>
+                        <option value="IT">الإيطالية</option>
+                        <option value="JA">اليابانية</option>
+                        <option value="ZH">الصينية</option>
+                        <option value="RU">الروسية</option>
+                        <option value="TR">التركية</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Translation Area -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Input -->
+                <div class="glass p-6 rounded-3xl shadow-xl border border-slate-200 relative">
+                    <textarea id="inputText" placeholder="أدخل النص هنا للترجمة..." class="w-full h-64 bg-transparent resize-none text-lg outline-none placeholder:text-slate-400" spellcheck="false"></textarea>
+                    <div class="flex justify-between items-center mt-4">
+                        <div class="flex gap-2">
+                            <button title="كاميرا (OCR)" id="cameraBtn" class="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                <i data-lucide="camera" class="w-5 h-5"></i>
+                            </button>
+                            <label title="ترجمة ملف ترجمة (SRT)" class="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-all">
+                                <i data-lucide="file-text" class="w-5 h-5"></i>
+                                <input type="file" id="srtUpload" accept=".srt" class="hidden">
+                            </label>
+                        </div>
+                        <span id="charCount" class="text-xs text-slate-400">0 / 5000</span>
+                    </div>
+                </div>
+
+                <!-- Output -->
+                <div class="glass p-6 rounded-3xl shadow-xl border border-slate-200 bg-slate-50 dark:bg-slate-800/50 relative">
+                    <div id="outputText" class="w-full h-64 overflow-y-auto text-lg text-slate-700 dark:text-slate-200"></div>
+                    <div class="flex justify-end gap-2 mt-4">
+                        <button id="copyBtn" class="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                            <i data-lucide="copy" class="w-5 h-5"></i>
+                        </button>
+                        <button id="speakBtn" class="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                            <i data-lucide="volume-2" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <div class="flex justify-center">
+                <button id="translateBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-12 py-4 rounded-2xl font-bold text-xl shadow-lg shadow-blue-200 dark:shadow-none transform transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
+                    <span>ترجمة</span>
+                    <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </main>
+
+        <!-- Camera Modal -->
+        <div id="cameraModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-2xl w-full">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">التعرف على النص عبر الكاميرا</h3>
+                    <button id="closeCamera" class="p-2"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+                <video id="video" class="w-full rounded-2xl bg-black" autoplay playsinline></video>
+                <canvas id="canvas" class="hidden"></canvas>
+                <div class="mt-6 flex justify-center">
+                    <button id="captureBtn" class="bg-red-600 text-white p-4 rounded-full shadow-lg hover:bg-red-700">
+                        <i data-lucide="aperture" class="w-8 h-8"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="io-box">
-      <span class="label">🌐 الترجمة</span>
-      <div class="output-text" id="outputText"></div>
-      <div class="meta">
-        <span id="emotionDisplay"></span>
-        <span id="engineDisplay"></span>
-        <span id="domainDisplay"></span>
-      </div>
-    </div>
-  </div>
 
-  <div class="action-row">
-    <button class="btn" id="translateBtn">🔄 ترجمة</button>
-    <button class="btn btn-secondary" id="speakBtn">🔊 استماع</button>
-    <button class="btn btn-secondary" id="copyBtn">📋 نسخ</button>
-    <button class="btn btn-secondary" id="clearBtn">🗑️ مسح</button>
-  </div>
-  <div id="status" class="status"></div>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="voice">🎙️ صوت</button>
-    <button class="tab-btn" data-tab="file">📄 ملف</button>
-    <button class="tab-btn" data-tab="camera">📸 كاميرا</button>
-    <button class="tab-btn" data-tab="subtitle">🎬 ترجمات</button>
-    <button class="tab-btn" data-tab="group">🌍 مجموعة</button>
-  </div>
+        // Theme Toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const body = document.body;
 
-  <div id="tab-voice" class="tab-content active">
-    <button class="btn" id="recordBtn">🎙️ سجّل الآن</button>
-    <div id="recordingStatus" style="margin-top:0.5rem;font-size:0.9rem;color:rgba(255,255,255,0.4);"></div>
-    <div id="voiceTranscript" style="margin-top:0.5rem;padding:0.5rem;background:rgba(255,255,255,0.02);border-radius:8px;"></div>
-  </div>
+        themeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            const isDark = body.classList.contains('dark-mode');
+            themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+            lucide.createIcons();
+        });
 
-  <div id="tab-file" class="tab-content">
-    <div class="dropzone" id="fileDropzone"><p>📎 اسحب ملفك هنا أو انقر للاختيار</p><p style="font-size:0.8rem;opacity:0.5;">PDF, DOCX, XLSX, TXT</p><input type="file" id="fileInput" accept=".pdf,.docx,.xlsx,.xls,.txt" /></div>
-    <div id="fileStatus"></div><div id="fileOutput"></div>
-  </div>
+        // Elements
+        const translateBtn = document.getElementById('translateBtn');
+        const inputText = document.getElementById('inputText');
+        const outputText = document.getElementById('outputText');
+        const sourceLang = document.getElementById('sourceLang');
+        const targetLang = document.getElementById('targetLang');
+        const charCount = document.getElementById('charCount');
 
-  <div id="tab-camera" class="tab-content">
-    <button class="btn" id="cameraBtn">📷 التقاط صورة</button>
-    <input type="file" accept="image/*" id="imageUpload" style="display:block;margin-top:0.5rem;" />
-    <div id="cameraPreview"></div><div id="cameraStatus"></div><div id="cameraOutput"></div>
-  </div>
+        // Character Count
+        inputText.addEventListener('input', () => {
+            charCount.textContent = `${inputText.value.length} / 5000`;
+        });
 
-  <div id="tab-subtitle" class="tab-content">
-    <div class="dropzone" id="subDropzone"><p>🎬 ارفع ملف صوتي/فيديو</p><p style="font-size:0.8rem;opacity:0.5;">MP3, WAV, MP4</p><input type="file" id="subInput" accept="audio/*,video/*" /></div>
-    <button class="btn" id="subBtn">🚀 إنشاء الترجمات</button>
-    <div id="subStatus"></div><div id="subOutput"></div>
-  </div>
+        // Translate Logic
+        translateBtn.addEventListener('click', async () => {
+            if (!inputText.value.trim()) return;
 
-  <div id="tab-group" class="tab-content">
-    <div class="dropzone" id="groupDropzone"><p>👥 ارفع تسجيلاً صوتياً للمجموعة</p><p style="font-size:0.8rem;opacity:0.5;">MP3, WAV</p><input type="file" id="groupInput" accept="audio/*" /></div>
-    <button class="btn" id="groupBtn">🚀 تحليل وترجمة</button>
-    <div id="groupStatus"></div><div id="groupOutput"></div>
-  </div>
-</div>
+            translateBtn.disabled = true;
+            translateBtn.innerHTML = `<div class="loader w-6 h-6 border-4 border-white/30 rounded-full"></div> <span>جاري الترجمة...</span>`;
 
-<script>
-  // ===== اللغات =====
-  const LANGS = ["Auto-Detect","Arabic","English","Russian","Chinese","German","Spanish","French",
-    "Portuguese","Italian","Japanese","Korean","Turkish","Dutch","Polish","Ukrainian",
-    "Swedish","Danish","Finnish","Romanian","Hungarian","Czech","Bulgarian","Greek",
-    "Indonesian","Hindi","Persian","Hebrew","Urdu"];
+            try {
+                const response = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: inputText.value,
+                        source: sourceLang.value,
+                        target: targetLang.value
+                    })
+                });
+                const data = await response.json();
+                outputText.innerText = data.translated_text;
+            } catch (error) {
+                console.error('Error:', error);
+                outputText.innerText = 'عذراً، حدث خطأ أثناء الترجمة.';
+            } finally {
+                translateBtn.disabled = false;
+                translateBtn.innerHTML = `<span>ترجمة</span> <i data-lucide="arrow-left" class="w-6 h-6"></i>`;
+                lucide.createIcons();
+            }
+        });
 
-  const srcSel = document.getElementById('srcLang');
-  const tgtSel = document.getElementById('tgtLang');
-  const swapBtn = document.getElementById('swapBtn');
-  const inputText = document.getElementById('inputText');
-  const outputText = document.getElementById('outputText');
-  const translateBtn = document.getElementById('translateBtn');
-  const speakBtn = document.getElementById('speakBtn');
-  const copyBtn = document.getElementById('copyBtn');
-  const clearBtn = document.getElementById('clearBtn');
-  const statusDiv = document.getElementById('status');
-  const emotionSpan = document.getElementById('emotionDisplay');
-  const engineSpan = document.getElementById('engineDisplay');
-  const domainSpan = document.getElementById('domainDisplay');
+        // Subtitle Upload
+        document.getElementById('srtUpload').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-  LANGS.forEach(l => {
-    const o1 = document.createElement('option'); o1.value = l; o1.textContent = l; srcSel.appendChild(o1);
-    const o2 = document.createElement('option'); o2.value = l; o2.textContent = l; tgtSel.appendChild(o2);
-  });
-  srcSel.value = 'Auto-Detect'; tgtSel.value = 'Arabic';
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('target', targetLang.value);
 
-  document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', function() {
-    document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
-    this.classList.add('active');
-    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-  }));
+            outputText.innerText = 'جاري معالجة وترجمة ملف الترجمة...';
+            
+            try {
+                const response = await fetch('/api/translate-srt', {
+                    method: 'POST',
+                    body: formData
+                });
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `translated_${file.name}`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                outputText.innerText = 'تمت ترجمة الملف وتحميله بنجاح!';
+            } catch (error) {
+                outputText.innerText = 'خطأ في ترجمة ملف SRT.';
+            }
+        });
 
-  swapBtn.addEventListener('click', () => {
-    const s = srcSel.value, t = tgtSel.value;
-    srcSel.value = t === 'Auto-Detect' ? 'Arabic' : t;
-    tgtSel.value = s === 'Auto-Detect' ? 'Arabic' : s;
-  });
+        // Camera Logic
+        const cameraBtn = document.getElementById('cameraBtn');
+        const cameraModal = document.getElementById('cameraModal');
+        const closeCamera = document.getElementById('closeCamera');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureBtn = document.getElementById('captureBtn');
 
-  function setStatus(msg, type='info') {
-    statusDiv.textContent = msg;
-    statusDiv.className = 'status ' + type;
-    if (!msg) { statusDiv.className = 'status'; statusDiv.style.display = 'none'; }
-    else { statusDiv.style.display = 'block'; }
-    setTimeout(() => { if (statusDiv.textContent === msg) statusDiv.style.display = 'none'; }, 7000);
-  }
+        cameraBtn.addEventListener('click', async () => {
+            cameraModal.classList.remove('hidden');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = stream;
+        });
 
-  // ===== اختبار الصحة =====
-  async function checkHealth() {
-    try {
-      const res = await fetch('/api/health');
-      if (res.ok) {
-        const data = await res.json();
-        console.log('✅ API is healthy:', data);
-        return true;
-      } else {
-        console.error('❌ Health check failed:', res.status);
-        return false;
-      }
-    } catch (e) {
-      console.error('❌ Cannot reach API:', e);
-      return false;
-    }
-  }
+        closeCamera.addEventListener('click', () => {
+            cameraModal.classList.add('hidden');
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+        });
 
-  // ===== الترجمة =====
-  async function translate() {
-    const text = inputText.value.trim();
-    if (!text) { setStatus('الرجاء إدخال نص', 'error'); return; }
-    translateBtn.disabled = true;
-    translateBtn.innerHTML = '⏳ جارٍ...';
-    setStatus('جاري الترجمة...', 'info');
+        captureBtn.addEventListener('click', async () => {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = canvas.toDataURL('image/jpeg');
+            cameraModal.classList.add('hidden');
+            outputText.innerText = 'جاري التعرف على النص...';
 
-    try {
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, source: srcSel.value, target: tgtSel.value })
-      });
-      // محاولة قراءة النص حتى لو كان خطأ
-      let data;
-      try {
-        data = await res.json();
-      } catch (e) {
-        data = { detail: 'استجابة غير صالحة (ليست JSON)' };
-      }
-      if (!res.ok) {
-        throw new Error(data.detail || `خطأ ${res.status} ${res.statusText}`);
-      }
-      outputText.textContent = data.translation;
-      emotionSpan.textContent = data.emotion || '';
-      engineSpan.textContent = data.engine || '';
-      domainSpan.textContent = data.domains ? data.domains.join(' ') : '';
-      setStatus('✅ تمت الترجمة', 'success');
-    } catch (err) {
-      setStatus('❌ فشل: ' + err.message, 'error');
-      console.error('Translate error:', err);
-    } finally {
-      translateBtn.disabled = false;
-      translateBtn.innerHTML = '🔄 ترجمة';
-    }
-  }
+            try {
+                const response = await fetch('/api/vision', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+                const data = await response.json();
+                inputText.value = data.text;
+                inputText.dispatchEvent(new Event('input'));
+                outputText.innerText = 'تم استخراج النص، اضغط ترجمة الآن.';
+            } catch (error) {
+                outputText.innerText = 'فشل التعرف على النص.';
+            }
+        });
 
-  translateBtn.addEventListener('click', translate);
-  inputText.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); translate(); } });
+        // Copy & Speak
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(outputText.innerText);
+            alert('تم النسخ!');
+        });
 
-  // ===== استماع =====
-  speakBtn.addEventListener('click', async () => {
-    const text = outputText.textContent.trim();
-    if (!text) { setStatus('لا يوجد نص مترجم', 'error'); return; }
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, lang: tgtSel.value })
-      });
-      if (!res.ok) throw new Error('فشل توليد الصوت');
-      const blob = await res.blob();
-      const audio = new Audio(URL.createObjectURL(blob));
-      audio.play();
-    } catch (err) { setStatus('❌ ' + err.message, 'error'); }
-  });
-
-  copyBtn.addEventListener('click', () => {
-    const t = outputText.textContent.trim();
-    if (!t) { setStatus('لا يوجد نص للنسخ', 'error'); return; }
-    navigator.clipboard?.writeText(t).then(() => setStatus('📋 تم النسخ', 'success'));
-  });
-  clearBtn.addEventListener('click', () => { inputText.value = ''; outputText.textContent = ''; emotionSpan.textContent = ''; engineSpan.textContent = ''; domainSpan.textContent = ''; });
-
-  // ===== صوت =====
-  let recognition = null;
-  document.getElementById('recordBtn').addEventListener('click', function() {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      setStatus('المتصفح لا يدعم الصوت', 'error'); return;
-    }
-    if (recognition) { recognition.stop(); this.textContent = '🎙️ سجّل الآن'; recognition = null; return; }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SR();
-    recognition.lang = srcSel.value === 'Auto-Detect' ? 'ar' : 'en';
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.onstart = () => { this.textContent = '⏹️ إيقاف'; document.getElementById('recordingStatus').textContent = '🎤 جارٍ الاستماع...'; };
-    recognition.onresult = (e) => {
-      let final = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) final += e.results[i][0].transcript;
-      }
-      if (final) { document.getElementById('voiceTranscript').textContent = final; inputText.value = final; translate(); }
-    };
-    recognition.onerror = (e) => { setStatus('خطأ صوت: ' + e.error, 'error'); this.textContent = '🎙️ سجّل الآن'; recognition = null; };
-    recognition.onend = () => { this.textContent = '🎙️ سجّل الآن'; document.getElementById('recordingStatus').textContent = '✅ انتهى'; recognition = null; };
-    recognition.start();
-  });
-
-  // ===== ملفات =====
-  const fileInput = document.getElementById('fileInput');
-  document.getElementById('fileDropzone').addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', async function() {
-    if (!this.files[0]) return;
-    const fd = new FormData(); fd.append('file', this.files[0]);
-    document.getElementById('fileStatus').innerHTML = '⏳ جارٍ الاستخراج...';
-    try {
-      const res = await fetch('/api/extract', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail);
-      inputText.value = data.text;
-      document.getElementById('fileStatus').innerHTML = '✅ تم الاستخراج';
-      translate();
-    } catch (e) { document.getElementById('fileStatus').innerHTML = '❌ ' + e.message; }
-  });
-
-  // ===== كاميرا =====
-  document.getElementById('cameraBtn').addEventListener('click', () => {
-    if (!navigator.mediaDevices?.getUserMedia) { setStatus('الكاميرا غير مدعومة', 'error'); return; }
-    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-      const video = document.createElement('video'); video.srcObject = stream; video.play();
-      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 480;
-      canvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
-      stream.getTracks().forEach(t => t.stop());
-      canvas.toBlob(async (blob) => {
-        const fd = new FormData(); fd.append('image', blob, 'capture.jpg');
-        document.getElementById('cameraStatus').innerHTML = '⏳ معالجة الصورة...';
-        try {
-          const res = await fetch('/api/ocr', { method: 'POST', body: fd });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.detail);
-          inputText.value = data.text;
-          document.getElementById('cameraStatus').innerHTML = '✅ تم الاستخراج';
-          document.getElementById('cameraPreview').innerHTML = `<img src="${canvas.toDataURL()}" class="preview-img" />`;
-          translate();
-        } catch (e) { document.getElementById('cameraStatus').innerHTML = '❌ ' + e.message; }
-      }, 'image/jpeg');
-    }).catch(e => setStatus('فشل الكاميرا: ' + e.message, 'error'));
-  });
-
-  document.getElementById('imageUpload').addEventListener('change', function() {
-    if (!this.files[0]) return;
-    const reader = new FileReader();
-    reader.onload = (e) => { document.getElementById('cameraPreview').innerHTML = `<img src="${e.target.result}" class="preview-img" />`; };
-    reader.readAsDataURL(this.files[0]);
-    const fd = new FormData(); fd.append('image', this.files[0]);
-    document.getElementById('cameraStatus').innerHTML = '⏳ معالجة الصورة...';
-    fetch('/api/ocr', { method: 'POST', body: fd })
-      .then(res => res.json()).then(data => {
-        if (!res.ok) throw new Error(data.detail);
-        inputText.value = data.text; document.getElementById('cameraStatus').innerHTML = '✅ تم الاستخراج'; translate();
-      }).catch(e => document.getElementById('cameraStatus').innerHTML = '❌ ' + e.message);
-  });
-
-  // ===== ترجمات =====
-  document.getElementById('subBtn').addEventListener('click', async function() {
-    const file = document.getElementById('subInput').files[0];
-    if (!file) { setStatus('ارفع ملفاً أولاً', 'error'); return; }
-    const fd = new FormData(); fd.append('file', file); fd.append('target', tgtSel.value);
-    document.getElementById('subStatus').innerHTML = '⏳ جارٍ...';
-    try {
-      const res = await fetch('/api/subtitle', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail);
-      let html = `<div>✅ ${data.segments?.length || 0} مقطع</div>`;
-      if (data.segments) data.segments.slice(0, 30).forEach(s => {
-        html += `<div class="srt-line"><span class="srt-num">${s.index}</span><span class="srt-time">${s.start}</span><span class="srt-trans">${s.text}</span></div>`;
-      });
-      document.getElementById('subOutput').innerHTML = html;
-      if (data.srt_translated) {
-        const a = document.createElement('a'); a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(data.srt_translated);
-        a.download = 'translated.srt'; a.textContent = '📥 تحميل SRT'; a.style.display = 'block'; a.style.marginTop = '1rem';
-        document.getElementById('subOutput').appendChild(a);
-      }
-      document.getElementById('subStatus').innerHTML = '✅ تم';
-    } catch (e) { document.getElementById('subStatus').innerHTML = '❌ ' + e.message; }
-  });
-
-  // ===== مجموعة =====
-  document.getElementById('groupBtn').addEventListener('click', async function() {
-    const file = document.getElementById('groupInput').files[0];
-    if (!file) { setStatus('ارفع ملفاً صوتياً', 'error'); return; }
-    const fd = new FormData(); fd.append('file', file); fd.append('target', tgtSel.value);
-    document.getElementById('groupStatus').innerHTML = '⏳ جارٍ التحليل...';
-    try {
-      const res = await fetch('/api/group', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail);
-      let html = `<div>✅ ${data.segments?.length || 0} مقطع</div>`;
-      if (data.segments) data.segments.forEach(s => {
-        html += `<div class="cb" style="border-left-color:${s.color || '#4ECBA0'}">
-          <div class="cb-hd"><span class="cb-spk">${s.icon || '👤'} متحدث ${s.speaker}</span><span class="cb-lang">${s.language || ''}</span><span style="font-size:0.65rem;opacity:0.5;">${s.timestamp || ''}</span></div>
-          <div class="cb-orig">"${s.original}"</div>
-          <div class="cb-trans">${s.translated || '—'}</div>
-        </div>`;
-      });
-      document.getElementById('groupOutput').innerHTML = html;
-      document.getElementById('groupStatus').innerHTML = '✅ تم';
-    } catch (e) { document.getElementById('groupStatus').innerHTML = '❌ ' + e.message; }
-  });
-
-  // ===== فحص الاتصال عند التحميل =====
-  window.addEventListener('load', async () => {
-    const ok = await checkHealth();
-    if (!ok) {
-      setStatus('⚠️ تعذر الاتصال بالخادم. تأكد من اتصالك بالإنترنت.', 'error');
-    } else {
-      setStatus('✅ الخادم جاهز', 'success');
-    }
-  });
-</script>
+        document.getElementById('speakBtn').addEventListener('click', () => {
+            const utterance = new SpeechSynthesisUtterance(outputText.innerText);
+            utterance.lang = targetLang.value === 'AR' ? 'ar-SA' : 'en-US';
+            window.speechSynthesis.speak(utterance);
+        });
+    </script>
 </body>
 </html>
