@@ -2,95 +2,66 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HN TRANSLATOR</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>" />
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: #0a0a1a;
-      color: #f0f4ff;
-      min-height: 100vh;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .container {
-      max-width: 1100px;
-      width: 100%;
-      background: rgba(7, 7, 26, 0.85);
-      backdrop-filter: blur(8px);
-      border-radius: 28px;
-      padding: 1.8rem 2rem;
-      border: 1px solid rgba(78, 203, 160, 0.15);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
-    }
-    .header { text-align: center; margin-bottom: 1.8rem; }
-    .header .brand { font-size: 0.7rem; letter-spacing: 0.4em; color: rgba(78,203,160,0.6); text-transform: uppercase; }
-    .header h1 { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.02em; margin: 0.2rem 0 0.4rem; }
-    .header h1 .accent { color: #4ECBA0; }
-    .header .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; font-size: 0.7rem; font-weight: 600; color: rgba(78,203,160,0.8); }
-    .header .tags span { background: rgba(78,203,160,0.08); border: 1px solid rgba(78,203,160,0.2); border-radius: 20px; padding: 0.15rem 0.8rem; }
-    .divider { width: 80px; height: 2px; background: linear-gradient(90deg, transparent, #4ECBA0, transparent); margin: 0.5rem auto 0; }
-    
-    .lang-row { display: flex; align-items: center; justify-content: center; gap: 0.8rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .lang-row select { background: #0f1827; color: #f0f4ff; border: 2px solid rgba(78,203,160,0.25); border-radius: 10px; padding: 0.5rem 1rem; font-size: 1rem; font-weight: 600; cursor: pointer; outline: none; min-width: 140px; }
-    .lang-row select:focus { border-color: #4ECBA0; }
-    .lang-row .swap-btn { background: rgba(78,203,160,0.12); border: 1px solid rgba(78,203,160,0.3); border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; color: #4ECBA0; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
-    .lang-row .swap-btn:hover { background: rgba(78,203,160,0.25); transform: rotate(180deg); }
-    .lang-row label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: rgba(78,203,160,0.6); letter-spacing: 0.1em; display: block; margin-bottom: 0.2rem; }
-    
-    .io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-top: 0.5rem; }
-    @media (max-width: 700px) { .io-grid { grid-template-columns: 1fr; } }
-    .io-box { background: rgba(255,255,255,0.02); border-radius: 16px; border: 1.5px solid rgba(78,203,160,0.15); padding: 0.8rem 1rem; position: relative; transition: border 0.3s; }
-    .io-box:focus-within { border-color: #4ECBA0; }
-    .io-box .label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: rgba(78,203,160,0.5); letter-spacing: 0.12em; display: block; margin-bottom: 0.3rem; }
-    .io-box textarea { width: 100%; background: transparent; border: none; color: #f0f4ff; font-size: 1.1rem; font-weight: 500; line-height: 1.7; resize: vertical; min-height: 120px; outline: none; font-family: inherit; }
-    .io-box textarea::placeholder { color: rgba(255,255,255,0.2); font-weight: 400; }
-    .io-box .output-text { font-size: 1.1rem; font-weight: 500; line-height: 1.7; min-height: 120px; white-space: pre-wrap; word-break: break-word; }
-    .io-box .output-text:empty::before { content: "الترجمة ستظهر هنا..."; color: rgba(255,255,255,0.2); font-weight: 400; }
-    .io-box .meta { display: flex; gap: 0.8rem; margin-top: 0.5rem; font-size: 0.7rem; color: rgba(78,203,160,0.5); border-top: 1px solid rgba(78,203,160,0.08); padding-top: 0.5rem; flex-wrap: wrap; }
-    
-    .action-row { display: flex; gap: 0.8rem; margin: 1.2rem 0 0.8rem; flex-wrap: wrap; justify-content: center; }
-    .btn { background: linear-gradient(135deg, #4ECBA0, #1a9d6a); color: #041510; font-weight: 700; font-size: 0.9rem; border: none; border-radius: 12px; padding: 0.6rem 1.8rem; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 16px rgba(78,203,160,0.25); display: inline-flex; align-items: center; gap: 0.4rem; }
-    .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
-    .btn-secondary { background: rgba(78,203,160,0.08); color: #4ECBA0; box-shadow: none; border: 1px solid rgba(78,203,160,0.2); }
-    .btn-secondary:hover { background: rgba(78,203,160,0.15); }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
-    
-    .status { margin: 0.5rem 0; padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.9rem; display: none; }
-    .status.error { background: rgba(255,80,80,0.12); color: #ff6b6b; border: 1px solid rgba(255,80,80,0.2); display: block; }
-    .status.success { background: rgba(78,203,160,0.12); color: #4ECBA0; border: 1px solid rgba(78,203,160,0.2); display: block; }
-    .status.info { background: rgba(78,203,160,0.05); color: #a0d4c0; border: 1px solid rgba(78,203,160,0.1); display: block; }
-    
-    .tabs { display: flex; gap: 0.2rem; margin: 1.5rem 0 1rem; border-bottom: 1px solid rgba(78,203,160,0.1); overflow-x: auto; padding-bottom: 0.2rem; }
-    .tab-btn { background: transparent; border: none; color: rgba(255,255,255,0.4); padding: 0.5rem 1.2rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: 8px 8px 0 0; transition: 0.2s; white-space: nowrap; }
-    .tab-btn.active { color: #4ECBA0; background: rgba(78,203,160,0.08); border-bottom: 2px solid #4ECBA0; }
-    .tab-btn:hover { color: #fff; background: rgba(255,255,255,0.03); }
-    .tab-content { display: none; margin-top: 1rem; }
-    .tab-content.active { display: block; }
-    
-    .dropzone { border: 2px dashed rgba(78,203,160,0.25); border-radius: 16px; padding: 2.5rem 1rem; text-align: center; color: rgba(255,255,255,0.3); cursor: pointer; transition: 0.3s; margin-bottom: 1rem; }
-    .dropzone:hover { border-color: #4ECBA0; background: rgba(78,203,160,0.03); }
-    .dropzone input { display: none; }
-    .preview-img { max-width: 100%; max-height: 300px; border-radius: 12px; margin: 0.5rem 0; }
-    
-    .srt-line { display: flex; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(78,203,160,0.05); font-size: 0.85rem; align-items: flex-start; }
-    .srt-num { color: rgba(255,255,255,0.25); min-width: 30px; }
-    .srt-time { color: rgba(255,255,255,0.35); min-width: 90px; font-family: monospace; }
-    .srt-text { flex: 1; }
-    .srt-trans { color: #4ECBA0; }
-    
-    .cb { background: rgba(78,203,160,0.04); border: 1px solid rgba(78,203,160,0.08); border-radius: 14px; padding: 0.8rem 1rem; margin-bottom: 0.6rem; border-left: 3px solid #4ECBA0; }
-    .cb-hd { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem; }
-    .cb-spk { font-weight: 700; color: #4ECBA0; }
-    .cb-lang { font-size: 0.7rem; color: rgba(255,255,255,0.4); }
-    .cb-orig { font-size: 0.85rem; color: rgba(255,255,255,0.5); font-style: italic; }
-    .cb-trans { font-size: 1rem; font-weight: 600; margin-top: 0.2rem; }
-    
-    @media (max-width: 480px) { .container { padding: 1rem; } .header h1 { font-size: 1.8rem; } }
+    /* نفس الأنماط السابقة مع إضافة بسيطة */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background:#0a0a1a; color:#f0f4ff; padding:1rem; display:flex; justify-content:center; }
+    .container { max-width:1100px; width:100%; background:rgba(7,7,26,0.85); backdrop-filter:blur(8px); border-radius:28px; padding:1.8rem 2rem; border:1px solid rgba(78,203,160,0.15); }
+    .header { text-align:center; margin-bottom:1.8rem; }
+    .header .brand { font-size:0.7rem; letter-spacing:0.4em; color:rgba(78,203,160,0.6); text-transform:uppercase; }
+    .header h1 { font-size:2.6rem; font-weight:700; letter-spacing:-0.02em; }
+    .header h1 .accent { color:#4ECBA0; }
+    .header .tags { display:flex; flex-wrap:wrap; justify-content:center; gap:0.4rem; font-size:0.7rem; font-weight:600; color:rgba(78,203,160,0.8); }
+    .header .tags span { background:rgba(78,203,160,0.08); border:1px solid rgba(78,203,160,0.2); border-radius:20px; padding:0.15rem 0.8rem; }
+    .divider { width:80px; height:2px; background:linear-gradient(90deg,transparent,#4ECBA0,transparent); margin:0.5rem auto 0; }
+    .lang-row { display:flex; align-items:center; justify-content:center; gap:0.8rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+    .lang-row select { background:#0f1827; color:#f0f4ff; border:2px solid rgba(78,203,160,0.25); border-radius:10px; padding:0.5rem 1rem; font-size:1rem; font-weight:600; cursor:pointer; outline:none; min-width:140px; }
+    .lang-row select:focus { border-color:#4ECBA0; }
+    .lang-row .swap-btn { background:rgba(78,203,160,0.12); border:1px solid rgba(78,203,160,0.3); border-radius:50%; width:40px; height:40px; font-size:1.2rem; color:#4ECBA0; cursor:pointer; transition:0.2s; display:flex; align-items:center; justify-content:center; }
+    .lang-row .swap-btn:hover { background:rgba(78,203,160,0.25); transform:rotate(180deg); }
+    .lang-row label { font-size:0.7rem; font-weight:700; text-transform:uppercase; color:rgba(78,203,160,0.6); letter-spacing:0.1em; display:block; margin-bottom:0.2rem; }
+    .io-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-top:0.5rem; }
+    @media(max-width:700px){ .io-grid{grid-template-columns:1fr;} }
+    .io-box { background:rgba(255,255,255,0.02); border-radius:16px; border:1.5px solid rgba(78,203,160,0.15); padding:0.8rem 1rem; transition:border 0.3s; }
+    .io-box:focus-within { border-color:#4ECBA0; }
+    .io-box .label { font-size:0.65rem; font-weight:700; text-transform:uppercase; color:rgba(78,203,160,0.5); letter-spacing:0.12em; display:block; margin-bottom:0.3rem; }
+    .io-box textarea { width:100%; background:transparent; border:none; color:#f0f4ff; font-size:1.1rem; font-weight:500; line-height:1.7; resize:vertical; min-height:120px; outline:none; font-family:inherit; }
+    .io-box textarea::placeholder { color:rgba(255,255,255,0.2); font-weight:400; }
+    .io-box .output-text { font-size:1.1rem; font-weight:500; line-height:1.7; min-height:120px; white-space:pre-wrap; word-break:break-word; }
+    .io-box .output-text:empty::before { content:"الترجمة ستظهر هنا..."; color:rgba(255,255,255,0.2); font-weight:400; }
+    .io-box .meta { display:flex; gap:0.8rem; margin-top:0.5rem; font-size:0.7rem; color:rgba(78,203,160,0.5); border-top:1px solid rgba(78,203,160,0.08); padding-top:0.5rem; flex-wrap:wrap; }
+    .action-row { display:flex; gap:0.8rem; margin:1.2rem 0 0.8rem; flex-wrap:wrap; justify-content:center; }
+    .btn { background:linear-gradient(135deg,#4ECBA0,#1a9d6a); color:#041510; font-weight:700; font-size:0.9rem; border:none; border-radius:12px; padding:0.6rem 1.8rem; cursor:pointer; transition:0.2s; box-shadow:0 4px 16px rgba(78,203,160,0.25); display:inline-flex; align-items:center; gap:0.4rem; }
+    .btn:hover { filter:brightness(1.1); transform:translateY(-2px); }
+    .btn-secondary { background:rgba(78,203,160,0.08); color:#4ECBA0; box-shadow:none; border:1px solid rgba(78,203,160,0.2); }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; filter:none; }
+    .status { margin:0.5rem 0; padding:0.4rem 1rem; border-radius:8px; font-size:0.9rem; display:none; }
+    .status.error { background:rgba(255,80,80,0.12); color:#ff6b6b; border:1px solid rgba(255,80,80,0.2); display:block; }
+    .status.success { background:rgba(78,203,160,0.12); color:#4ECBA0; border:1px solid rgba(78,203,160,0.2); display:block; }
+    .status.info { background:rgba(78,203,160,0.05); color:#a0d4c0; border:1px solid rgba(78,203,160,0.1); display:block; }
+    .tabs { display:flex; gap:0.2rem; margin:1.5rem 0 1rem; border-bottom:1px solid rgba(78,203,160,0.1); overflow-x:auto; padding-bottom:0.2rem; }
+    .tab-btn { background:transparent; border:none; color:rgba(255,255,255,0.4); padding:0.5rem 1.2rem; font-size:0.8rem; font-weight:600; cursor:pointer; border-radius:8px 8px 0 0; transition:0.2s; white-space:nowrap; }
+    .tab-btn.active { color:#4ECBA0; background:rgba(78,203,160,0.08); border-bottom:2px solid #4ECBA0; }
+    .tab-btn:hover { color:#fff; background:rgba(255,255,255,0.03); }
+    .tab-content { display:none; margin-top:1rem; }
+    .tab-content.active { display:block; }
+    .dropzone { border:2px dashed rgba(78,203,160,0.25); border-radius:16px; padding:2.5rem 1rem; text-align:center; color:rgba(255,255,255,0.3); cursor:pointer; transition:0.3s; margin-bottom:1rem; }
+    .dropzone:hover { border-color:#4ECBA0; background:rgba(78,203,160,0.03); }
+    .dropzone input { display:none; }
+    .preview-img { max-width:100%; max-height:300px; border-radius:12px; margin:0.5rem 0; }
+    .srt-line { display:flex; gap:0.5rem; padding:0.3rem 0; border-bottom:1px solid rgba(78,203,160,0.05); font-size:0.85rem; align-items:flex-start; }
+    .srt-num { color:rgba(255,255,255,0.25); min-width:30px; }
+    .srt-time { color:rgba(255,255,255,0.35); min-width:90px; font-family:monospace; }
+    .srt-trans { color:#4ECBA0; }
+    .cb { background:rgba(78,203,160,0.04); border:1px solid rgba(78,203,160,0.08); border-radius:14px; padding:0.8rem 1rem; margin-bottom:0.6rem; border-left:3px solid #4ECBA0; }
+    .cb-hd { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.2rem; }
+    .cb-spk { font-weight:700; color:#4ECBA0; }
+    .cb-lang { font-size:0.7rem; color:rgba(255,255,255,0.4); }
+    .cb-orig { font-size:0.85rem; color:rgba(255,255,255,0.5); font-style:italic; }
+    .cb-trans { font-size:1rem; font-weight:600; margin-top:0.2rem; }
+    @media(max-width:480px){ .container{padding:1rem;} .header h1{font-size:1.8rem;} }
   </style>
 </head>
 <body>
@@ -116,7 +87,7 @@
     <div class="io-box">
       <span class="label">🌐 الترجمة</span>
       <div class="output-text" id="outputText"></div>
-      <div class="meta" id="metaInfo">
+      <div class="meta">
         <span id="emotionDisplay"></span>
         <span id="engineDisplay"></span>
         <span id="domainDisplay"></span>
@@ -197,7 +168,6 @@
   });
   srcSel.value = 'Auto-Detect'; tgtSel.value = 'Arabic';
 
-  // ===== تبويبات =====
   document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', function() {
     document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
@@ -216,10 +186,28 @@
     statusDiv.className = 'status ' + type;
     if (!msg) { statusDiv.className = 'status'; statusDiv.style.display = 'none'; }
     else { statusDiv.style.display = 'block'; }
-    setTimeout(() => { if (statusDiv.textContent === msg) { statusDiv.style.display = 'none'; } }, 7000);
+    setTimeout(() => { if (statusDiv.textContent === msg) statusDiv.style.display = 'none'; }, 7000);
   }
 
-  // ===== الترجمة الأساسية =====
+  // ===== اختبار الصحة =====
+  async function checkHealth() {
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        const data = await res.json();
+        console.log('✅ API is healthy:', data);
+        return true;
+      } else {
+        console.error('❌ Health check failed:', res.status);
+        return false;
+      }
+    } catch (e) {
+      console.error('❌ Cannot reach API:', e);
+      return false;
+    }
+  }
+
+  // ===== الترجمة =====
   async function translate() {
     const text = inputText.value.trim();
     if (!text) { setStatus('الرجاء إدخال نص', 'error'); return; }
@@ -248,12 +236,15 @@
       translateBtn.innerHTML = '🔄 ترجمة';
     }
   }
+
   translateBtn.addEventListener('click', translate);
+  // إدخال سريع
+  inputText.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); translate(); } });
 
   // ===== استماع =====
   speakBtn.addEventListener('click', async () => {
     const text = outputText.textContent.trim();
-    if (!text) { setStatus('لا يوجد نص مترجم للاستماع', 'error'); return; }
+    if (!text) { setStatus('لا يوجد نص مترجم', 'error'); return; }
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
@@ -343,9 +334,7 @@
   document.getElementById('imageUpload').addEventListener('change', function() {
     if (!this.files[0]) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
-      document.getElementById('cameraPreview').innerHTML = `<img src="${e.target.result}" class="preview-img" />`;
-    };
+    reader.onload = (e) => { document.getElementById('cameraPreview').innerHTML = `<img src="${e.target.result}" class="preview-img" />`; };
     reader.readAsDataURL(this.files[0]);
     const fd = new FormData(); fd.append('image', this.files[0]);
     document.getElementById('cameraStatus').innerHTML = '⏳ معالجة الصورة...';
@@ -403,9 +392,15 @@
     } catch (e) { document.getElementById('groupStatus').innerHTML = '❌ ' + e.message; }
   });
 
-  // ===== تشغيل سريع =====
-  // الترجمة عند الضغط على Enter في حقل النص
-  inputText.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); translate(); } });
+  // ===== فحص الاتصال عند التحميل =====
+  window.addEventListener('load', async () => {
+    const ok = await checkHealth();
+    if (!ok) {
+      setStatus('⚠️ تعذر الاتصال بالخادم. تأكد من اتصالك بالإنترنت.', 'error');
+    } else {
+      setStatus('✅ الخادم جاهز', 'success');
+    }
+  });
 </script>
 </body>
 </html>
