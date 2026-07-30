@@ -18,10 +18,5 @@
       "src": "/(.*)",
       "dest": "index.html"
     }
-  ],
-  "env": {
-    "GROQ_API_KEY": "@groq_api_key",
-    "DEEPL_API_KEY": "@deepl_api_key",
-    "COHERE_API_KEY": "@cohere_api_key"
-  }
+  ]
 }
