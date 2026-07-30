@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import requests
 from gtts import gTTS
 
-# ===== استيرادات اختيارية =====
+# استيرادات اختيارية مع التعامل مع الأخطاء
 try:
     from deep_translator import GoogleTranslator, MyMemoryTranslator
 except:
@@ -47,7 +47,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ===== المفاتيح =====
+# ===== المفاتيح (من متغيرات البيئة) =====
 GROQ_KEY = os.getenv("GROQ_API_KEY", "").strip()
 DEEPL_KEY = os.getenv("DEEPL_API_KEY", "").strip()
 COHERE_KEY = os.getenv("COHERE_API_KEY", "").strip()
@@ -87,8 +87,7 @@ LANGUAGES = {
 
 # ===== دوال مساعدة =====
 def detect_lang(text):
-    if not text:
-        return "en", "English"
+    if not text: return "en", "English"
     ar = sum(1 for c in text if "\u0600" <= c <= "\u06FF") / max(len(text), 1)
     cy = sum(1 for c in text if "\u0400" <= c <= "\u04FF") / max(len(text), 1)
     cj = sum(1 for c in text if "\u4E00" <= c <= "\u9FFF") / max(len(text), 1)
@@ -124,25 +123,24 @@ def quick_domain(text):
     result = []
     for d, v in domains.items():
         score = sum(tl.count(kw) for kw in v["keywords"])
-        if score > 0:
-            result.append((d, score))
+        if score > 0: result.append((d, score))
     result.sort(key=lambda x: -x[1])
     return [f"{domains[d]['icon']} {domains[d]['name']}" for d, _ in result[:2]]
 
-# ===== الترجمة =====
+# ===== الترجمة الذكية =====
 def smart_translate(text, target, source="Auto-Detect"):
     if not text or not text.strip():
         return None, "نص فارغ"
     src_g = LANGUAGES.get(source, {}).get("g", "auto")
     tgt_g = LANGUAGES.get(target, {}).get("g", "en")
 
-    # 1) Google Translate (الأسرع)
+    # 1) Google (الأسرع والأضمن)
     if GoogleTranslator:
         try:
             res = GoogleTranslator(source=src_g or "auto", target=tgt_g).translate(text)
             if res:
                 return res, "Google ⚡"
-        except:
+        except Exception as e:
             pass
 
     # 2) DeepL
@@ -158,7 +156,7 @@ def smart_translate(text, target, source="Auto-Detect"):
             except:
                 pass
 
-    # 3) Groq AI
+    # 3) Groq AI (للنصوص القصيرة)
     if GROQ_KEY and len(text) <= 1200:
         system = "You are an expert translator. Translate meaning and intent naturally. Return ONLY the translation."
         prompt = f"Translate from {source} to {target}:\n\n{text}"
@@ -186,7 +184,6 @@ def smart_translate(text, target, source="Auto-Detect"):
                 return res, "MyMemory"
         except:
             pass
-
     return None, "فشلت جميع محاولات الترجمة"
 
 # ===== TTS =====
@@ -201,7 +198,7 @@ def make_tts(text, lang="en"):
     except:
         return None
 
-# ===== استخراج ملفات =====
+# ===== استخراج الملفات =====
 def extract_file(file_bytes, filename):
     ext = os.path.splitext(filename)[1].lower()
     if ext == ".pdf" and pdfplumber:
@@ -210,18 +207,15 @@ def extract_file(file_bytes, filename):
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
                 for pg in pdf.pages:
                     t = pg.extract_text()
-                    if t:
-                        txt += t + "\n"
+                    if t: txt += t + "\n"
             return txt.strip() if txt.strip() else None, None
-        except Exception as e:
-            return None, str(e)
+        except Exception as e: return None, str(e)
     if ext == ".docx" and docx:
         try:
             d = docx.Document(io.BytesIO(file_bytes))
             txt = "\n".join(p.text for p in d.paragraphs)
             return txt.strip() if txt.strip() else None, None
-        except Exception as e:
-            return None, str(e)
+        except Exception as e: return None, str(e)
     if ext in (".xlsx", ".xls") and openpyxl:
         try:
             wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
@@ -233,16 +227,13 @@ def extract_file(file_bytes, filename):
                             parts.append(str(cell.value))
             txt = "\n".join(parts)
             return txt.strip() if txt.strip() else None, None
-        except Exception as e:
-            return None, str(e)
+        except Exception as e: return None, str(e)
     if ext == ".txt":
         for enc in ("utf-8", "windows-1256", "latin-1"):
             try:
                 t = file_bytes.decode(enc)
-                if t.strip():
-                    return t.strip(), None
-            except:
-                pass
+                if t.strip(): return t.strip(), None
+            except: pass
     return None, f"نوع ملف غير مدعوم: {ext}"
 
 # ===== OCR (Groq Vision) =====
@@ -255,8 +246,7 @@ def ocr_image(image_bytes):
             try:
                 fmt = Image.open(io.BytesIO(image_bytes)).format or "JPEG"
                 mime = f"image/{'jpeg' if fmt.upper() in ('JPG','JPEG') else fmt.lower()}"
-            except:
-                pass
+            except: pass
         b64 = base64.b64encode(image_bytes).decode()
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -276,10 +266,9 @@ def ocr_image(image_bytes):
             txt = r.json()["choices"][0]["message"]["content"].strip()
             return (txt, None) if txt else (None, "لا يوجد نص")
         return None, f"Groq Vision {r.status_code}"
-    except Exception as e:
-        return None, str(e)
+    except Exception as e: return None, str(e)
 
-# ===== التعرف على الصوت (Groq Whisper) =====
+# ===== STT (Groq Whisper) =====
 def groq_stt(audio_bytes, lang="auto"):
     if not GROQ_KEY:
         return None, "مفتاح Groq غير موجود"
@@ -287,32 +276,25 @@ def groq_stt(audio_bytes, lang="auto"):
     if lang and lang != "auto":
         lc = {"zh-CN": "zh", "zh-cn": "zh", "iw": "he"}.get(lang, lang[:2])
     files = {"file": ("audio.wav", audio_bytes, "audio/wav"), "model": (None, "whisper-large-v3-turbo")}
-    if lc:
-        files["language"] = (None, lc)
+    if lc: files["language"] = (None, lc)
     try:
         r = requests.post("https://api.groq.com/openai/v1/audio/transcriptions",
                           headers={"Authorization": f"Bearer {GROQ_KEY}"}, files=files, timeout=30)
         if r.status_code == 200:
             return r.json(), None
         return None, f"Groq STT {r.status_code}"
-    except Exception as e:
-        return None, str(e)
+    except Exception as e: return None, str(e)
 
-# ===== الترجمات =====
+# ===== الترجمات (Subtitles) =====
 def seconds_to_srt(s):
-    h = int(s // 3600)
-    m = int((s % 3600) // 60)
-    sc = int(s % 60)
-    ms = int((s % 1) * 1000)
+    h = int(s // 3600); m = int((s % 3600) // 60); sc = int(s % 60); ms = int((s % 1) * 1000)
     return f"{h:02d}:{m:02d}:{sc:02d},{ms:03d}"
 
 def generate_subtitles(audio_bytes, target_lang):
     data, err = groq_stt(audio_bytes, "auto")
-    if err:
-        return None, err
+    if err: return None, err
     segments = data.get("segments", [])
-    if not segments:
-        return None, "لم يُكتشف كلام"
+    if not segments: return None, "لم يُكتشف كلام"
     trans_blocks = []
     for i, seg in enumerate(segments, 1):
         start = seconds_to_srt(seg.get("start", 0))
@@ -324,35 +306,27 @@ def generate_subtitles(audio_bytes, target_lang):
         return "\n\n".join(f"{b['index']}\n{b['start']} --> {b['end']}\n{b['text']}" for b in blocks)
     return {"segments": trans_blocks, "srt_translated": to_srt(trans_blocks)}, None
 
-# ===== مجموعة =====
+# ===== مجموعة (Group) =====
 def group_chat(audio_bytes, target_lang):
     data, err = groq_stt(audio_bytes, "auto")
-    if err:
-        return None, err
+    if err: return None, err
     segments = data.get("segments", [])
-    if not segments:
-        return None, "لم يُكتشف كلام"
+    if not segments: return None, "لم يُكتشف كلام"
     groups, cur = [], []
     for seg in segments:
-        if not cur:
-            cur.append(seg)
+        if not cur: cur.append(seg)
         else:
             if seg.get("start", 0) - cur[-1].get("end", 0) >= 0.6:
-                groups.append(cur)
-                cur = []
+                groups.append(cur); cur = []
             cur.append(seg)
-    if cur:
-        groups.append(cur)
+    if cur: groups.append(cur)
     results, spk_map, cnt = [], {}, 1
     icons = ["🧑", "👤", "👩", "👱", "🧔", "🧕", "👲", "🧑‍💼", "👩‍💼", "🙍"]
     for grp in groups:
         text = " ".join(s.get("text", "").strip() for s in grp).strip()
-        if not text:
-            continue
+        if not text: continue
         lc, ln = detect_lang(text)
-        if lc not in spk_map:
-            spk_map[lc] = cnt
-            cnt += 1
+        if lc not in spk_map: spk_map[lc] = cnt; cnt += 1
         spk = spk_map[lc]
         translated, engine = smart_translate(text, target_lang, ln)
         results.append({
@@ -367,7 +341,7 @@ def group_chat(audio_bytes, target_lang):
         })
     return {"segments": results}, None
 
-# ===== نماذج API =====
+# ===== نماذج الطلبات =====
 class TranslateRequest(BaseModel):
     text: str
     source: str = "Auto-Detect"
@@ -377,7 +351,7 @@ class TTSRequest(BaseModel):
     text: str
     lang: str = "en"
 
-# ===== نقاط النهاية =====
+# ===== نقاط النهاية (API) =====
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "groq": bool(GROQ_KEY), "deepl": bool(DEEPL_KEY)}
@@ -415,10 +389,8 @@ async def extract_endpoint(file: UploadFile = File(...)):
     try:
         content = await file.read()
         text, err = extract_file(content, file.filename)
-        if err:
-            raise HTTPException(status_code=400, detail=err)
-        if not text:
-            raise HTTPException(status_code=400, detail="لا يوجد نص في الملف")
+        if err: raise HTTPException(status_code=400, detail=err)
+        if not text: raise HTTPException(status_code=400, detail="لا يوجد نص في الملف")
         return {"text": text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -428,8 +400,7 @@ async def ocr_endpoint(image: UploadFile = File(...)):
     try:
         img = await image.read()
         text, err = ocr_image(img)
-        if err:
-            raise HTTPException(status_code=500, detail=err)
+        if err: raise HTTPException(status_code=500, detail=err)
         return {"text": text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -439,8 +410,7 @@ async def subtitle_endpoint(file: UploadFile = File(...), target: str = Form("Ar
     try:
         audio = await file.read()
         result, err = generate_subtitles(audio, target)
-        if err:
-            raise HTTPException(status_code=500, detail=err)
+        if err: raise HTTPException(status_code=500, detail=err)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -450,8 +420,7 @@ async def group_endpoint(file: UploadFile = File(...), target: str = Form("Arabi
     try:
         audio = await file.read()
         result, err = group_chat(audio, target)
-        if err:
-            raise HTTPException(status_code=500, detail=err)
+        if err: raise HTTPException(status_code=500, detail=err)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -459,8 +428,3 @@ async def group_endpoint(file: UploadFile = File(...), target: str = Form("Arabi
 @app.get("/")
 async def root():
     return {"message": "HN Translator API is running"}
-
-# لو للتشغيل المحلي
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
