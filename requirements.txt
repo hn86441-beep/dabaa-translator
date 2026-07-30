@@ -5,3 +5,4 @@ groq
 python-multipart
 srt
 pydantic
+python-dotenv
