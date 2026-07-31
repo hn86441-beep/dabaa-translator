@@ -1,8 +1,5 @@
-fastapi
-uvicorn
-deepl
-groq
-python-multipart
-srt
-pydantic
-python-dotenv
+api
+index.html
+requirements.txt
+vercel.json
+translate.py
