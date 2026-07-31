@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HN TRANSLATOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ac:#4ECBA0;--ac2:#2fa87a;
+  --bg:#07071a;--bg2:#0c1525;--bg3:#0a1020;
+  --card:rgba(78,203,160,.07);--card2:rgba(78,203,160,.13);
+  --brd:rgba(78,203,160,.2);--brd2:rgba(78,203,160,.38);
+  --txt:#F0F4FF;--sub:rgba(78,203,160,.75);
+  --inp:#0f1827;--ph:rgba(78,203,160,.38);
+  --err:#ff6b6b;--gold:#B08D57;
+  --r:12px;--sh:0 4px 18px rgba(78,203,160,.18);
+  --tr:all .2s cubic-bezier(.4,0,.2,1);
+}
+.light{
+  --bg:#eff3f8;--bg2:#e4eaf5;--bg3:#dce3f0;
+  --card:rgba(26,158,112,.06);--card2:rgba(26,158,112,.12);
+  --brd:rgba(26,158,112,.22);--brd2:rgba(26,158,112,.4);
+  --txt:#111827;--sub:rgba(26,158,112,.78);
+  --inp:#fff;--ph:rgba(26,158,112,.4);
+  --ac:#1a9e70;--ac2:#0f7a54;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:'Space Grotesk','Tajawal',system-ui,sans-serif;
+  background:linear-gradient(135deg,var(--bg),var(--bg2) 55%,var(--bg3));
+  min-height:100vh;color:var(--txt);background-attachment:fixed;
+  transition:background .3s,color .3s;
+}
+::-webkit-scrollbar{width:5px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:3px}
+
+/* ══ HEADER ══ */
+header{
+  text-align:center;padding:1.1rem 1rem .6rem;
+  background:linear-gradient(180deg,var(--bg) 0%,transparent 100%);
+  position:sticky;top:0;z-index:200;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--brd);
+}
+.hdr-inner{position:relative;max-width:1200px;margin:0 auto}
+.hdr-controls{
+  position:absolute;top:0;left:0;
+  display:flex;gap:6px;align-items:center;
+}
+.hdr-btn{
+  background:var(--card);border:1px solid var(--brd);border-radius:8px;
+  color:var(--sub);font-size:16px;width:34px;height:34px;
+  cursor:pointer;transition:var(--tr);display:flex;align-items:center;justify-content:center;
+}
+.hdr-btn:hover{border-color:var(--ac);color:var(--ac);background:var(--card2)}
+.brand-row{display:flex;align-items:center;justify-content:center;gap:.4rem;margin-bottom:.15rem}
+.brand-dot{color:var(--ac);font-size:7px;opacity:.4}
+.brand-name{font-size:9px;font-weight:700;letter-spacing:.35em;color:var(--ac);text-transform:uppercase;opacity:.7}
+h1{font-size:1.75rem;font-weight:700;letter-spacing:-.02em;
+  text-shadow:0 0 40px rgba(78,203,160,.3)}
+h1 .ac{color:var(--ac)}
+.hdr-tags{display:flex;justify-content:center;gap:.3rem;margin:.15rem 0;flex-wrap:wrap}
+.hdr-tag{font-size:9px;font-weight:600;background:var(--card);border:1px solid var(--brd);
+  border-radius:20px;padding:2px 7px;color:var(--sub)}
+
+/* ══ TABS ══ */
+.tabs-bar{
+  display:flex;justify-content:center;gap:3px;padding:.35rem .8rem;
+  background:var(--card);border-bottom:1px solid var(--brd);
+  overflow-x:auto;scrollbar-width:none;
+}
+.tabs-bar::-webkit-scrollbar{display:none}
+.tab-btn{
+  background:transparent;border:1px solid transparent;border-radius:8px 8px 0 0;
+  color:var(--sub);font-size:12px;font-weight:600;padding:.38rem .85rem;
+  cursor:pointer;transition:var(--tr);white-space:nowrap;
+  font-family:'Space Grotesk','Tajawal',sans-serif;
+}
+.tab-btn:hover{background:var(--card2);color:var(--txt)}
+.tab-btn.active{background:var(--card2);color:var(--ac);border-color:var(--brd);border-bottom-color:transparent}
+
+/* ══ MAIN ══ */
+.main{max-width:1200px;margin:0 auto;padding:1rem 1rem 3rem}
+.tab-pane{display:none;animation:fadein .2s ease}
+.tab-pane.active{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ══ LANG SELECTOR ══ */
+.lang-row{
+  display:grid;grid-template-columns:1fr 42px 1fr;
+  gap:8px;align-items:center;margin-bottom:.8rem;
+}
+.lang-select{
+  background:var(--inp);border:1.5px solid var(--brd);border-radius:var(--r);
+  color:var(--txt);font-size:13px;padding:.45rem .75rem;
+  font-family:'Space Grotesk','Tajawal',sans-serif;cursor:pointer;
+  outline:none;width:100%;transition:var(--tr);
+}
+.lang-select:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(78,203,160,.15)}
+.swap-btn{
+  background:var(--card);border:1.5px solid var(--brd);border-radius:var(--r);
+  color:var(--ac);font-size:18px;width:42px;height:42px;cursor:pointer;
+  transition:var(--tr);display:flex;align-items:center;justify-content:center;
+}
+.swap-btn:hover{background:var(--card2);border-color:var(--ac);transform:rotate(180deg)}
+
+/* ══ TRANSLATE PANEL ══ */
+.translate-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1rem;margin-bottom:.75rem;
+}
+@media(max-width:700px){.translate-grid{grid-template-columns:1fr}}
+.panel{
+  background:var(--card);border:1.5px solid var(--brd);border-radius:16px;
+  overflow:hidden;position:relative;transition:var(--tr);
+}
+.panel:focus-within{border-color:var(--brd2);box-shadow:0 0 0 3px rgba(78,203,160,.1)}
+.panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.5rem .85rem .3rem;
+  font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--sub);
+  border-bottom:1px solid var(--brd);
+}
+.panel-actions{display:flex;gap:4px}
+.p-btn{
+  background:transparent;border:none;color:var(--sub);
+  font-size:14px;width:26px;height:26px;border-radius:6px;
+  cursor:pointer;transition:var(--tr);display:flex;align-items:center;justify-content:center;
+}
+.p-btn:hover{background:var(--card2);color:var(--ac)}
+.panel-bar::before{
+  content:'';display:block;height:2px;
+  background:linear-gradient(90deg,transparent,var(--ac),transparent);
+}
+#srcText{
+  width:100%;min-height:200px;padding:1rem 1rem .5rem;
+  background:transparent;border:none;color:var(--txt);
+  font-size:17px;font-family:'Tajawal','Space Grotesk',Arial,sans-serif;
+  font-weight:600;line-height:1.85;resize:none;outline:none;
+  caret-color:var(--ac);-webkit-font-smoothing:antialiased;
+}
+#srcText::placeholder{color:var(--ph);opacity:.7;font-weight:400;font-size:15px}
+.char-count{
+  font-size:9px;padding:.2rem .85rem .4rem;
+  color:var(--sub);opacity:.45;text-align:left;
+}
+#tgtPanel{min-height:236px;position:relative}
+#tgtText{
+  padding:1rem 1rem .5rem;
+  font-size:17px;font-family:'Tajawal','Space Grotesk',Arial,sans-serif;
+  font-weight:600;line-height:1.85;color:var(--txt);min-height:180px;
+  white-space:pre-wrap;word-break:break-word;
+}
+.tgt-placeholder{color:var(--sub);opacity:.28;font-style:italic;font-weight:400;font-size:15px}
+.engine-badge{
+  display:inline-block;font-size:8.5px;font-weight:800;
+  padding:2px 8px;border-radius:20px;letter-spacing:.05em;
+  background:var(--card2);border:1px solid var(--brd2);color:var(--ac);
+  margin:.3rem .85rem .5rem;
+}
+#loadingDot{
+  display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:8px;height:8px;background:var(--ac);border-radius:50%;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+50%{opacity:.4;transform:translate(-50%,-50%) scale(.6)}}
+
+/* ══ SPELL SUGGESTIONS ══ */
+#spellBox{
+  display:none;align-items:center;gap:.4rem;flex-wrap:wrap;
+  padding:.4rem .8rem;margin:.2rem 0;
+  background:rgba(255,180,0,.07);border:1px solid rgba(255,180,0,.25);
+  border-radius:10px;font-size:13px;
+}
+.spell-label{color:rgba(255,180,0,.9);font-weight:700;font-size:10px;white-space:nowrap}
+.spell-pill{
+  background:rgba(255,180,0,.1);border:1px solid rgba(255,180,0,.35);
+  border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;
+  cursor:pointer;transition:var(--tr);color:var(--txt);
+}
+.spell-pill:hover{background:rgba(255,180,0,.22);border-color:rgba(255,180,0,.6)}
+
+/* ══ TOOLS ROW ══ */
+.tools-row{
+  display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;
+  padding:.5rem 0;border-top:1px solid var(--brd);border-bottom:1px solid var(--brd);
+  margin-bottom:.8rem;
+}
+.tool-btn{
+  background:var(--card);border:1.5px solid var(--brd);border-radius:10px;
+  color:var(--sub);font-size:13px;font-weight:600;
+  padding:.42rem .9rem;cursor:pointer;transition:var(--tr);
+  display:flex;align-items:center;gap:.35rem;white-space:nowrap;
+  font-family:'Space Grotesk','Tajawal',sans-serif;
+}
+.tool-btn:hover{border-color:var(--ac);color:var(--ac);background:var(--card2)}
+.tool-btn.active{background:var(--card2);border-color:var(--ac);color:var(--ac)}
+.tool-btn svg{width:14px;height:14px;fill:currentColor;flex-shrink:0}
+
+/* ══ SECTION HEADING ══ */
+.sh{
+  font-size:9px;font-weight:700;text-transform:uppercase;color:var(--sub);
+  margin:.7rem 0 .3rem;letter-spacing:.12em;
+  display:flex;align-items:center;gap:.4rem;
+}
+.sh::before{content:'';display:inline-block;width:3px;height:11px;
+  background:var(--ac);border-radius:2px}
+
+/* ══ CARD ══ */
+.result-card{
+  background:var(--card);border:1px solid var(--brd);border-radius:14px;
+  padding:.8rem 1rem;margin:.4rem 0;position:relative;overflow:hidden;
+}
+.result-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--ac),transparent)}
+.result-card .rc-lbl{font-size:9px;font-weight:700;text-transform:uppercase;
+  color:var(--sub);letter-spacing:.18em}
+.result-card .rc-body{font-size:16px;color:var(--txt);margin-top:.35rem;
+  line-height:1.75;font-family:'Tajawal','Space Grotesk',sans-serif;font-weight:500}
+.result-card .rc-meta{font-size:10px;color:var(--sub);margin-top:5px;
+  opacity:.72;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+
+/* ══ HISTORY ══ */
+#histPanel{
+  background:var(--bg2);border:1.5px solid var(--brd);border-radius:16px;
+  overflow:hidden;
+}
+.hist-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.6rem 1rem;background:var(--card);border-bottom:1px solid var(--brd);
+}
+.hist-title{font-size:11px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--sub);display:flex;align-items:center;gap:.4rem}
+.hist-actions{display:flex;gap:.4rem}
+.hist-btn{background:var(--card);border:1px solid var(--brd);border-radius:6px;
+  color:var(--sub);font-size:11px;padding:3px 9px;cursor:pointer;transition:var(--tr)}
+.hist-btn:hover{border-color:var(--ac);color:var(--ac)}
+.hist-list{max-height:320px;overflow-y:auto;padding:.4rem .5rem}
+/* timeline */
+.htl-wrap{padding:0 .3rem 0 1rem;position:relative}
+.htl-wrap::before{
+  content:'';position:absolute;
+  left:1.35rem;top:.3rem;bottom:.3rem;width:1.5px;
+  background:linear-gradient(180deg,var(--brd),transparent);pointer-events:none;
+}
+.htl{
+  position:relative;margin-bottom:.5rem;
+  padding:.55rem .75rem .5rem .85rem;
+  background:linear-gradient(135deg,var(--card),rgba(78,203,160,.02));
+  border:1px solid var(--brd);border-left:3px solid var(--htl-dot,var(--ac));
+  border-radius:0 12px 12px 0;transition:var(--tr);cursor:default;overflow:hidden;
+}
+.htl::before{
+  content:'';position:absolute;left:-1rem;top:.75rem;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--htl-dot,var(--ac));
+  box-shadow:0 0 0 2.5px var(--bg),0 0 8px var(--htl-dot,var(--ac));
+}
+.htl::after{
+  content:'';position:absolute;left:-.7rem;top:1.1rem;
+  width:.7rem;height:1.5px;background:var(--htl-dot,var(--ac));opacity:.35;
+}
+.htl:hover{border-color:var(--htl-dot,var(--ac));transform:translateX(-2px);
+  box-shadow:-3px 4px 16px rgba(78,203,160,.18)}
+.htl-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.15rem;gap:.3rem}
+.htl-tag{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--htl-dot,var(--ac));display:flex;align-items:center;gap:.2rem}
+.htl-time{font-size:8px;opacity:.38;font-family:monospace;white-space:nowrap;color:var(--sub)}
+.htl-orig{font-size:11.5px;line-height:1.45;opacity:.62;
+  font-family:'Tajawal','Space Grotesk',sans-serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt)}
+.htl-sep{display:flex;align-items:center;gap:.3rem;margin:.15rem 0;
+  font-size:9px;color:var(--htl-dot,var(--ac));opacity:.5}
+.htl-sep-line{flex:1;height:1px;background:linear-gradient(90deg,var(--brd),transparent)}
+.htl-trans{font-size:12.5px;font-weight:700;line-height:1.45;
+  font-family:'Tajawal','Space Grotesk',sans-serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt)}
+.htl-foot{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:.28rem;padding-top:.25rem;border-top:1px solid var(--brd);opacity:.85;
+}
+.htl-lang{font-size:8px;font-weight:700;padding:1px 7px;border-radius:20px;
+  background:rgba(78,203,160,.12);color:var(--ac);letter-spacing:.04em}
+.htl-del{background:transparent;border:none;color:var(--sub);opacity:.4;
+  font-size:12px;cursor:pointer;transition:var(--tr);padding:0 3px}
+.htl-del:hover{color:var(--err);opacity:1}
+.hist-empty{
+  display:flex;flex-direction:column;align-items:center;
+  padding:2rem 1rem;opacity:.22;gap:.3rem;
+}
+.hist-empty-icon{font-size:32px}
+.hist-empty-txt{font-size:11px;font-weight:600}
+
+/* ══ GROUP CHAT ══ */
+.group-banner{
+  background:var(--card);border:1.5px solid var(--brd);border-radius:14px;
+  padding:1rem;margin-bottom:.75rem;text-align:center;
+  font-size:13px;color:var(--sub);line-height:1.7;
+}
+.cb{
+  border-radius:16px;padding:.9rem 1.1rem;margin-bottom:.65rem;
+  border:1px solid var(--brd);background:var(--card);transition:var(--tr);
+}
+.cb:hover{transform:translateX(3px)}
+.cb-hd{display:flex;align-items:center;gap:10px;margin-bottom:.4rem}
+.cb-ic{font-size:24px;line-height:1}
+.cb-spk{font-size:13px;font-weight:700}
+.cb-lang{font-size:10px;color:var(--sub);opacity:.8}
+.cb-ts{font-size:9px;color:var(--sub);opacity:.45}
+.cb-orig{font-size:13px;color:var(--sub);font-style:italic;
+  border-left:3px solid var(--brd);padding-left:9px;margin-bottom:.3rem;opacity:.9}
+.cb-trans{font-size:16px;font-weight:600;line-height:1.7;
+  font-family:'Tajawal','Space Grotesk',sans-serif;color:var(--txt)}
+.cb-eng{font-size:9px;color:var(--sub);opacity:.42;margin-top:3px}
+
+/* ══ SUBTITLE ══ */
+.srt-line{
+  display:flex;gap:.7rem;padding:.35rem 0;
+  border-bottom:1px solid rgba(78,203,160,.1);align-items:flex-start;
+}
+.srt-num{min-width:22px;font-size:10px;color:var(--sub);opacity:.4;font-family:monospace}
+.srt-time{min-width:92px;font-size:10px;color:var(--sub);opacity:.6;font-family:monospace}
+.srt-trans{flex:1;font-size:14px;font-weight:600;
+  font-family:'Tajawal','Space Grotesk',sans-serif;color:var(--txt)}
+
+/* ══ AI CHAT ══ */
+.chat-messages{
+  max-height:320px;overflow-y:auto;padding:.4rem;
+  display:flex;flex-direction:column;gap:.5rem;
+  scrollbar-width:thin;scrollbar-color:var(--brd) transparent;
+}
+.msg-u{
+  background:var(--card2);border:1px solid var(--brd);
+  border-radius:14px 14px 3px 14px;padding:.55rem .9rem;
+  margin-right:10%;font-size:14px;color:var(--txt);
+  font-family:'Tajawal','Space Grotesk',sans-serif;
+  line-height:1.6;text-align:right;
+}
+.msg-a{
+  background:rgba(255,255,255,.04);border:1px solid var(--brd);
+  border-radius:14px 14px 14px 3px;padding:.55rem .9rem;
+  margin-left:10%;font-size:14px;color:var(--txt);
+  font-family:'Tajawal','Space Grotesk',sans-serif;
+  line-height:1.65;border-left:3px solid var(--ac);
+}
+.chat-typing{
+  display:none;font-size:12px;color:var(--sub);padding:.3rem;
+  text-align:center;
+}
+.chat-input-row{display:flex;gap:.5rem;margin-top:.5rem}
+.chat-input{
+  flex:1;background:var(--inp);border:1.5px solid var(--brd);border-radius:12px;
+  color:var(--txt);font-size:14px;padding:.55rem .9rem;outline:none;
+  font-family:'Tajawal','Space Grotesk',sans-serif;transition:var(--tr);
+}
+.chat-input:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(78,203,160,.12)}
+.chat-send-btn{
+  background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;
+  border-radius:12px;color:#041510;font-weight:700;font-size:14px;
+  padding:.55rem 1.2rem;cursor:pointer;transition:var(--tr);white-space:nowrap;
+  font-family:'Space Grotesk',sans-serif;
+}
+.chat-send-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+
+/* ══ BUTTONS ══ */
+.btn{
+  background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;
+  border-radius:var(--r);color:#041510;font-weight:700;font-size:14px;
+  padding:.55rem 1.4rem;cursor:pointer;transition:var(--tr);
+  font-family:'Space Grotesk','Tajawal',sans-serif;
+  box-shadow:0 3px 12px rgba(78,203,160,.3);
+}
+.btn:hover{filter:brightness(1.1);transform:translateY(-2px);box-shadow:0 8px 22px rgba(78,203,160,.4)}
+.btn:active{transform:translateY(0)}
+.btn-outline{
+  background:transparent;border:1.5px solid var(--brd);color:var(--sub);
+  border-radius:var(--r);font-weight:600;font-size:13px;
+  padding:.45rem 1rem;cursor:pointer;transition:var(--tr);
+  font-family:'Space Grotesk','Tajawal',sans-serif;
+}
+.btn-outline:hover{border-color:var(--ac);color:var(--ac);background:var(--card2)}
+
+/* ══ TOAST ══ */
+#toast{
+  position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--ac);color:#041510;font-weight:700;font-size:14px;
+  padding:.6rem 1.4rem;border-radius:30px;z-index:9999;
+  box-shadow:0 8px 24px rgba(78,203,160,.4);transition:var(--tr);opacity:0;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{background:var(--err);color:#fff}
+
+/* ══ PROGRESS / UPLOAD ══ */
+.upload-area{
+  border:2px dashed var(--brd);border-radius:var(--r);
+  padding:1.5rem;text-align:center;color:var(--sub);
+  cursor:pointer;transition:var(--tr);background:var(--card);
+}
+.upload-area:hover{border-color:var(--ac);background:var(--card2);color:var(--ac)}
+.upload-area input{display:none}
+.progress-bar{
+  height:4px;border-radius:2px;background:var(--brd);
+  margin:.6rem 0;overflow:hidden;display:none;
+}
+.progress-fill{height:100%;width:0;border-radius:2px;
+  background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .3s ease}
+
+/* ══ RECORDER ══ */
+.recorder{
+  display:flex;flex-direction:column;align-items:center;
+  gap:.8rem;padding:1rem;
+}
+.rec-circle{
+  width:70px;height:70px;border-radius:50%;border:2px solid var(--brd);
+  background:var(--card);cursor:pointer;transition:var(--tr);
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;position:relative;
+}
+.rec-circle:hover{border-color:var(--ac);background:var(--card2);transform:scale(1.06)}
+.rec-circle.recording{
+  border-color:var(--err);background:rgba(255,107,107,.12);
+  animation:rec-pulse 1.2s infinite;
+}
+@keyframes rec-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,107,.4)}
+  50%{box-shadow:0 0 0 12px rgba(255,107,107,0)}}
+.rec-label{font-size:12px;color:var(--sub);font-weight:600}
+.rec-time{font-size:20px;font-weight:700;color:var(--txt);font-family:monospace;display:none}
+
+/* ══ AUDIO PLAYER ══ */
+audio{
+  width:100%;height:36px;margin-top:.4rem;
+  filter:brightness(.9) saturate(.8);
+}
+
+/* ══ DOMAIN BADGES ══ */
+.dom-row{display:flex;gap:.3rem;flex-wrap:wrap;margin:.25rem 0}
+.dom-badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;
+  background:var(--card);border:1px solid var(--brd);color:var(--sub)}
+
+/* ══ MISC ══ */
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--brd),transparent);margin:.5rem 0}
+.centered{text-align:center}
+.flex{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.flex-center{display:flex;align-items:center;justify-content:center;gap:.5rem}
+select,input,textarea{font-family:inherit}
+.hidden{display:none!important}
+.txt-ac{color:var(--ac)}
+.badge{
+  display:inline-block;font-size:9px;font-weight:700;
+  padding:2px 8px;border-radius:20px;letter-spacing:.05em;
+  background:var(--card2);border:1px solid var(--brd2);color:var(--ac);
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="hdr-inner">
+    <div class="hdr-controls">
+      <button class="hdr-btn" id="themeBtn" title="تبديل المظهر">🌓</button>
+      <button class="hdr-btn" id="histBtn" title="السجل">🕘</button>
+    </div>
+    <div class="brand-row">
+      <span class="brand-dot">◆</span>
+      <span class="brand-name">Smart Voice Translator</span>
+      <span class="brand-dot">◆</span>
+    </div>
+    <h1>HN <span class="ac">TRANSLATOR</span></h1>
+    <div class="hdr-tags">
+      <span class="hdr-tag">🎙️ Voice</span>
+      <span class="hdr-tag">✍️ Text + AI</span>
+      <span class="hdr-tag">📸 Camera</span>
+      <span class="hdr-tag">🎬 Subtitles</span>
+      <span class="hdr-tag">🌍 Group</span>
+    </div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs-bar">
+  <button class="tab-btn active" data-tab="text">✍️ النص</button>
+  <button class="tab-btn" data-tab="voice">🎙️ الصوت</button>
+  <button class="tab-btn" data-tab="camera">📸 الكاميرا</button>
+  <button class="tab-btn" data-tab="file">📄 الملف</button>
+  <button class="tab-btn" data-tab="subtitle">🎬 ترجمة فيديو</button>
+  <button class="tab-btn" data-tab="group">🌍 محادثة جماعية</button>
+  <button class="tab-btn" data-tab="chat">🤖 المساعد</button>
+  <button class="tab-btn" data-tab="history">🕘 السجل</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- ══════════════ TEXT TAB ══════════════ -->
+<div class="tab-pane active" id="tab-text">
+  <!-- Lang row -->
+  <div class="lang-row">
+    <select id="srcLang" class="lang-select"></select>
+    <button class="swap-btn" id="swapBtn" title="تبديل اللغتين">⇄</button>
+    <select id="tgtLang" class="lang-select"></select>
+  </div>
+  <!-- Translate panels -->
+  <div class="translate-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <span>📝 النص الأصلي</span>
+        <div class="panel-actions">
+          <button class="p-btn" title="نسخ" onclick="copyText('srcText')">📋</button>
+          <button class="p-btn" title="مسح" onclick="clearSrc()">🗑️</button>
+        </div>
+      </div>
+      <div class="panel-bar"></div>
+      <textarea id="srcText" placeholder="اكتب النص هنا … يدعم العامية والأمثال واللهجات"></textarea>
+      <div class="char-count" id="charCount">0 / 5000</div>
+    </div>
+    <div class="panel" id="tgtPanel">
+      <div class="panel-header">
+        <span>🌐 الترجمة <span id="engineBadge" class="badge" style="display:none"></span></span>
+        <div class="panel-actions">
+          <button class="p-btn" title="نسخ" onclick="copyText('tgtText')">📋</button>
+          <button class="p-btn" title="قراءة بصوت" onclick="speakTgt()">🔊</button>
+        </div>
+      </div>
+      <div class="panel-bar"></div>
+      <div id="tgtText"><span class="tgt-placeholder">الترجمة تظهر هنا تلقائياً …</span></div>
+      <div id="loadingDot"></div>
+      <div id="tgtAudio"></div>
+    </div>
+  </div>
+  <!-- Spell suggestions -->
+  <div id="spellBox">
+    <span class="spell-label">🔤 هل تقصد؟</span>
+    <span id="spellPills"></span>
+  </div>
+  <!-- Domain badges -->
+  <div id="domainRow" class="dom-row"></div>
+</div>
+
+<!-- ══════════════ VOICE TAB ══════════════ -->
+<div class="tab-pane" id="tab-voice">
+  <div class="lang-row" style="margin-bottom:.5rem">
+    <select id="vSrcLang" class="lang-select"></select>
+    <button class="swap-btn" id="vSwap">⇄</button>
+    <select id="vTgtLang" class="lang-select"></select>
+  </div>
+  <div class="recorder">
+    <div class="rec-circle" id="recBtn">🎙️</div>
+    <div class="rec-label" id="recLabel">اضغط للتسجيل</div>
+    <div class="rec-time" id="recTime">00:00</div>
+    <button class="btn" id="sendRecBtn" style="display:none">🚀 ترجمة التسجيل</button>
+  </div>
+  <div id="voiceResult"></div>
+</div>
+
+<!-- ══════════════ CAMERA TAB ══════════════ -->
+<div class="tab-pane" id="tab-camera">
+  <div class="lang-row" style="margin-bottom:.5rem">
+    <select id="camSrcLang" class="lang-select" style="grid-column:1/4">لغة التسمية المصدر</select>
+    <select id="camTgtLang" class="lang-select"></select>
+  </div>
+  <div style="display:flex;gap:.5rem;margin-bottom:.7rem;flex-wrap:wrap">
+    <label class="upload-area" style="flex:1;min-width:200px;cursor:pointer">
+      📁 ارفع صورة
+      <input type="file" id="camFileInput" accept="image/*">
+    </label>
+    <button class="tool-btn" id="camCaptureBtn" style="flex:1;min-width:160px;justify-content:center">
+      <svg viewBox="0 0 24 24"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4z"/><path d="M9 3L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+      📷 فتح الكاميرا
+    </button>
+  </div>
+  <video id="camVideo" style="display:none;width:100%;border-radius:12px;border:1.5px solid var(--brd)" autoplay playsinline></video>
+  <button class="btn" id="snapBtn" style="display:none;width:100%;margin:.5rem 0">📸 التقاط</button>
+  <img id="camPreview" style="display:none;max-width:100%;border-radius:12px;border:1.5px solid var(--brd);margin:.4rem 0">
+  <div id="camResult"></div>
+</div>
+
+<!-- ══════════════ FILE TAB ══════════════ -->
+<div class="tab-pane" id="tab-file">
+  <div class="lang-row" style="margin-bottom:.7rem">
+    <select id="fileSrcLang" class="lang-select"></select>
+    <button class="swap-btn" id="fileSwap">⇄</button>
+    <select id="fileTgtLang" class="lang-select"></select>
+  </div>
+  <label class="upload-area">
+    📎 ارفع ملفاً (PDF · DOCX · XLSX · TXT)
+    <input type="file" id="fileInput" accept=".txt,.pdf,.docx,.xlsx,.xls">
+  </label>
+  <div class="progress-bar" id="fileProgress"><div class="progress-fill" id="fileFill"></div></div>
+  <div id="fileResult"></div>
+</div>
+
+<!-- ══════════════ SUBTITLE TAB ══════════════ -->
+<div class="tab-pane" id="tab-subtitle">
+  <div class="sh">🎯 اللغة الهدف للترجمة</div>
+  <select id="subTgtLang" class="lang-select" style="max-width:280px;margin-bottom:.8rem"></select>
+  <label class="upload-area">
+    🎵 ارفع ملف صوتي أو فيديو (MP3 · WAV · MP4 · WEBM · OGG)
+    <input type="file" id="subFileInput" accept=".mp3,.wav,.mp4,.webm,.ogg,.m4a,.mov">
+  </label>
+  <div class="progress-bar" id="subProgress"><div class="progress-fill" id="subFill"></div></div>
+  <div id="subResult"></div>
+</div>
+
+<!-- ══════════════ GROUP TAB ══════════════ -->
+<div class="tab-pane" id="tab-group">
+  <div class="group-banner">
+    🌍 <strong>المحادثة الجماعية</strong><br>
+    سجّل محادثة بين أشخاص يتحدثون بلغات مختلفة في وقت واحد —
+    يكتشف التطبيق لغة كل متحدث ويترجمه تلقائياً
+  </div>
+  <div class="sh">🎯 اللغة الهدف</div>
+  <select id="grpTgtLang" class="lang-select" style="max-width:280px;margin-bottom:.8rem"></select>
+  <div class="recorder" id="grpRecorder">
+    <div class="rec-circle" id="grpRecBtn">🎙️</div>
+    <div class="rec-label" id="grpRecLabel">اضغط لبدء التسجيل الجماعي</div>
+    <div class="rec-time" id="grpRecTime">00:00</div>
+    <button class="btn" id="grpSendBtn" style="display:none">🚀 تحليل وترجمة</button>
+  </div>
+  <div id="grpResult"></div>
+</div>
+
+<!-- ══════════════ CHAT TAB ══════════════ -->
+<div class="tab-pane" id="tab-chat">
+  <div class="lang-row" style="margin-bottom:.6rem">
+    <select id="chatSrcLang" class="lang-select"></select>
+    <button class="swap-btn" id="chatSwap">⇄</button>
+    <select id="chatTgtLang" class="lang-select"></select>
+  </div>
+  <div class="panel" style="margin-bottom:.5rem;min-height:320px">
+    <div class="panel-header">
+      <span>🤖 المساعد الذكي</span>
+      <button class="p-btn" onclick="clearChat()" title="مسح المحادثة">🗑️</button>
+    </div>
+    <div class="panel-bar"></div>
+    <div class="chat-messages" id="chatMsgs">
+      <div class="msg-a">
+        مرحباً! أنا مساعدك الذكي 🤖<br>
+        يمكنني: ترجمة الأمثال والتعابير · تصحيح الإملاء والنحو · تحويل العامية لفصحى · تلخيص النصوص · وأي طلب لغوي آخر
+      </div>
+    </div>
+    <div class="chat-typing" id="chatTyping">⏳ يفكر…</div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" class="chat-input" id="chatInput"
+           placeholder="اطلب أي شيء: صحح · لخّص · ترجم مثلاً · اشرح…">
+    <button class="chat-send-btn" id="chatSendBtn">إرسال ↵</button>
+  </div>
+</div>
+
+<!-- ══════════════ HISTORY TAB ══════════════ -->
+<div class="tab-pane" id="tab-history">
+  <div id="histPanel">
+    <div class="hist-header">
+      <span class="hist-title">🕘 سجل المحفوظات <span id="histCount" class="badge">0</span></span>
+      <div class="hist-actions">
+        <button class="hist-btn" id="exportHistBtn">📥 تصدير</button>
+        <button class="hist-btn" id="clearHistBtn">🗑️ مسح</button>
+      </div>
+    </div>
+    <div class="hist-list">
+      <div class="htl-wrap" id="histList">
+        <div class="hist-empty">
+          <span class="hist-empty-icon">📭</span>
+          <span class="hist-empty-txt">لا توجد محفوظات بعد</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════
+const API = '/api';
+
+const LANGS = [
+  "Auto-Detect","Arabic","English","Russian","Chinese","German","Spanish","French",
+  "Portuguese","Italian","Japanese","Korean","Turkish","Dutch","Polish","Ukrainian",
+  "Swedish","Danish","Finnish","Romanian","Hungarian","Czech","Bulgarian","Greek",
+  "Indonesian","Hindi","Persian","Hebrew","Urdu"
+];
+const GTTS = {
+  "Arabic":"ar","English":"en","Russian":"ru","Chinese":"zh-cn","German":"de",
+  "Spanish":"es","French":"fr","Portuguese":"pt","Italian":"it","Japanese":"ja",
+  "Korean":"ko","Turkish":"tr","Dutch":"nl","Polish":"pl","Ukrainian":"uk",
+  "Swedish":"sv","Danish":"da","Finnish":"fi","Romanian":"ro","Hungarian":"hu",
+  "Czech":"cs","Bulgarian":"bg","Greek":"el","Indonesian":"id","Hindi":"hi",
+  "Persian":"fa","Hebrew":"iw","Urdu":"ur","Auto-Detect":"en"
+};
+const DOMAINS = {
+  medical:   {e:"🏥",n:"طبي",   kw:["doctor","hospital","طبيب","مستشفى","علاج","دواء"]},
+  legal:     {e:"⚖️",n:"قانوني",kw:["contract","court","law","عقد","قانون","محكمة"]},
+  political: {e:"🏛️",n:"سياسي",kw:["minister","government","رئيس","وزير","برلمان"]},
+  economic:  {e:"📈",n:"اقتصادي",kw:["economic","investment","اقتصاد","استثمار"]},
+  scientific:{e:"🔬",n:"علمي",  kw:["research","experiment","بحث","تجربة"]},
+  military:  {e:"🎖️",n:"عسكري",kw:["military","army","جيش","عسكري","سلاح"]},
+  sports:    {e:"⚽",n:"رياضي", kw:["football","stadium","كرة","ملعب","فريق"]},
+  it:        {e:"💻",n:"تقني",  kw:["programming","software","برمجة","تطبيق"]},
+  religious: {e:"🕌",n:"ديني",  kw:["mosque","prayer","مسجد","صلاة","قرآن"]},
+  literary:  {e:"📖",n:"أدبي",  kw:["story","poem","قصة","شعر","رواية"]},
+};
+function quickDomain(txt){
+  const tl=txt.toLowerCase();
+  return Object.entries(DOMAINS)
+    .map(([k,v])=>[k,v.kw.reduce((s,w)=>s+(tl.includes(w)?1:0),0)])
+    .filter(([,s])=>s>0).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>k);
+}
+
+// ════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════
+let srcLang="Auto-Detect", tgtLang="Arabic";
+let translateTimer=null, spellTimer=null;
+let chatHistory=[];
+let mediaRecorder=null, recChunks=[], recInterval=null, recSecs=0;
+let grpRecorder=null, grpChunks=[], grpInterval=null, grpSecs=0;
+let camStream=null;
+let history=JSON.parse(localStorage.getItem("hn_hist")||"[]");
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+function populateLangs(){
+  const selects=[
+    ["srcLang","Auto-Detect"], ["tgtLang","Arabic"],
+    ["vSrcLang","Auto-Detect"],["vTgtLang","Arabic"],
+    ["camSrcLang","Auto-Detect"],["camTgtLang","Arabic"],
+    ["fileSrcLang","Auto-Detect"],["fileTgtLang","Arabic"],
+    ["subTgtLang","Arabic"],["grpTgtLang","Arabic"],
+    ["chatSrcLang","Auto-Detect"],["chatTgtLang","Arabic"],
+  ];
+  selects.forEach(([id,def])=>{
+    const sel=document.getElementById(id); if(!sel) return;
+    const list = id.includes("Tgt")||id==="subTgtLang"||id==="grpTgtLang"
+      ? LANGS.filter(l=>l!=="Auto-Detect") : LANGS;
+    list.forEach(l=>{
+      const o=document.createElement("option");
+      o.value=l; o.textContent=l; if(l===def) o.selected=true;
+      sel.appendChild(o);
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  populateLangs();
+  renderHistory();
+  setupTheme();
+  setupTabs();
+  setupTextTab();
+  setupVoice();
+  setupCamera();
+  setupFile();
+  setupSubtitle();
+  setupGroup();
+  setupChat();
+  setupHistActions();
+});
+
+// ════════════════════════════════════════════════════════
+//  THEME
+// ════════════════════════════════════════════════════════
+function setupTheme(){
+  const btn=document.getElementById("themeBtn");
+  const saved=localStorage.getItem("hn_theme")||"dark";
+  if(saved==="light") document.body.classList.add("light");
+  btn.addEventListener("click",()=>{
+    document.body.classList.toggle("light");
+    const m=document.body.classList.contains("light");
+    btn.textContent=m?"🌙":"🌓";
+    localStorage.setItem("hn_theme",m?"light":"dark");
+  });
+  if(saved==="light") btn.textContent="🌙";
+}
+
+// ════════════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════════════
+function setupTabs(){
+  document.querySelectorAll(".tab-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+      document.querySelectorAll(".tab-pane").forEach(p=>p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-"+btn.dataset.tab).classList.add("active");
+    });
+  });
+  document.getElementById("histBtn").addEventListener("click",()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab-pane").forEach(p=>p.classList.remove("active"));
+    document.querySelector('[data-tab="history"]').classList.add("active");
+    document.getElementById("tab-history").classList.add("active");
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════════
+function toast(msg,isErr=false){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.className="show"+(isErr?" err":"");
+  setTimeout(()=>t.className="",3000);
+}
+function copyText(id){
+  const el=document.getElementById(id);
+  const txt = el.tagName==="TEXTAREA" ? el.value : el.innerText.replace(/الترجمة تظهر هنا.*/,"").trim();
+  if(!txt) return;
+  navigator.clipboard.writeText(txt).then(()=>toast("✅ تم النسخ")).catch(()=>toast("❌ فشل النسخ",true));
+}
+function showLoading(show){
+  document.getElementById("loadingDot").style.display=show?"block":"none";
+}
+function makeDlBtn(label,content,filename,mime="text/plain"){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download=filename; a.className="btn-outline";
+  a.style.cssText="display:inline-block;padding:.42rem 1rem;margin:.2rem;text-decoration:none";
+  a.textContent=label; return a;
+}
+
+// ════════════════════════════════════════════════════════
+//  HISTORY
+// ════════════════════════════════════════════════════════
+function saveHistory(item){
+  history.unshift({...item, time:new Date().toLocaleString("ar-EG")});
+  history=history.slice(0,150);
+  localStorage.setItem("hn_hist",JSON.stringify(history));
+  renderHistory();
+}
+function renderHistory(){
+  const list=document.getElementById("histList");
+  const cnt=document.getElementById("histCount");
+  if(cnt) cnt.textContent=history.length;
+  if(!history.length){
+    list.innerHTML='<div class="hist-empty"><span class="hist-empty-icon">📭</span><span class="hist-empty-txt">لا توجد محفوظات بعد</span></div>';
+    return;
+  }
+  list.innerHTML='';
+  history.forEach((it,i)=>{
+    const eng=it.engine||"";
+    let dot="var(--ac)"; let tag="◎ Google"; let icon="🌐";
+    if(eng.includes("AI")||eng.includes("Groq")){dot="#4ECBA0";tag="✦ AI";icon="🤖"}
+    else if(eng.includes("DeepL")){dot="#6ea8fe";tag="⬡ DeepL";icon="⚡"}
+
+    const div=document.createElement("div");
+    div.className="htl";
+    div.style.setProperty("--htl-dot",dot);
+    div.innerHTML=`
+<div class="htl-top">
+  <span class="htl-tag">${icon} ${tag}</span>
+  <span class="htl-time">${it.time||""}</span>
+</div>
+<div class="htl-orig">${(it.original||"").slice(0,55)}</div>
+<div class="htl-sep">
+  <div class="htl-sep-line"></div>
+  <span>↓</span>
+  <div class="htl-sep-line" style="background:linear-gradient(90deg,transparent,${dot})"></div>
+</div>
+<div class="htl-trans">${(it.translated||"").slice(0,55)}</div>
+<div class="htl-foot">
+  <span class="htl-lang">${it.target||""}</span>
+  <button class="htl-del" onclick="delHistory(${i})" title="حذف">✕</button>
+</div>`;
+    list.appendChild(div);
+  });
+}
+function delHistory(i){
+  history.splice(i,1);
+  localStorage.setItem("hn_hist",JSON.stringify(history));
+  renderHistory();
+}
+function setupHistActions(){
+  document.getElementById("clearHistBtn").addEventListener("click",()=>{
+    if(confirm("مسح جميع المحفوظات؟")){
+      history=[]; localStorage.removeItem("hn_hist"); renderHistory(); toast("✅ تم المسح");
+    }
+  });
+  document.getElementById("exportHistBtn").addEventListener("click",()=>{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(history,null,2)],{type:"application/json"}));
+    a.download="hn_history.json"; a.click();
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  TEXT TAB — auto-translate + spell check
+// ════════════════════════════════════════════════════════
+function setupTextTab(){
+  const src=document.getElementById("srcText");
+  const sl=document.getElementById("srcLang");
+  const tl=document.getElementById("tgtLang");
+
+  sl.addEventListener("change",()=>{srcLang=sl.value;triggerTranslate()});
+  tl.addEventListener("change",()=>{tgtLang=tl.value;triggerTranslate()});
+
+  document.getElementById("swapBtn").addEventListener("click",()=>{
+    if(srcLang==="Auto-Detect") return;
+    [srcLang,tgtLang]=[tgtLang,srcLang];
+    sl.value=srcLang; tl.value=tgtLang;
+    const cur=document.getElementById("tgtText").innerText.replace(/الترجمة.*/,"").trim();
+    if(cur && !cur.includes("تظهر")) src.value=cur;
+    triggerTranslate();
+  });
+
+  src.addEventListener("input",()=>{
+    const len=src.value.length;
+    document.getElementById("charCount").textContent=`${len} / 5000`;
+    clearTimeout(translateTimer); clearTimeout(spellTimer);
+    if(len<2){
+      document.getElementById("tgtText").innerHTML='<span class="tgt-placeholder">الترجمة تظهر هنا تلقائياً …</span>';
+      document.getElementById("spellBox").style.display="none";
+      document.getElementById("domainRow").innerHTML="";
+      showBadge(false); return;
+    }
+    translateTimer = setTimeout(()=>doTranslate(src.value),600);
+    spellTimer     = setTimeout(()=>doSpell(src.value),1500);
+    // domains
+    const doms=quickDomain(src.value);
+    document.getElementById("domainRow").innerHTML=
+      doms.map(d=>`<span class="dom-badge">${DOMAINS[d].e} ${DOMAINS[d].n}</span>`).join("");
+  });
+
+  src.addEventListener("keydown",e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==="Enter") doTranslate(src.value,true);
+  });
+}
+
+function triggerTranslate(){
+  const txt=document.getElementById("srcText").value.trim();
+  if(txt.length>=2) doTranslate(txt);
+}
+function clearSrc(){
+  document.getElementById("srcText").value="";
+  document.getElementById("tgtText").innerHTML='<span class="tgt-placeholder">الترجمة تظهر هنا تلقائياً …</span>';
+  document.getElementById("charCount").textContent="0 / 5000";
+  document.getElementById("spellBox").style.display="none";
+  document.getElementById("domainRow").innerHTML="";
+  document.getElementById("tgtAudio").innerHTML="";
+  showBadge(false);
+}
+function showBadge(show,eng=""){
+  const b=document.getElementById("engineBadge");
+  b.style.display=show?"inline-block":"none";
+  if(show) b.textContent=eng;
+}
+
+async function doTranslate(text,force=false){
+  if(!text||text.trim().length<2) return;
+  showLoading(true); showBadge(false);
+  try{
+    const res=await fetch(`${API}/translate`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text:text.trim(),target:tgtLang,source:srcLang})
+    });
+    const data=await res.json();
+    showLoading(false);
+    if(!res.ok||data.error){
+      document.getElementById("tgtText").innerHTML=`<span style="color:var(--err)">❌ ${data.error||"خطأ في الترجمة"}</span>`;
+      return;
+    }
+    document.getElementById("tgtText").textContent=data.translated;
+    showBadge(true,data.engine||"");
+    saveHistory({original:text.trim().slice(0,200),translated:data.translated.slice(0,200),
+                 engine:data.engine,target:tgtLang,source:srcLang});
+  }catch(e){
+    showLoading(false);
+    document.getElementById("tgtText").innerHTML='<span style="color:var(--err)">⚠️ خطأ في الاتصال. تحقق من الإنترنت.</span>';
+  }
+}
+
+async function speakTgt(){
+  const txt=document.getElementById("tgtText").innerText.replace(/الترجمة.*/,"").trim();
+  if(!txt||txt.length<2) return;
+  const lang=GTTS[tgtLang]||"en";
+  try{
+    const res=await fetch(`${API}/tts`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text:txt,lang})});
+    if(!res.ok) return;
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const box=document.getElementById("tgtAudio");
+    box.innerHTML=`<audio controls autoplay src="${url}" style="width:100%;margin-top:.3rem"></audio>`;
+  }catch(e){ toast("⚠️ التشغيل الصوتي غير متاح",true) }
+}
+
+async function doSpell(text){
+  if(!text||text.length<5) return;
+  try{
+    const res=await fetch(`${API}/spell`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text:text.trim().slice(0,400),lang:srcLang})});
+    const data=await res.json();
+    const sug=data.suggestions||[];
+    const box=document.getElementById("spellBox");
+    const pills=document.getElementById("spellPills");
+    if(!sug.length){box.style.display="none";return;}
+    pills.innerHTML=sug.map(s=>
+      `<span class="spell-pill" onclick="applySpell('${s.wrong}','${s.correct}')">`+
+      `<b>${s.correct}</b> ← <span style="text-decoration:line-through;opacity:.6">${s.wrong}</span>`+
+      (s.reason?` <small style="opacity:.5">(${s.reason})</small>`:"")+`</span>`
+    ).join("");
+    box.style.display="flex";
+  }catch(e){}
+}
+function applySpell(wrong,correct){
+  const src=document.getElementById("srcText");
+  src.value=src.value.replace(wrong,correct);
+  document.getElementById("spellBox").style.display="none";
+  doTranslate(src.value);
+}
+
+// ════════════════════════════════════════════════════════
+//  VOICE TAB
+// ════════════════════════════════════════════════════════
+function setupVoice(){
+  const btn=document.getElementById("recBtn");
+  const sendBtn=document.getElementById("sendRecBtn");
+  document.getElementById("vSwap").addEventListener("click",()=>{
+    const sl=document.getElementById("vSrcLang");
+    const tl=document.getElementById("vTgtLang");
+    const t=sl.value; sl.value=tl.value; tl.value=t;
+  });
+  btn.addEventListener("click",()=>{
+    if(!mediaRecorder||mediaRecorder.state==="inactive") startVoiceRec();
+    else stopVoiceRec();
+  });
+  sendBtn.addEventListener("click",()=>sendVoice());
+}
+function startVoiceRec(){
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    mediaRecorder=new MediaRecorder(stream); recChunks=[]; recSecs=0;
+    mediaRecorder.ondataavailable=e=>recChunks.push(e.data);
+    mediaRecorder.start(100);
+    document.getElementById("recBtn").classList.add("recording");
+    document.getElementById("recBtn").textContent="⏹️";
+    document.getElementById("recLabel").textContent="جارٍ التسجيل — اضغط للإيقاف";
+    document.getElementById("recTime").style.display="block";
+    recInterval=setInterval(()=>{
+      recSecs++;
+      const m=String(Math.floor(recSecs/60)).padStart(2,"0");
+      const s=String(recSecs%60).padStart(2,"0");
+      document.getElementById("recTime").textContent=`${m}:${s}`;
+    },1000);
+  }).catch(()=>toast("❌ لا يمكن الوصول للميكروفون",true));
+}
+function stopVoiceRec(){
+  mediaRecorder.stop();
+  mediaRecorder.onstop=()=>{
+    clearInterval(recInterval);
+    document.getElementById("recBtn").classList.remove("recording");
+    document.getElementById("recBtn").textContent="🎙️";
+    document.getElementById("recLabel").textContent="تم التسجيل — أرسله للترجمة";
+    document.getElementById("sendRecBtn").style.display="inline-block";
+  };
+}
+async function sendVoice(){
+  const blob=new Blob(recChunks,{type:"audio/webm"});
+  const sl=document.getElementById("vSrcLang").value;
+  const tl=document.getElementById("vTgtLang").value;
+  const fd=new FormData(); fd.append("audio",blob,"audio.webm"); fd.append("lang",sl);
+  const res=document.getElementById("voiceResult");
+  res.innerHTML='<div style="text-align:center;color:var(--sub);padding:1rem">⏳ التعرف على الكلام…</div>';
+  try{
+    const r=await fetch(`${API}/stt`,{method:"POST",body:fd});
+    const d=await r.json();
+    if(!r.ok||d.error){res.innerHTML=`<div style="color:var(--err)">❌ ${d.error}</div>`;return;}
+    const text=d.text;
+    const tr=await fetch(`${API}/translate`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text,target:tl,source:sl})});
+    const td=await tr.json();
+    res.innerHTML=`
+<div class="result-card">
+  <div class="rc-lbl">📝 النص المُعرَّف</div>
+  <div class="rc-body">${text}</div>
+</div>
+<div class="result-card">
+  <div class="rc-lbl">🌐 الترجمة <span class="badge">${td.engine||""}</span></div>
+  <div class="rc-body">${td.translated||""}</div>
+</div>`;
+    if(td.translated) saveHistory({original:text.slice(0,200),translated:td.translated.slice(0,200),
+      engine:td.engine,target:tl,source:sl});
+    document.getElementById("sendRecBtn").style.display="none";
+    document.getElementById("recLabel").textContent="اضغط للتسجيل";
+    document.getElementById("recTime").style.display="none"; recSecs=0;
+  }catch(e){res.innerHTML='<div style="color:var(--err)">⚠️ خطأ في الاتصال</div>';}
+}
+
+// ════════════════════════════════════════════════════════
+//  CAMERA TAB — Groq Vision OCR (FIXED)
+// ════════════════════════════════════════════════════════
+function setupCamera(){
+  document.getElementById("camFileInput").addEventListener("change",e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const reader=new FileReader();
+    reader.onload=ev=>processImage(ev.target.result);
+    reader.readAsDataURL(f);
+  });
+  document.getElementById("camCaptureBtn").addEventListener("click",toggleCam);
+  document.getElementById("snapBtn").addEventListener("click",snapPhoto);
+}
+async function toggleCam(){
+  const video=document.getElementById("camVideo");
+  const snap=document.getElementById("snapBtn");
+  const btn=document.getElementById("camCaptureBtn");
+  if(camStream){
+    camStream.getTracks().forEach(t=>t.stop()); camStream=null;
+    video.style.display="none"; snap.style.display="none";
+    btn.innerHTML=`<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4z"/><path d="M9 3L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg> 📷 فتح الكاميرا`;
+  } else {
+    try{
+      camStream=await navigator.mediaDevices.getUserMedia({video:true});
+      video.srcObject=camStream; video.style.display="block"; snap.style.display="block";
+      btn.textContent="⏹️ إغلاق الكاميرا";
+    }catch(e){toast("❌ لا يمكن الوصول للكاميرا",true)}
+  }
+}
+function snapPhoto(){
+  const video=document.getElementById("camVideo");
+  const canvas=document.createElement("canvas");
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext("2d").drawImage(video,0,0);
+  const dataUrl=canvas.toDataURL("image/jpeg",0.9);
+  document.getElementById("camPreview").src=dataUrl;
+  document.getElementById("camPreview").style.display="block";
+  processImage(dataUrl);
+  toggleCam();
+}
+async function processImage(dataUrl){
+  const tl=document.getElementById("camTgtLang").value;
+  const res=document.getElementById("camResult");
+  res.innerHTML='<div style="text-align:center;color:var(--sub);padding:1rem">⏳ استخراج النص…</div>';
+  try{
+    const r=await fetch(`${API}/ocr`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({image:dataUrl})});
+    const d=await r.json();
+    if(!r.ok||d.error){res.innerHTML=`<div style="color:var(--err)">❌ ${d.error}</div>`;return;}
+    const txt=d.text;
+    res.innerHTML=`
+<div class="result-card">
+  <div class="rc-lbl">📝 النص المستخرج <span class="badge">${d.model||"Groq Vision"}</span></div>
+  <div class="rc-body" dir="auto">${txt}</div>
+</div>
+<div style="text-align:center;color:var(--sub);padding:.5rem">⏳ الترجمة…</div>`;
+    const tr=await fetch(`${API}/translate`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text:txt,target:tl,source:"Auto-Detect"})});
+    const td=await tr.json();
+    res.innerHTML=`
+<div class="result-card">
+  <div class="rc-lbl">📝 النص المستخرج <span class="badge">${d.model||"Groq Vision"}</span></div>
+  <div class="rc-body" dir="auto">${txt}</div>
+</div>
+<div class="result-card">
+  <div class="rc-lbl">🌐 الترجمة <span class="badge">${td.engine||""}</span></div>
+  <div class="rc-body">${td.translated||""}</div>
+</div>
+<div class="flex" style="margin-top:.5rem;gap:.4rem">
+  ${(() => {
+    const a1=document.createElement("button"); a1.className="btn-outline";
+    a1.textContent="📋 نسخ الترجمة"; a1.onclick=()=>{
+      navigator.clipboard.writeText(td.translated||""); toast("✅ تم النسخ");
+    }; return a1.outerHTML;
+  })()}
+</div>`;
+    if(td.translated) saveHistory({original:txt.slice(0,200),translated:td.translated.slice(0,200),
+      engine:td.engine,target:tl,source:"Camera OCR"});
+  }catch(e){res.innerHTML='<div style="color:var(--err)">⚠️ خطأ في الاتصال</div>';}
+}
+
+// ════════════════════════════════════════════════════════
+//  FILE TAB
+// ════════════════════════════════════════════════════════
+function setupFile(){
+  document.getElementById("fileInput").addEventListener("change",e=>{
+    const f=e.target.files[0]; if(f) doFile(f);
+  });
+  document.getElementById("fileSwap").addEventListener("click",()=>{
+    const sl=document.getElementById("fileSrcLang");
+    const tl=document.getElementById("fileTgtLang");
+    const t=sl.value; sl.value=tl.value; tl.value=t;
+  });
+}
+async function doFile(file){
+  const sl=document.getElementById("fileSrcLang").value;
+  const tl=document.getElementById("fileTgtLang").value;
+  const prog=document.getElementById("fileProgress");
+  const fill=document.getElementById("fileFill");
+  const res=document.getElementById("fileResult");
+  prog.style.display="block"; fill.style.width="30%";
+  res.innerHTML='<div style="text-align:center;color:var(--sub);padding:1rem">⏳ استخراج وترجمة النص…</div>';
+  const fd=new FormData();
+  fd.append("file",file); fd.append("source_lang",sl); fd.append("target_lang",tl);
+  try{
+    fill.style.width="60%";
+    const r=await fetch(`${API}/file`,{method:"POST",body:fd});
+    const d=await r.json(); fill.style.width="100%";
+    setTimeout(()=>prog.style.display="none",500);
+    if(!r.ok||d.error){res.innerHTML=`<div style="color:var(--err)">❌ ${d.error}</div>`;return;}
+    res.innerHTML=`
+<div class="result-card">
+  <div class="rc-lbl">📄 النص الأصلي <small style="opacity:.5">${d.chars||0} حرف</small></div>
+  <div class="rc-body" style="max-height:160px;overflow-y:auto;font-size:14px;opacity:.8">${(d.original||"").slice(0,800)}${(d.original||"").length>800?"…":""}</div>
+</div>
+<div class="result-card">
+  <div class="rc-lbl">🌐 الترجمة الكاملة</div>
+  <div class="rc-body" style="max-height:220px;overflow-y:auto">${d.translated||""}</div>
+</div>`;
+    const box=res.querySelector(".result-card:last-child");
+    const a=makeDlBtn("📥 تحميل الترجمة",d.translated||"","translated.txt");
+    box.appendChild(a);
+    if(d.translated) saveHistory({original:(d.original||"").slice(0,200),
+      translated:(d.translated||"").slice(0,200),engine:"File",target:tl,source:sl});
+  }catch(e){
+    prog.style.display="none";
+    res.innerHTML='<div style="color:var(--err)">⚠️ خطأ في الاتصال</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  SUBTITLE TAB (FIXED)
+// ════════════════════════════════════════════════════════
+function setupSubtitle(){
+  document.getElementById("subFileInput").addEventListener("change",e=>{
+    const f=e.target.files[0]; if(f) doSubtitle(f);
+  });
+}
+async function doSubtitle(file){
+  const tl=document.getElementById("subTgtLang").value;
+  const prog=document.getElementById("subProgress");
+  const fill=document.getElementById("subFill");
+  const res=document.getElementById("subResult");
+  prog.style.display="block"; fill.style.width="20%";
+  res.innerHTML='<div style="text-align:center;color:var(--sub);padding:1.5rem">⏳ تفريغ الصوت وترجمته…<br><small style="opacity:.5">قد يستغرق دقيقة حسب حجم الملف</small></div>';
+  const fd=new FormData();
+  fd.append("audio",file); fd.append("target_lang",tl); fd.append("source_lang","Auto-Detect");
+  try{
+    fill.style.width="60%";
+    const r=await fetch(`${API}/subtitle`,{method:"POST",body:fd});
+    fill.style.width="90%";
+    const d=await r.json(); fill.style.width="100%";
+    setTimeout(()=>prog.style.display="none",500);
+    if(!r.ok||d.error){res.innerHTML=`<div style="color:var(--err)">❌ ${d.error}</div>`;return;}
+    const segs=d.segments||[];
+    const preview=segs.slice(0,12).map((b,i)=>`
+<div class="srt-line">
+  <span class="srt-num">${b.n||i+1}</span>
+  <span class="srt-time">${(b.s||"").replace(",",".")}</span>
+  <span class="srt-trans">${b.t||""}</span>
+</div>`).join("");
+    res.innerHTML=`
+<div class="result-card">
+  <div class="rc-lbl">✅ تم تفريغ ${d.count} مقطع</div>
+  <div style="max-height:280px;overflow-y:auto;margin-top:.5rem">${preview}${segs.length>12?`<div style="text-align:center;opacity:.5;font-size:12px;padding:.5rem">… و${segs.length-12} مقطعاً آخر</div>`:""}</div>
+</div>
+<div class="flex" style="margin-top:.6rem;gap:.4rem;flex-wrap:wrap">
+</div>`;
+    const box=res.querySelector(".flex");
+    [
+      ["📥 SRT أصلي",d.original_srt||"","original.srt"],
+      ["📥 SRT مترجم",d.translated_srt||"","translated.srt"],
+      ["📥 SRT ثنائي",d.bilingual_srt||"","bilingual.srt"],
+    ].forEach(([l,c,f])=>{const a=makeDlBtn(l,c,f);box.appendChild(a);});
+  }catch(e){
+    prog.style.display="none";
+    res.innerHTML='<div style="color:var(--err)">⚠️ خطأ في الاتصال</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  GROUP CHAT TAB
+// ════════════════════════════════════════════════════════
+function setupGroup(){
+  const btn=document.getElementById("grpRecBtn");
+  const sendBtn=document.getElementById("grpSendBtn");
+  btn.addEventListener("click",()=>{
+    if(!grpRecorder||grpRecorder.state==="inactive") startGrpRec();
+    else stopGrpRec();
+  });
+  sendBtn.addEventListener("click",()=>sendGroup());
+}
+function startGrpRec(){
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    grpRecorder=new MediaRecorder(stream); grpChunks=[]; grpSecs=0;
+    grpRecorder.ondataavailable=e=>grpChunks.push(e.data);
+    grpRecorder.start(100);
+    document.getElementById("grpRecBtn").classList.add("recording");
+    document.getElementById("grpRecBtn").textContent="⏹️";
+    document.getElementById("grpRecLabel").textContent="جارٍ التسجيل — اضغط للإيقاف";
+    document.getElementById("grpRecTime").style.display="block";
+    grpInterval=setInterval(()=>{
+      grpSecs++;
+      const m=String(Math.floor(grpSecs/60)).padStart(2,"0");
+      const s=String(grpSecs%60).padStart(2,"0");
+      document.getElementById("grpRecTime").textContent=`${m}:${s}`;
+    },1000);
+  }).catch(()=>toast("❌ لا يمكن الوصول للميكروفون",true));
+}
+function stopGrpRec(){
+  grpRecorder.stop();
+  grpRecorder.onstop=()=>{
+    clearInterval(grpInterval);
+    document.getElementById("grpRecBtn").classList.remove("recording");
+    document.getElementById("grpRecBtn").textContent="🎙️";
+    document.getElementById("grpRecLabel").textContent="تم التسجيل — أرسله للتحليل";
+    document.getElementById("grpSendBtn").style.display="inline-block";
+  };
+}
+const ICONS=["🧑","👤","👩","👱","🧔","🧕","👲","🧑‍💼","👩‍💼","🙍"];
+async function sendGroup(){
+  const blob=new Blob(grpChunks,{type:"audio/webm"});
+  const tl=document.getElementById("grpTgtLang").value;
+  const res=document.getElementById("grpResult");
+  res.innerHTML='<div style="text-align:center;color:var(--sub);padding:1.5rem">⏳ تمييز المتحدثين وترجمة اللغات…</div>';
+  const fd=new FormData(); fd.append("audio",blob,"audio.webm"); fd.append("target_lang",tl);
+  try{
+    const r=await fetch(`${API}/group`,{method:"POST",body:fd});
+    const d=await r.json();
+    if(!r.ok||d.error){res.innerHTML=`<div style="color:var(--err)">❌ ${d.error}</div>`;return;}
+    const results=d.results||[];
+    const spks=new Set(results.map(x=>x.spk)).size;
+    const hues=[140,200,30,280,60,340,100,240];
+    res.innerHTML=`<div style="text-align:center;font-size:12px;opacity:.6;margin-bottom:.6rem">${results.length} مقطع · ${spks} متحدث${spks>1?"ون":""}</div>`+
+      results.map(item=>{
+        const hue=hues[(item.spk-1)%hues.length];
+        const sc=`hsl(${hue},65%,62%)`; const bc=`hsl(${hue},65%,40%)`;
+        const ts=item.t1>0?`⏱ ${item.t0.toFixed(1)}s–${item.t1.toFixed(1)}s`:"";
+        return `<div class="cb" style="border-left:3px solid ${bc}">
+<div class="cb-hd">
+  <span class="cb-ic">${ICONS[Math.min(item.spk-1,9)]}</span>
+  <div>
+    <div class="cb-spk" style="color:${sc}">المتحدث ${item.spk}</div>
+    <div class="cb-lang">🌐 ${item.lang} ${ts?`<span class="cb-ts">${ts}</span>`:""}</div>
+  </div>
+</div>
+<div class="cb-orig">"${item.orig}"</div>
+<div class="cb-trans">${item.trans||"—"}</div>
+<div class="cb-eng">${item.eng||""}</div>
+</div>`;
+      }).join("");
+    if(results.length){
+      const log=results.map(x=>`المتحدث ${x.spk} (${x.lang}):\n  الأصلي: ${x.orig}\n  الترجمة: ${x.trans}\n`).join("\n");
+      const a=makeDlBtn("📥 تحميل المحضر",log,"transcript.txt");
+      a.style.display="block"; a.style.margin=".5rem 0";
+      res.appendChild(a);
+    }
+    document.getElementById("grpSendBtn").style.display="none";
+    document.getElementById("grpRecLabel").textContent="اضغط لبدء التسجيل الجماعي";
+    document.getElementById("grpRecTime").style.display="none"; grpSecs=0;
+  }catch(e){res.innerHTML='<div style="color:var(--err)">⚠️ خطأ في الاتصال</div>';}
+}
+
+// ════════════════════════════════════════════════════════
+//  AI CHAT TAB
+// ════════════════════════════════════════════════════════
+function setupChat(){
+  document.getElementById("chatSwap").addEventListener("click",()=>{
+    const sl=document.getElementById("chatSrcLang");
+    const tl=document.getElementById("chatTgtLang");
+    const t=sl.value; sl.value=tl.value; tl.value=t;
+  });
+  document.getElementById("chatSendBtn").addEventListener("click",sendChat);
+  document.getElementById("chatInput").addEventListener("keydown",e=>{
+    if((e.key==="Enter"&&!e.shiftKey)){e.preventDefault();sendChat();}
+  });
+}
+function appendMsg(role,text){
+  const box=document.getElementById("chatMsgs");
+  const div=document.createElement("div");
+  div.className=role==="user"?"msg-u":"msg-a";
+  div.textContent=text; box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+function clearChat(){
+  chatHistory=[];
+  document.getElementById("chatMsgs").innerHTML=
+    '<div class="msg-a">مرحباً! أنا مساعدك الذكي 🤖<br>يمكنني: ترجمة الأمثال · تصحيح الإملاء · تلخيص النصوص · وأي طلب لغوي آخر</div>';
+}
+async function sendChat(){
+  const input=document.getElementById("chatInput");
+  const msg=input.value.trim(); if(!msg) return;
+  appendMsg("user",msg); input.value=""; chatHistory.push({role:"user",content:msg});
+  document.getElementById("chatTyping").style.display="block";
+  const sl=document.getElementById("chatSrcLang").value;
+  const tl=document.getElementById("chatTgtLang").value;
+  const srcTxt=document.getElementById("srcText").value.trim();
+  const tgtTxt=document.getElementById("tgtText").innerText.replace(/الترجمة.*/,"").trim();
+  try{
+    const r=await fetch(`${API}/chat`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message:msg,source_text:srcTxt,current_translation:tgtTxt,
+        source_lang:sl,target_lang:tl,history:chatHistory.slice(0,-1)})});
+    const d=await r.json();
+    document.getElementById("chatTyping").style.display="none";
+    const reply=d.reply||d.error||"⚠️ لا يوجد رد";
+    appendMsg("assistant",reply); chatHistory.push({role:"assistant",content:reply});
+    if(chatHistory.length>20) chatHistory=chatHistory.slice(-20);
+  }catch(e){
+    document.getElementById("chatTyping").style.display="none";
+    appendMsg("assistant","⚠️ خطأ في الاتصال — تحقق من الإنترنت");
+  }
+}
+</script>
+</body>
+</html>
+ENDOFHTML
+echo "✅ index.html: $(wc -l < /mnt/user-data/outputs/hn_vercel/index.html) lines"
