@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HN TRANSLATOR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* تم نقل نفس الـ CSS الخاص بك مع تعديلات بسيطة ليتوافق مع HTML */
+        :root{--c-ai:#4ECBA0;--c-dl:#6ea8fe;--c-go:#f4a261}
+        body{background:linear-gradient(135deg,#07071a 0%,#0c1525 55%,#070f1a 100%);color:#F0F4FF;font-family:'Tajawal','Space Grotesk',sans-serif;margin:0;padding:0}
+        .app-container{display:flex;min-height:100vh}
+        .sidebar{width:300px;background:linear-gradient(180deg,#06061a 0%,#0a1020 60%,#070d1a 100%);border-left:1px solid rgba(78,203,160,.2);padding:20px;overflow-y:auto}
+        .main{flex:1;padding:30px;max-width:1000px;margin:0 auto}
+        .hdr{text-align:center;padding:20px 0}
+        .hdr h1{font-size:30px;color:#F0F4FF;margin:0}
+        .hdr h1 .ac{color:#4ECBA0}
+        .hdr .tags{display:flex;justify-content:center;gap:8px;margin-top:10px}
+        .hdr .tag{font-size:10px;background:rgba(78,203,160,.08);border:1px solid rgba(78,203,160,.2);border-radius:20px;padding:3px 10px;color:rgba(78,203,160,.78)}
+        .panel{background:rgba(255,255,255,.025);border:1px solid rgba(78,203,160,.2);border-radius:14px;padding:15px;margin-bottom:20px}
+        textarea{width:100%;background:#0f1827;color:#F0F4FF;border:2px solid rgba(78,203,160,.2);border-radius:12px;padding:14px;font-size:17px;font-family:'Tajawal';box-sizing:border-box}
+        button{background:linear-gradient(135deg,#4ECBA0,#1a9d6a);color:#041510;font-weight:700;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;transition:0.2s}
+        button:hover{filter:brightness(1.1);transform:translateY(-2px)}
+        .btn-sec{background:transparent;border:1px solid rgba(78,203,160,.2);color:#4ECBA0}
+        .t-panel{background:#0f1827;border:2px solid rgba(78,203,160,.2);border-radius:12px;padding:15px;min-height:100px;font-size:17px;line-height:1.8}
+        .htl{background:rgba(78,203,160,.06);border:1px solid rgba(78,203,160,.2);border-left:3px solid var(--c-ai);border-radius:0 12px 12px 0;padding:10px;margin-bottom:10px}
+        select, input[type="file"]{background:#0f1827;color:#F0F4FF;border:1px solid rgba(78,203,160,.2);border-radius:8px;padding:8px;margin-bottom:10px}
+        audio{width:100%;margin-top:10px}
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="sidebar">
+        <h3>🕘 سجل المحفوظات</h3>
+        <div id="history-list"></div>
+    </div>
+    <div class="main">
+        <div class="hdr">
+            <h1>HN <span class="ac">TRANSLATOR</span></h1>
+            <div class="tags">
+                <span class="tag">🎙️ Voice</span><span class="tag">✍️ Text + AI</span>
+                <span class="tag">📸 Vision</span><span class="tag">🎬 Subtitles</span><span class="tag">🌍 Group</span>
+            </div>
+        </div>
+
+        <div class="panel" style="display:flex;gap:10px;align-items:center">
+            <select id="src_lang" onchange="translateText()"></select>
+            <button class="btn-sec" onclick="swapLangs()">⇄</button>
+            <select id="tgt_lang" onchange="translateText()"></select>
+        </div>
+
+        <div class="panel">
+            <textarea id="input_text" placeholder="اكتب النص..." oninput="translateText()"></textarea>
+            <div style="margin-top:10px" id="t_panel" class="t-panel">الترجمة تظهر هنا تلقائياً...</div>
+            <button onclick="speakText()">🔊 استماع</button>
+        </div>
+
+        <div class="panel">
+            <h3>🎙️ التعرف على الصوت</h3>
+            <input type="file" id="audio_file" accept="audio/*">
+            <button onclick="transcribeAudio()">ترجمة صوتية</button>
+            <p id="stt_result"></p>
+        </div>
+
+        <div class="panel">
+            <h3>📸 استخراج نص من صورة</h3>
+            <input type="file" id="img_file" accept="image/*">
+            <button onclick="ocrImage()">استخراج وترجمة</button>
+            <p id="ocr_result"></p>
+        </div>
+    </div>
+</div>
+
+<script>
+const LANGS = ["Auto-Detect","Arabic","English","Russian","Chinese","German","Spanish","French","Portuguese","Italian","Japanese","Korean","Turkish","Dutch","Polish","Ukrainian","Swedish","Danish","Finnish","Romanian","Hungarian","Czech","Bulgarian","Greek","Indonesian","Hindi","Persian","Hebrew","Urdu"];
+const tts_map = {"Auto-Detect":"en","Arabic":"ar","English":"en","Russian":"ru","Chinese":"zh-cn","German":"de","Spanish":"es","French":"fr","Portuguese":"pt","Italian":"it","Japanese":"ja","Korean":"ko","Turkish":"tr","Dutch":"nl","Polish":"pl","Ukrainian":"uk","Swedish":"sv","Danish":"da","Finnish":"fi","Romanian":"ro","Hungarian":"hu","Czech":"cs","Bulgarian":"bg","Greek":"el","Indonesian":"id","Hindi":"hi","Persian":"fa","Hebrew":"iw","Urdu":"ur"};
+
+// Populate dropdowns
+const src_sel = document.getElementById('src_lang');
+const tgt_sel = document.getElementById('tgt_lang');
+LANGS.forEach(l => {
+    src_sel.add(new Option(l, l));
+    if(l !== "Auto-Detect") tgt_sel.add(new Option(l, l));
+});
+src_sel.value = "Auto-Detect";
+tgt_sel.value = "Arabic";
+
+function swapLangs() {
+    let s = src_sel.value, t = tgt_sel.value;
+    src_sel.value = t;
+    tgt_sel.value = s === "Auto-Detect" ? "Arabic" : s;
+    translateText();
+}
+
+async function translateText() {
+    const text = document.getElementById('input_text').value.trim();
+    if(text.length < 3) return;
+    
+    const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: text, tgt: tgt_sel.value, src: src_sel.value})
+    });
+    const data = await res.json();
+    if(data.trans) {
+        document.getElementById('t_panel').innerText = data.trans;
+        saveHistory(text, data.trans, tgt_sel.value, data.eng);
+    }
+}
+
+async function speakText() {
+    const text = document.getElementById('t_panel').innerText;
+    const lang = tts_map[tgt_sel.value];
+    const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: text, lang: lang})
+    });
+    const data = await res.json();
+    if(data.audio) {
+        const audio = new Audio('data:audio/mp3;base64,' + data.audio);
+        audio.play();
+    }
+}
+
+async function transcribeAudio() {
+    const file = document.getElementById('audio_file').files[0];
+    if(!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('lang', LANGS.find(l => l.includes(src_sel.value)) || 'auto');
+    
+    document.getElementById('stt_result').innerText = "جاري المعالجة...";
+    const res = await fetch('/api/stt', {method: 'POST', body: fd});
+    const data = await res.json();
+    if(data.txt) document.getElementById('stt_result').innerText = data.txt;
+    else document.getElementById('stt_result').innerText = "خطأ: " + data.err;
+}
+
+async function ocrImage() {
+    const file = document.getElementById('img_file').files[0];
+    if(!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    
+    document.getElementById('ocr_result').innerText = "جاري الاستخراج...";
+    const res = await fetch('/api/ocr', {method: 'POST', body: fd});
+    const data = await res.json();
+    if(data.txt) {
+        document.getElementById('input_text').value = data.txt;
+        translateText();
+    } else document.getElementById('ocr_result').innerText = "خطأ: " + data.err;
+}
+
+// History Management (LocalStorage)
+function saveHistory(orig, trans, tgt, eng) {
+    let hist = JSON.parse(localStorage.getItem('hn_hist') || '[]');
+    hist.unshift({orig, trans, tgt, eng, time: new Date().toLocaleString('ar-EG')});
+    if(hist.length > 50) hist = hist.slice(0, 50);
+    localStorage.setItem('hn_hist', JSON.stringify(hist));
+    renderHistory();
+}
+
+function renderHistory() {
+    let hist = JSON.parse(localStorage.getItem('hn_hist') || '[]');
+    let html = hist.map((h, i) => `
+        <div class="htl">
+            <small>${h.eng} - ${h.time}</small>
+            <div style="opacity:0.6;font-size:12px">${h.orig.substring(0,40)}...</div>
+            <div style="font-weight:bold;font-size:14px">${h.trans.substring(0,40)}...</div>
+            <button class="btn-sec" style="font-size:10px;padding:2px 5px" onclick="deleteHist(${i})">حذف</button>
+        </div>
+    `).join('');
+    document.getElementById('history-list').innerHTML = html || '<small>لا يوجد سجل</small>';
+}
+
+function deleteHist(i) {
+    let hist = JSON.parse(localStorage.getItem('hn_hist') || '[]');
+    hist.splice(i, 1);
+    localStorage.setItem('hn_hist', JSON.stringify(hist));
+    renderHistory();
+}
+
+renderHistory();
+</script>
+</body>
+</html>
