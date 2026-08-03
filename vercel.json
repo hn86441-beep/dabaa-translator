@@ -1,13 +1,18 @@
 {
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index" }
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
   ]
 }
-EOF
-
-python3 -c "
-import ast
-src=open('/mnt/user-data/outputs/hn_vercel/api/index.py').read()
-ast.parse(src)
-print('✅ backend OK')
-"
