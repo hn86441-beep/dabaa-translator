@@ -6,34 +6,48 @@
     <title>HN TRANSLATOR</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        /* تم نقل نفس الـ CSS الخاص بك مع تعديلات بسيطة ليتوافق مع HTML */
         :root{--c-ai:#4ECBA0;--c-dl:#6ea8fe;--c-go:#f4a261}
-        body{background:linear-gradient(135deg,#07071a 0%,#0c1525 55%,#070f1a 100%);color:#F0F4FF;font-family:'Tajawal','Space Grotesk',sans-serif;margin:0;padding:0}
-        .app-container{display:flex;min-height:100vh}
-        .sidebar{width:300px;background:linear-gradient(180deg,#06061a 0%,#0a1020 60%,#070d1a 100%);border-left:1px solid rgba(78,203,160,.2);padding:20px;overflow-y:auto}
-        .main{flex:1;padding:30px;max-width:1000px;margin:0 auto}
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{background:linear-gradient(135deg,#07071a 0%,#0c1525 55%,#070f1a 100%);color:#F0F4FF;font-family:'Tajawal','Space Grotesk',sans-serif;min-height:100vh}
+        .app{display:flex;min-height:100vh}
+        .sidebar{width:320px;background:linear-gradient(180deg,#06061a 0%,#0a1020 60%,#070d1a 100%);border-left:1px solid rgba(78,203,160,.2);padding:20px;overflow-y:auto;position:sticky;top:0;height:100vh}
+        .main{flex:1;padding:40px;max-width:1000px;margin:0 auto}
         .hdr{text-align:center;padding:20px 0}
-        .hdr h1{font-size:30px;color:#F0F4FF;margin:0}
+        .hdr h1{font-size:32px;color:#F0F4FF;letter-spacing:-.02em;text-shadow:0 0 40px #4ECBA038}
         .hdr h1 .ac{color:#4ECBA0}
-        .hdr .tags{display:flex;justify-content:center;gap:8px;margin-top:10px}
-        .hdr .tag{font-size:10px;background:rgba(78,203,160,.08);border:1px solid rgba(78,203,160,.2);border-radius:20px;padding:3px 10px;color:rgba(78,203,160,.78)}
-        .panel{background:rgba(255,255,255,.025);border:1px solid rgba(78,203,160,.2);border-radius:14px;padding:15px;margin-bottom:20px}
-        textarea{width:100%;background:#0f1827;color:#F0F4FF;border:2px solid rgba(78,203,160,.2);border-radius:12px;padding:14px;font-size:17px;font-family:'Tajawal';box-sizing:border-box}
-        button{background:linear-gradient(135deg,#4ECBA0,#1a9d6a);color:#041510;font-weight:700;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;transition:0.2s}
+        .hdr .tags{display:flex;justify-content:center;gap:8px;margin-top:15px;flex-wrap:wrap}
+        .hdr .tag{font-size:10px;background:rgba(78,203,160,.08);border:1px solid rgba(78,203,160,.2);border-radius:20px;padding:4px 12px;color:rgba(78,203,160,.78)}
+        .tabs{display:flex;gap:5px;border-bottom:1px solid rgba(78,203,160,.2);margin:30px 0 20px;flex-wrap:wrap}
+        .tab{padding:12px 20px;cursor:pointer;font-weight:600;color:#8fa8c8;border:none;background:transparent;border-radius:8px 8px 0 0;font-family:'Tajawal';font-size:14px;transition:0.2s}
+        .tab.active{background:rgba(78,203,160,.08);color:#4ECBA0;border-bottom:2px solid #4ECBA0}
+        .tab-content{display:none}
+        .tab-content.active{display:block}
+        .card{background:rgba(78,203,160,.05);border:1px solid rgba(78,203,160,.2);border-radius:12px;padding:20px;margin-bottom:20px}
+        textarea{width:100%;background:#0f1827;color:#F0F4FF;border:2px solid rgba(78,203,160,.2);border-radius:12px;padding:15px;font-size:17px;font-family:'Tajawal';resize:vertical;min-height:150px}
+        textarea:focus{outline:none;border-color:#4ECBA0;box-shadow:0 0 0 3px #4ECBA022}
+        .t-panel{background:#0f1827;border:2px solid rgba(78,203,160,.2);border-radius:12px;padding:15px;min-height:100px;font-size:17px;line-height:1.8;font-weight:600;margin-top:15px}
+        button{background:linear-gradient(135deg,#4ECBA0,#1a9d6a);color:#041510;font-weight:700;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;transition:0.2s;font-family:'Tajawal';font-size:14px}
         button:hover{filter:brightness(1.1);transform:translateY(-2px)}
-        .btn-sec{background:transparent;border:1px solid rgba(78,203,160,.2);color:#4ECBA0}
-        .t-panel{background:#0f1827;border:2px solid rgba(78,203,160,.2);border-radius:12px;padding:15px;min-height:100px;font-size:17px;line-height:1.8}
-        .htl{background:rgba(78,203,160,.06);border:1px solid rgba(78,203,160,.2);border-left:3px solid var(--c-ai);border-radius:0 12px 12px 0;padding:10px;margin-bottom:10px}
-        select, input[type="file"]{background:#0f1827;color:#F0F4FF;border:1px solid rgba(78,203,160,.2);border-radius:8px;padding:8px;margin-bottom:10px}
+        .btn-sec{background:transparent;border:1px solid rgba(78,203,160,.3);color:#4ECBA0}
+        select, input[type="file"]{background:#0f1827;color:#F0F4FF;border:1px solid rgba(78,203,160,.2);border-radius:8px;padding:10px;margin:5px 0;font-family:'Tajawal'}
+        .htl{background:rgba(78,203,160,.06);border:1px solid rgba(78,203,160,.2);border-left:3px solid var(--c-ai);border-radius:0 12px 12px 0;padding:12px;margin-bottom:10px;position:relative}
+        .htl-time{font-size:10px;opacity:.5;font-family:monospace}
+        .htl-o{font-size:12px;opacity:.6;margin:5px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .htl-tr{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .chat-box{max-height:400px;overflow-y:auto;margin-bottom:15px;padding:10px;background:rgba(0,0,0,.1);border-radius:12px}
+        .msg-u{text-align:right;background:rgba(78,203,160,.1);padding:10px 15px;border-radius:12px;margin-bottom:10px;margin-left:20%}
+        .msg-a{text-align:right;background:rgba(255,255,255,.04);padding:10px 15px;border-radius:12px;margin-bottom:10px;margin-right:20%;border-right:3px solid #4ECBA0}
         audio{width:100%;margin-top:10px}
+        .srt-line{display:flex;gap:15px;padding:8px 0;border-bottom:1px solid rgba(78,203,160,.1);font-size:14px}
     </style>
 </head>
 <body>
-<div class="app-container">
+<div class="app">
     <div class="sidebar">
-        <h3>🕘 سجل المحفوظات</h3>
+        <h3 style="color:#4ECBA0;letter-spacing:.1em;font-size:12px;margin-bottom:15px">🕘 سجل المحفوظات</h3>
         <div id="history-list"></div>
     </div>
+    
     <div class="main">
         <div class="hdr">
             <h1>HN <span class="ac">TRANSLATOR</span></h1>
@@ -43,30 +57,94 @@
             </div>
         </div>
 
-        <div class="panel" style="display:flex;gap:10px;align-items:center">
+        <div class="card" style="display:flex;gap:10px;align-items:center;justify-content:center">
             <select id="src_lang" onchange="translateText()"></select>
             <button class="btn-sec" onclick="swapLangs()">⇄</button>
             <select id="tgt_lang" onchange="translateText()"></select>
         </div>
 
-        <div class="panel">
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab(0)">✍️ Text + AI</button>
+            <button class="tab" onclick="switchTab(1)">🎙️ Voice</button>
+            <button class="tab" onclick="switchTab(2)">📄 File</button>
+            <button class="tab" onclick="switchTab(3)">📸 Camera</button>
+            <button class="tab" onclick="switchTab(4)">🎬 Subtitles</button>
+            <button class="tab" onclick="switchTab(5)">🌍 Group</button>
+        </div>
+
+        <!-- Tab 0: Text + AI -->
+        <div class="tab-content active" id="tab-0">
             <textarea id="input_text" placeholder="اكتب النص..." oninput="translateText()"></textarea>
-            <div style="margin-top:10px" id="t_panel" class="t-panel">الترجمة تظهر هنا تلقائياً...</div>
-            <button onclick="speakText()">🔊 استماع</button>
+            <div class="t-panel" id="t_panel">الترجمة تظهر هنا تلقائياً...</div>
+            <div style="margin-top:15px; display:flex; gap:10px">
+                <button onclick="speakText('t_panel')">🔊 استماع</button>
+                <button onclick="copyText('t_panel')" class="btn-sec">📋 نسخ</button>
+            </div>
+            <div class="card" style="margin-top:30px">
+                <h3 style="color:#4ECBA0;margin-bottom:15px">🤖 مساعد الذكاء الاصطناعي</h3>
+                <div class="chat-box" id="chat_box"></div>
+                <div style="display:flex;gap:10px">
+                    <input type="text" id="chat_input" placeholder="اسأل المساعد..." style="flex:1;background:#0f1827;color:#F0F4FF;border:1px solid rgba(78,203,160,.2);border-radius:8px;padding:10px" onkeypress="if(event.key==='Enter')sendChat()">
+                    <button onclick="sendChat()">إرسال</button>
+                </div>
+            </div>
         </div>
 
-        <div class="panel">
-            <h3>🎙️ التعرف على الصوت</h3>
-            <input type="file" id="audio_file" accept="audio/*">
-            <button onclick="transcribeAudio()">ترجمة صوتية</button>
-            <p id="stt_result"></p>
+        <!-- Tab 1: Voice -->
+        <div class="tab-content" id="tab-1">
+            <div class="card">
+                <h3 style="color:#4ECBA0;margin-bottom:15px">🎙️ تسجيل صوتي</h3>
+                <input type="file" id="audio_file" accept="audio/*">
+                <button onclick="transcribeAudio()">ترجمة صوتية</button>
+                <p id="stt_status" style="margin-top:10px;opacity:.7"></p>
+                <div class="t-panel" id="voice_panel" style="margin-top:15px">سيظهر النص والترجمة هنا...</div>
+                <button onclick="speakText('voice_panel')" style="margin-top:10px">🔊 استماع للترجمة</button>
+            </div>
         </div>
 
-        <div class="panel">
-            <h3>📸 استخراج نص من صورة</h3>
-            <input type="file" id="img_file" accept="image/*">
-            <button onclick="ocrImage()">استخراج وترجمة</button>
-            <p id="ocr_result"></p>
+        <!-- Tab 2: File -->
+        <div class="tab-content" id="tab-2">
+            <div class="card">
+                <h3 style="color:#4ECBA0;margin-bottom:15px">📄 ترجمة الملفات</h3>
+                <input type="file" id="doc_file" accept=".txt,.pdf,.docx,.xlsx,.xls">
+                <button onclick="translateFile()">ترجمة الملف</button>
+                <p id="file_status" style="margin-top:10px;opacity:.7"></p>
+                <div class="t-panel" id="file_panel" style="margin-top:15px;max-height:300px;overflow-y:auto">ترجمة الملف ستظهر هنا...</div>
+                <button onclick="speakText('file_panel')" style="margin-top:10px">🔊 استماع</button>
+            </div>
+        </div>
+
+        <!-- Tab 3: Camera/OCR -->
+        <div class="tab-content" id="tab-3">
+            <div class="card">
+                <h3 style="color:#4ECBA0;margin-bottom:15px">📸 استخراج نص من صورة</h3>
+                <input type="file" id="img_file" accept="image/*">
+                <button onclick="ocrImage()">استخراج وترجمة</button>
+                <p id="ocr_status" style="margin-top:10px;opacity:.7"></p>
+                <div class="t-panel" id="ocr_panel" style="margin-top:15px">النص المستخرج والترجمة سيظهرون هنا...</div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Subtitles -->
+        <div class="tab-content" id="tab-4">
+            <div class="card">
+                <h3 style="color:#4ECBA0;margin-bottom:15px">🎬 ترجمة الفيديو (SRT)</h3>
+                <input type="file" id="video_file" accept="audio/*,video/*">
+                <button onclick="generateSRT()">استخراج وترجمة الترجمات</button>
+                <p id="srt_status" style="margin-top:10px;opacity:.7"></p>
+                <div id="srt_output" style="margin-top:15px"></div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Group Chat -->
+        <div class="tab-content" id="tab-5">
+            <div class="card">
+                <h3 style="color:#4ECBA0;margin-bottom:15px">🌍 ترجمة محادثات جماعية</h3>
+                <input type="file" id="group_file" accept="audio/*">
+                <button onclick="analyzeGroup()">تحليل وترجمة</button>
+                <p id="group_status" style="margin-top:10px;opacity:.7"></p>
+                <div id="group_output" style="margin-top:15px"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -75,88 +153,169 @@
 const LANGS = ["Auto-Detect","Arabic","English","Russian","Chinese","German","Spanish","French","Portuguese","Italian","Japanese","Korean","Turkish","Dutch","Polish","Ukrainian","Swedish","Danish","Finnish","Romanian","Hungarian","Czech","Bulgarian","Greek","Indonesian","Hindi","Persian","Hebrew","Urdu"];
 const tts_map = {"Auto-Detect":"en","Arabic":"ar","English":"en","Russian":"ru","Chinese":"zh-cn","German":"de","Spanish":"es","French":"fr","Portuguese":"pt","Italian":"it","Japanese":"ja","Korean":"ko","Turkish":"tr","Dutch":"nl","Polish":"pl","Ukrainian":"uk","Swedish":"sv","Danish":"da","Finnish":"fi","Romanian":"ro","Hungarian":"hu","Czech":"cs","Bulgarian":"bg","Greek":"el","Indonesian":"id","Hindi":"hi","Persian":"fa","Hebrew":"iw","Urdu":"ur"};
 
-// Populate dropdowns
 const src_sel = document.getElementById('src_lang');
 const tgt_sel = document.getElementById('tgt_lang');
 LANGS.forEach(l => {
     src_sel.add(new Option(l, l));
     if(l !== "Auto-Detect") tgt_sel.add(new Option(l, l));
 });
-src_sel.value = "Auto-Detect";
-tgt_sel.value = "Arabic";
+src_sel.value = "Auto-Detect"; tgt_sel.value = "Arabic";
+
+function switchTab(i) {
+    document.querySelectorAll('.tab').forEach((t, idx) => t.classList.toggle('active', idx === i));
+    document.querySelectorAll('.tab-content').forEach((t, idx) => t.classList.toggle('active', idx === i));
+}
 
 function swapLangs() {
     let s = src_sel.value, t = tgt_sel.value;
-    src_sel.value = t;
-    tgt_sel.value = s === "Auto-Detect" ? "Arabic" : s;
+    src_sel.value = t; tgt_sel.value = s === "Auto-Detect" ? "Arabic" : s;
     translateText();
 }
 
 async function translateText() {
     const text = document.getElementById('input_text').value.trim();
     if(text.length < 3) return;
-    
     const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text: text, tgt: tgt_sel.value, src: src_sel.value})
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text, tgt: tgt_sel.value, src: src_sel.value})
     });
     const data = await res.json();
     if(data.trans) {
         document.getElementById('t_panel').innerText = data.trans;
-        saveHistory(text, data.trans, tgt_sel.value, data.eng);
+        saveHistory(text, data.trans, tgt_sel.value, data.eng, data.emo);
     }
 }
 
-async function speakText() {
-    const text = document.getElementById('t_panel').innerText;
-    const lang = tts_map[tgt_sel.value];
-    const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text: text, lang: lang})
+async function sendChat() {
+    const inp = document.getElementById('chat_input');
+    const msg = inp.value.trim(); if(!msg) return;
+    inp.value = '';
+    const box = document.getElementById('chat_box');
+    box.innerHTML += `<div class="msg-u">${msg}</div>`;
+    box.scrollTop = box.scrollHeight;
+    
+    const res = await fetch('/api/chat', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({msg})
     });
     const data = await res.json();
-    if(data.audio) {
-        const audio = new Audio('data:audio/mp3;base64,' + data.audio);
-        audio.play();
-    }
+    if(data.ans) box.innerHTML += `<div class="msg-a">${data.ans}</div>`;
+    else box.innerHTML += `<div class="msg-a" style="color:#f55">حدث خطأ في الاتصال بالذكاء الاصطناعي.</div>`;
+    box.scrollTop = box.scrollHeight;
+}
+
+async function speakText(id) {
+    const text = document.getElementById(id).innerText;
+    if(!text || text.includes('...')) return;
+    const res = await fetch('/api/tts', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text, lang: tts_map[tgt_sel.value]})
+    });
+    const data = await res.json();
+    if(data.audio) new Audio('data:audio/mp3;base64,' + data.audio).play();
+}
+
+function copyText(id) {
+    navigator.clipboard.writeText(document.getElementById(id).innerText);
 }
 
 async function transcribeAudio() {
     const file = document.getElementById('audio_file').files[0];
     if(!file) return;
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('lang', LANGS.find(l => l.includes(src_sel.value)) || 'auto');
-    
-    document.getElementById('stt_result').innerText = "جاري المعالجة...";
+    document.getElementById('stt_status').innerText = '⏳ جاري التعرف على الكلام...';
+    const fd = new FormData(); fd.append('file', file); fd.append('lang', src_sel.value);
     const res = await fetch('/api/stt', {method: 'POST', body: fd});
     const data = await res.json();
-    if(data.txt) document.getElementById('stt_result').innerText = data.txt;
-    else document.getElementById('stt_result').innerText = "خطأ: " + data.err;
+    if(data.txt) {
+        document.getElementById('stt_status').innerText = '✅ تم التعرف. جاري الترجمة...';
+        const trRes = await fetch('/api/translate', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: data.txt, tgt: tgt_sel.value, src: src_sel.value})
+        });
+        const trData = await trRes.json();
+        document.getElementById('voice_panel').innerText = trData.trans;
+        saveHistory(data.txt, trData.trans, tgt_sel.value, trData.eng, trData.emo);
+    } else document.getElementById('stt_status').innerText = '❌ خطأ: ' + data.err;
+}
+
+async function translateFile() {
+    const file = document.getElementById('doc_file').files[0];
+    if(!file) return;
+    document.getElementById('file_status').innerText = '⏳ جاري استخراج النص...';
+    const fd = new FormData(); fd.append('file', file);
+    const ext = await fetch('/api/extract', {method: 'POST', body: fd});
+    const extData = await ext.json();
+    if(!extData.txt) { document.getElementById('file_status').innerText = '❌ ' + extData.err; return; }
+    
+    document.getElementById('file_status').innerText = '⏳ جاري ترجمة الملف...';
+    const trRes = await fetch('/api/translate', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: extData.txt, tgt: tgt_sel.value, src: src_sel.value})
+    });
+    const trData = await trRes.json();
+    document.getElementById('file_panel').innerText = trData.trans;
+    saveHistory(extData.txt.substring(0,100), trData.trans.substring(0,100), tgt_sel.value, trData.eng, trData.emo);
+    document.getElementById('file_status').innerText = '✅ تم!';
 }
 
 async function ocrImage() {
     const file = document.getElementById('img_file').files[0];
     if(!file) return;
-    const fd = new FormData();
-    fd.append('file', file);
-    
-    document.getElementById('ocr_result').innerText = "جاري الاستخراج...";
+    document.getElementById('ocr_status').innerText = '⏳ جاري استخراج النص من الصورة...';
+    const fd = new FormData(); fd.append('file', file);
     const res = await fetch('/api/ocr', {method: 'POST', body: fd});
     const data = await res.json();
     if(data.txt) {
-        document.getElementById('input_text').value = data.txt;
-        translateText();
-    } else document.getElementById('ocr_result').innerText = "خطأ: " + data.err;
+        document.getElementById('ocr_status').innerText = '✅ تم الاستخراج. جاري الترجمة...';
+        const trRes = await fetch('/api/translate', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: data.txt, tgt: tgt_sel.value, src: src_sel.value})
+        });
+        const trData = await trRes.json();
+        document.getElementById('ocr_panel').innerText = trData.trans;
+        saveHistory(data.txt.substring(0,100), trData.trans.substring(0,100), tgt_sel.value, trData.eng, trData.emo);
+    } else document.getElementById('ocr_status').innerText = '❌ ' + data.err;
 }
 
-// History Management (LocalStorage)
-function saveHistory(orig, trans, tgt, eng) {
+async function generateSRT() {
+    const file = document.getElementById('video_file').files[0];
+    if(!file) return;
+    document.getElementById('srt_status').innerText = '⏳ جاري تحليل الصوت (قد يستغرق وقتاً)...';
+    const fd = new FormData(); fd.append('file', file); fd.append('tgt', tgt_sel.value);
+    const res = await fetch('/api/srt', {method: 'POST', body: fd});
+    const data = await res.json();
+    if(data.blocks) {
+        document.getElementById('srt_status').innerText = '✅ تم استخراج ' + data.blocks.length + ' مقطع.';
+        let html = '';
+        data.blocks.forEach(b => {
+            html += `<div class="srt-line"><span style="opacity:.4">${b.num}</span><span style="opacity:.6;font-family:monospace">${b.start.toFixed(1)}s - ${b.end.toFixed(1)}s</span><span style="flex:1;font-weight:600">${b.trans}</span></div>`;
+        });
+        document.getElementById('srt_output').innerHTML = html;
+    } else document.getElementById('srt_status').innerText = '❌ ' + data.err;
+}
+
+async function analyzeGroup() {
+    const file = document.getElementById('group_file').files[0];
+    if(!file) return;
+    document.getElementById('group_status').innerText = '⏳ جاري تحليل المحادثة...';
+    const fd = new FormData(); fd.append('file', file); fd.append('tgt', tgt_sel.value);
+    const res = await fetch('/api/group', {method: 'POST', body: fd});
+    const data = await res.json();
+    if(data.results) {
+        document.getElementById('group_status').innerText = '✅ تم تحليل ' + data.results.length + ' مقطع.';
+        let html = '';
+        data.results.forEach(r => {
+            html += `<div class="card" style="margin-bottom:10px"><div style="opacity:.6;margin-bottom:5px">${r.t0.toFixed(1)}s - ${r.t1.toFixed(1)}s</div><div style="font-weight:bold;margin-bottom:5px">${r.trans}</div><div style="font-size:12px;opacity:.5">${r.orig}</div></div>`;
+        });
+        document.getElementById('group_output').innerHTML = html;
+    } else document.getElementById('group_status').innerText = '❌ ' + data.err;
+}
+
+// History Management
+function saveHistory(orig, trans, tgt, eng, emo) {
     let hist = JSON.parse(localStorage.getItem('hn_hist') || '[]');
-    hist.unshift({orig, trans, tgt, eng, time: new Date().toLocaleString('ar-EG')});
-    if(hist.length > 50) hist = hist.slice(0, 50);
+    hist.unshift({orig, trans, tgt, eng, emo, time: new Date().toLocaleString('ar-EG')});
+    if(hist.length > 60) hist = hist.slice(0, 60);
     localStorage.setItem('hn_hist', JSON.stringify(hist));
     renderHistory();
 }
@@ -165,13 +324,13 @@ function renderHistory() {
     let hist = JSON.parse(localStorage.getItem('hn_hist') || '[]');
     let html = hist.map((h, i) => `
         <div class="htl">
-            <small>${h.eng} - ${h.time}</small>
-            <div style="opacity:0.6;font-size:12px">${h.orig.substring(0,40)}...</div>
-            <div style="font-weight:bold;font-size:14px">${h.trans.substring(0,40)}...</div>
-            <button class="btn-sec" style="font-size:10px;padding:2px 5px" onclick="deleteHist(${i})">حذف</button>
+            <div style="display:flex;justify-content:space-between"><span style="font-size:10px;color:#4ECBA0">${h.eng}</span><span class="htl-time">${h.time}</span></div>
+            <div class="htl-o">${h.orig}</div>
+            <div class="htl-tr">${h.trans}</div>
+            <button class="btn-sec" style="font-size:10px;padding:2px 8px;margin-top:5px" onclick="deleteHist(${i})">حذف</button>
         </div>
     `).join('');
-    document.getElementById('history-list').innerHTML = html || '<small>لا يوجد سجل</small>';
+    document.getElementById('history-list').innerHTML = html || '<div style="opacity:.3;text-align:center;padding:30px">لا يوجد سجل بعد</div>';
 }
 
 function deleteHist(i) {
