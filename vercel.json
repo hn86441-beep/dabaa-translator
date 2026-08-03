@@ -4,4 +4,10 @@
   ]
 }
 EOF
-echo "✅ vercel.json"
+
+python3 -c "
+import ast
+src=open('/mnt/user-data/outputs/hn_vercel/api/index.py').read()
+ast.parse(src)
+print('✅ backend OK')
+"
