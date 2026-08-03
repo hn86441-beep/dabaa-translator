@@ -1,43 +1,33 @@
-import os, io, base64, json, time, urllib.parse
+import os, io, base64, json, urllib.parse
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
-from pydantic import BaseModel
-import requests
+from fastapi.responses import JSONResponse
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from collections import OrderedDict
-from datetime import datetime
 from PIL import Image
 from deep_translator import GoogleTranslator, MyMemoryTranslator
 from gtts import gTTS
+import pdfplumber, docx, openpyxl
 
 app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Environment Variables
+# Environment Variables (تُقرأ من Vercel)
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 DEEPL_KEY = os.environ.get("DEEPL_API_KEY", "").strip()
 COHERE_KEY = os.environ.get("COHERE_API_KEY", "").strip()
 CALLMEBOT_APIKEY = os.environ.get("CALLMEBOT_APIKEY", "").strip()
 WA_PHONE = "201152582350"
 
-# WhatsApp Alerts
 def notify_whatsapp(message, err_key=None):
-    if not CALLMEBOT_APIKEY or not WA_PHONE: return
+    if not CALLMEBOT_APIKEY: return
     try:
         text = urllib.parse.quote(f"🚨 HN TRANSLATOR\n{message[:500]}")
-        requests.get("https://api.callmebot.com/whatsapp.php", 
-                     params={"phone": WA_PHONE, "text": text, "apikey": CALLMEBOT_APIKEY}, timeout=8)
+        requests.get("https://api.callmebot.com/whatsapp.php", params={"phone": WA_PHONE, "text": text, "apikey": CALLMEBOT_APIKEY}, timeout=8)
     except: pass
 
-# Languages Map
 LANGS = {
-    "Auto-Detect":{"g":"auto", "d":None, "tts":"en"}, "Arabic":{"g":"ar","d":"AR","tts":"ar"},
+    "Auto-Detect":{"g":"auto","d":None,"tts":"en"}, "Arabic":{"g":"ar","d":"AR","tts":"ar"},
     "English":{"g":"en","d":"EN-US","tts":"en"}, "Russian":{"g":"ru","d":"RU","tts":"ru"},
     "Chinese":{"g":"zh-CN","d":"ZH","tts":"zh-cn"}, "German":{"g":"de","d":"DE","tts":"de"},
     "Spanish":{"g":"es","d":"ES","tts":"es"}, "French":{"g":"fr","d":"FR","tts":"fr"},
@@ -54,7 +44,12 @@ LANGS = {
     "Urdu":{"g":"ur","d":None,"tts":"ur"}
 }
 
-_TR_SYS = "You are an expert multilingual translator. Translate MEANING and INTENT. Return ONLY the translation."
+_POS = {"شكر","ممتاز","رائع","سعيد","فرح","جميل","موافق","happy","good","great","love"}
+_NEG = {"حزين","سيء","كره","غضب","ألم","خطأ","فشل","sad","bad","hate","angry"}
+def emotion(text):
+    tl = text.lower()
+    p = sum(1 for w in _POS if w in tl); n = sum(1 for w in _NEG if w in tl)
+    return "😊 إيجابي" if p>n else ("😔 سلبي" if n>p else "😐 محايد")
 
 def groq_llm(prompt, system="", max_tokens=700, fast=False):
     if not GROQ_KEY: return None
@@ -82,7 +77,8 @@ def smart_translate(text, tgt, src="Auto-Detect"):
                 if r.status_code == 200: return r.json()["translations"][0]["text"], "DeepL"
             except: pass
     if GROQ_KEY and len(text) <= 1500:
-        r = groq_llm(f"Translate from {src} to {tgt}:\n\n{text}", system=_TR_SYS, max_tokens=800, fast=len(text)<300)
+        sys = "You are an expert multilingual translator. Translate MEANING. Return ONLY the translation."
+        r = groq_llm(f"Translate from {src} to {tgt}:\n\n{text}", system=sys, max_tokens=800, fast=len(text)<300)
         if r: return r, "AI Contextual"
     src_g = LANGS.get(src, {}).get("g","auto"); tgt_g = LANGS.get(tgt, {}).get("g","en")
     try:
@@ -107,24 +103,21 @@ async def api_translate(req: Request):
     data = await req.json()
     text, tgt, src = data.get("text",""), data.get("tgt","Arabic"), data.get("src","Auto-Detect")
     trans, eng = smart_translate(text, tgt, src)
-    return {"trans": trans, "eng": eng}
+    return {"trans": trans, "eng": eng, "emo": emotion(text) if text else ""}
 
 @app.post("/api/chat")
 async def api_chat(req: Request):
     data = await req.json()
-    # Logic for AI Chat simplified for API
-    res = groq_llm(data.get("msg",""), system="You are a helpful translation assistant.")
+    sys = "أنت ذكاء اصطناعي متخصص في اللغات والترجمة. ردودك مباشرة. إذا طُلبت ترجمة أعطها فوراً."
+    res = groq_llm(data.get("msg",""), system=sys)
     return {"ans": res}
 
 @app.post("/api/tts")
 async def api_tts(req: Request):
     data = await req.json()
-    text, lang = data.get("text",""), data.get("lang","en")
     try:
-        buf = io.BytesIO()
-        gTTS(text=text[:500], lang=lang, slow=False).write_to_fp(buf)
-        buf.seek(0)
-        return JSONResponse({"audio": base64.b64encode(buf.read()).decode()})
+        buf = io.BytesIO(); gTTS(text=data.get("text","")[:500], lang=data.get("lang","en"), slow=False).write_to_fp(buf)
+        buf.seek(0); return JSONResponse({"audio": base64.b64encode(buf.read()).decode()})
     except: return JSONResponse({"audio": None})
 
 @app.post("/api/ocr")
@@ -148,16 +141,52 @@ async def api_stt(file: UploadFile = File(...), lang: str = Form("auto")):
     if data: return JSONResponse({"txt": data.get("text","").strip(), "err": None})
     return JSONResponse({"txt": None, "err": err})
 
+@app.post("/api/srt")
+async def api_srt(file: UploadFile = File(...), tgt: str = Form("Arabic")):
+    audio = await file.read()
+    data, err = groq_stt(audio, lang="auto", verbose=True)
+    if not data: return JSONResponse({"blocks": None, "err": err})
+    blocks = []
+    for i, s in enumerate(data.get("segments", []), 1):
+        txt = s.get("text","").strip()
+        tr, _ = smart_translate(txt, tgt)
+        blocks.append({"num": i, "start": s.get("start",0), "end": s.get("end",0), "orig": txt, "trans": tr or txt})
+    return JSONResponse({"blocks": blocks, "err": None})
+
 @app.post("/api/group")
 async def api_group(file: UploadFile = File(...), tgt: str = Form("Arabic")):
     audio = await file.read()
     data, err = groq_stt(audio, lang="auto", verbose=True)
     if not data: return JSONResponse({"results": None, "err": err})
-    segs = data.get("segments", [])
     results = []
-    for s in segs:
+    for s in data.get("segments", []):
         txt = s.get("text","").strip()
         if not txt: continue
         tr, eng = smart_translate(txt, tgt, "Auto-Detect")
         results.append({"orig": txt, "trans": tr, "t0": s.get("start",0), "t1": s.get("end",0), "eng": eng})
     return JSONResponse({"results": results, "err": None})
+
+@app.post("/api/extract")
+async def api_extract(file: UploadFile = File(...)):
+    fb = await file.read()
+    fn = file.filename
+    ext = os.path.splitext(fn)[1].lower()
+    try:
+        if ext == ".pdf":
+            txt = ""
+            with pdfplumber.open(io.BytesIO(fb)) as pdf:
+                for pg in pdf.pages:
+                    t = pg.extract_text()
+                    if t: txt += t + "\n"
+            return {"txt": txt.strip(), "err": None}
+        elif ext == ".docx":
+            d = docx.Document(io.BytesIO(fb)); txt = "\n".join(p.text for p in d.paragraphs)
+            return {"txt": txt.strip(), "err": None}
+        elif ext in (".xlsx",".xls"):
+            wb = openpyxl.load_workbook(io.BytesIO(fb), data_only=True)
+            parts = [str(c.value) for sh in wb.worksheets for row in sh.iter_rows() for c in row if c.value is not None]
+            return {"txt": "\n".join(parts).strip(), "err": None}
+        elif ext == ".txt":
+            return {"txt": fb.decode("utf-8", errors="ignore").strip(), "err": None}
+        else: return {"txt": None, "err": "Unsupported file"}
+    except Exception as e: return {"txt": None, "err": str(e)}
