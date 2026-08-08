@@ -3,7 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AI Translation Suite</title>
+<title>HN TRANSLATOR</title>
+<meta name="description" content="HN Translator — ترجمة نصية وصوتية وذكاء اصطناعي في مكان واحد" />
+<meta name="theme-color" content="#07080d" />
+
+<!-- PWA / إضافة إلى الشاشة الرئيسية -->
+<link rel="manifest" href="/manifest.json" />
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png" />
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -24,6 +33,27 @@
     --radius:18px;
     --radius-sm:12px;
   }
+  /* ---------- Light Mode ---------- */
+  [data-theme="light"]{
+    --bg-0:#eef1f8;
+    --bg-1:#ffffff;
+    --glass:rgba(20,25,45,0.04);
+    --glass-border:rgba(20,25,45,0.10);
+    --glass-strong:rgba(255,255,255,0.75);
+    --text-0:#181a2a;
+    --text-1:#4c5270;
+    --text-2:#868da8;
+  }
+  [data-theme="light"] body{
+    background:
+      radial-gradient(circle at 15% 10%, rgba(124,92,255,0.14), transparent 40%),
+      radial-gradient(circle at 85% 20%, rgba(34,211,238,0.12), transparent 45%),
+      radial-gradient(circle at 50% 90%, rgba(244,114,182,0.10), transparent 45%),
+      var(--bg-0);
+  }
+  [data-theme="light"] header{ background:rgba(255,255,255,0.7); }
+  [data-theme="light"] textarea,[data-theme="light"] .output-box{ background:rgba(20,25,45,0.03); }
+  [data-theme="light"] select,[data-theme="light"] .assistant-input input{ background:rgba(20,25,45,0.04); }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
     font-family:'Tajawal','Inter',sans-serif;
@@ -35,6 +65,7 @@
     color:var(--text-0);
     min-height:100vh;
     padding-bottom:60px;
+    transition: background .3s ease, color .3s ease;
   }
   ::selection{background:var(--accent); color:#fff;}
   a{color:inherit;}
@@ -49,15 +80,19 @@
     border-bottom:1px solid var(--glass-border);
   }
   .brand{display:flex; align-items:center; gap:12px;}
-  .brand .logo{
-    width:42px; height:42px; border-radius:12px;
-    background:linear-gradient(135deg,var(--accent),var(--accent-2));
-    display:flex; align-items:center; justify-content:center;
-    font-weight:900; font-size:18px; color:#fff;
+  .brand .logo-img{
+    width:44px; height:44px; border-radius:12px; object-fit:cover;
     box-shadow:0 8px 24px rgba(124,92,255,0.35);
   }
-  .brand h1{font-size:19px; font-weight:700;}
+  .brand h1{font-size:19px; font-weight:700; letter-spacing:.5px;}
   .brand span{display:block; font-size:11px; color:var(--text-2); font-weight:400;}
+  .theme-toggle{
+    width:40px; height:40px; border-radius:50%;
+    background:var(--glass); border:1px solid var(--glass-border);
+    color:var(--text-1); cursor:pointer; font-size:17px;
+    display:flex; align-items:center; justify-content:center; transition:.2s;
+  }
+  .theme-toggle:hover{ color:#fff; border-color:var(--accent); transform:rotate(20deg); }
   .status-pill{
     display:flex; align-items:center; gap:8px;
     font-size:12px; color:var(--text-1);
@@ -130,6 +165,7 @@
   }
   .swap-btn:hover{color:#fff; transform:rotate(180deg); border-color:var(--accent);}
 
+  .textarea-wrap{position:relative;}
   textarea, .output-box{
     width:100%; min-height:170px; resize:vertical;
     background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);
@@ -138,8 +174,55 @@
     outline:none;
   }
   textarea:focus{border-color:var(--accent);}
-  .output-box{white-space:pre-wrap; overflow-y:auto;}
-  .char-count{font-size:11px; color:var(--text-2); text-align:left; margin-top:6px;}
+  .output-box{white-space:pre-wrap; overflow-y:auto; position:relative;}
+  .char-count{font-size:11px; color:var(--text-2); text-align:left; margin-top:6px; display:flex; justify-content:space-between; align-items:center;}
+  .live-indicator{display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2);}
+  .live-indicator .live-dot{width:6px;height:6px;border-radius:50%;background:var(--text-2);}
+  .live-indicator.active .live-dot{background:var(--success); box-shadow:0 0 6px var(--success); animation:pulse 1.2s infinite;}
+  .live-indicator.active{color:var(--success);}
+  .clear-input-btn{
+    position:absolute; top:10px; left:10px; z-index:2;
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(255,255,255,0.08); border:1px solid var(--glass-border);
+    color:var(--text-2); cursor:pointer; font-size:13px; line-height:1;
+    display:flex; align-items:center; justify-content:center; transition:.2s;
+  }
+  .clear-input-btn:hover{ background:var(--danger); color:#fff; border-color:transparent; }
+  .tts-btn{
+    position:absolute; top:10px; left:10px; z-index:2;
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(255,255,255,0.08); border:1px solid var(--glass-border);
+    color:var(--text-2); cursor:pointer; font-size:12px;
+    display:flex; align-items:center; justify-content:center; transition:.2s;
+  }
+  .tts-btn:hover{ background:var(--accent-2); color:#07080d; border-color:transparent; }
+
+  /* ---------- History Panel ---------- */
+  .history-list{display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto;}
+  .history-item{
+    background:var(--glass); border:1px solid var(--glass-border); border-radius:12px;
+    padding:10px 12px; cursor:pointer; transition:.2s; font-size:12.5px;
+  }
+  .history-item:hover{ border-color:var(--accent-2); background:rgba(34,211,238,0.06); }
+  .history-item .h-src{ color:var(--text-1); margin-bottom:3px; }
+  .history-item .h-out{ color:var(--text-0); font-weight:500; }
+  .history-item .h-meta{ display:flex; justify-content:space-between; margin-top:5px; font-size:10px; color:var(--text-2); }
+  .history-empty{ text-align:center; color:var(--text-2); font-size:12.5px; padding:20px 0; }
+
+  /* ---------- Camera Modal ---------- */
+  .camera-modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px);
+    z-index:200; display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .camera-modal-overlay.open{ display:flex; }
+  .camera-modal{
+    background:var(--bg-1); border:1px solid var(--glass-border); border-radius:var(--radius);
+    padding:20px; max-width:520px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  }
+  .camera-modal video, .camera-modal canvas{
+    width:100%; border-radius:var(--radius-sm); background:#000; margin-bottom:14px;
+  }
+  .camera-modal .cam-actions{display:flex; gap:10px; justify-content:center;}
 
   .toolbar{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
   button.primary{
@@ -278,13 +361,16 @@
 
 <header>
   <div class="brand">
-    <div class="logo">AI</div>
+    <img src="/assets/logo.png" alt="HN Translator" class="logo-img" />
     <div>
-      <h1>AI Translation Suite</h1>
+      <h1>HN TRANSLATOR</h1>
       <span>DeepL · Groq · Cohere — منصة ترجمة ذكية موحدة</span>
     </div>
   </div>
-  <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText">جارٍ التحقق من الاتصال...</span></div>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <button class="theme-toggle" id="themeToggle" title="تبديل الوضع الليلي/النهاري">🌙</button>
+    <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText">جارٍ التحقق من الاتصال...</span></div>
+  </div>
 </header>
 
 <nav class="tabs">
@@ -309,14 +395,33 @@
               <option value="FR">Français</option>
               <option value="ES">Español</option>
               <option value="DE">Deutsch</option>
+              <option value="PT">Português</option>
+              <option value="IT">Italiano</option>
+              <option value="NL">Nederlands</option>
               <option value="TR">Türkçe</option>
               <option value="RU">Русский</option>
+              <option value="UK">Українська</option>
+              <option value="PL">Polski</option>
+              <option value="SV">Svenska</option>
               <option value="ZH">中文</option>
+              <option value="JA">日本語</option>
+              <option value="KO">한국어</option>
+              <option value="ID">Bahasa Indonesia</option>
+              <option value="EL">Ελληνικά</option>
+              <option value="HI">हिन्दी</option>
+              <option value="UR">اردو</option>
+              <option value="FA">فارسی</option>
             </select>
             <span style="font-size:11px;color:var(--text-2)">من</span>
           </div>
-          <textarea id="srcText" placeholder="اكتب النص هنا للترجمة الفورية..."></textarea>
-          <div class="char-count"><span id="charCount">0</span> حرف</div>
+          <div class="textarea-wrap">
+            <button class="clear-input-btn" id="clearSrcBtn" title="حذف النص">✕</button>
+            <textarea id="srcText" placeholder="اكتب النص هنا وستُترجم فوراً أثناء الكتابة..."></textarea>
+          </div>
+          <div class="char-count">
+            <span><span id="charCount">0</span> حرف</span>
+            <span class="live-indicator" id="liveIndicator"><span class="live-dot"></span> ترجمة لحظية</span>
+          </div>
         </div>
 
         <div>
@@ -325,15 +430,33 @@
             <select id="tgtLang">
               <option value="AR">العربية</option>
               <option value="EN-US">English (US)</option>
+              <option value="EN-GB">English (UK)</option>
               <option value="FR">Français</option>
               <option value="ES">Español</option>
               <option value="DE">Deutsch</option>
+              <option value="PT-BR">Português (BR)</option>
+              <option value="PT-PT">Português (PT)</option>
+              <option value="IT">Italiano</option>
+              <option value="NL">Nederlands</option>
               <option value="TR">Türkçe</option>
               <option value="RU">Русский</option>
+              <option value="UK">Українська</option>
+              <option value="PL">Polski</option>
+              <option value="SV">Svenska</option>
               <option value="ZH">中文</option>
+              <option value="JA">日本語</option>
+              <option value="KO">한국어</option>
+              <option value="ID">Bahasa Indonesia</option>
+              <option value="EL">Ελληνικά</option>
+              <option value="HI">हिन्दी</option>
+              <option value="UR">اردو</option>
+              <option value="FA">فارسی</option>
             </select>
           </div>
-          <div class="output-box" id="outText">ستظهر الترجمة هنا...</div>
+          <div class="output-box" id="outText" style="position:relative;">
+            <button class="tts-btn" id="ttsBtn" title="استماع للترجمة">🔊</button>
+            <span id="outTextContent">ستظهر الترجمة هنا...</span>
+          </div>
         </div>
       </div>
 
@@ -342,6 +465,19 @@
         <button class="ghost" id="translateAIBtn">✨ ترجمة ذكية عبر Groq</button>
         <button class="ghost" id="correctBtn">✅ تصحيح لغوي</button>
         <button class="ghost" id="copyOutBtn">📋 نسخ الناتج</button>
+      </div>
+      <div class="hint" style="margin-top:14px;">
+        ملاحظة: بعض اللغات (مثل الهندية، الأردو، الفارسية) غير مدعومة عبر DeepL — استخدم زر "ترجمة ذكية عبر Groq" لها.
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2><span class="ic">🕘</span> سجل الترجمات</h2>
+      <div class="toolbar" style="margin-top:0; margin-bottom:14px;">
+        <button class="ghost" id="clearHistoryBtn" style="padding:8px 16px;font-size:12px;">🗑️ مسح السجل</button>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="history-empty">لا توجد ترجمات محفوظة بعد</div>
       </div>
     </div>
 
@@ -416,16 +552,30 @@
       <h2><span class="ic">🖼️</span> صورة أو كاميرا (OCR)</h2>
       <div class="upload-zone" id="imageDropZone">
         <div class="big-ic">📷</div>
-        <p>ارفع صورة أو التقط بالكاميرا لاستخراج النص منها</p>
+        <p>ارفع صورة لاستخراج النص منها</p>
       </div>
-      <input type="file" id="imageInput" accept="image/*" capture="environment" />
+      <input type="file" id="imageInput" accept="image/*" />
       <div id="imageRowContainer"></div>
       <div class="toolbar">
         <button class="primary" id="ocrBtn">🔍 استخراج النص من الصورة</button>
+        <button class="ghost" id="openCameraBtn">📸 التقط بالكاميرا مباشرة</button>
       </div>
       <div class="output-box" id="ocrOut" style="margin-top:14px; display:none;"></div>
     </div>
   </section>
+
+  <!-- Live Camera Modal -->
+  <div class="camera-modal-overlay" id="cameraModalOverlay">
+    <div class="camera-modal">
+      <h2 style="margin-bottom:14px;"><span class="ic">📸</span> التقاط صورة</h2>
+      <video id="cameraVideo" autoplay playsinline></video>
+      <canvas id="cameraCanvas" style="display:none;"></canvas>
+      <div class="cam-actions">
+        <button class="primary" id="captureBtn">📷 التقاط</button>
+        <button class="ghost" id="closeCameraBtn">إلغاء</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ======================= VOICE VIEW ======================= -->
   <section class="view" id="view-voice">
@@ -563,32 +713,57 @@ document.querySelectorAll(".tab-btn").forEach(btn=>{
 });
 
 /* =========================================================
-   1) الترجمة الفورية
+   1) الترجمة الفورية (اللحظية) + السجل + الحذف + الاستماع
    ========================================================= */
 const srcText = document.getElementById("srcText");
 const outText = document.getElementById("outText");
+const outTextContent = document.getElementById("outTextContent");
 const charCount = document.getElementById("charCount");
+const liveIndicator = document.getElementById("liveIndicator");
+
+function setOutText(text){ outTextContent.textContent = text; }
+function setOutLoading(msg){ outTextContent.innerHTML = `<span class="loader"></span> ${msg}`; }
 
 srcText.addEventListener("input", ()=> charCount.textContent = srcText.value.length);
+
+/* زر حذف نص الإدخال */
+document.getElementById("clearSrcBtn").addEventListener("click", ()=>{
+  srcText.value = "";
+  charCount.textContent = "0";
+  setOutText("ستظهر الترجمة هنا...");
+  srcText.focus();
+});
+
+/* الاستماع للترجمة (Text-to-Speech عبر المتصفح، مجاني بدون API) */
+document.getElementById("ttsBtn").addEventListener("click", ()=>{
+  const text = outTextContent.textContent;
+  if(!text || text === "ستظهر الترجمة هنا...") return showToast("لا يوجد نص لقراءته", "error");
+  if(!("speechSynthesis" in window)) return showToast("المتصفح لا يدعم القراءة الصوتية", "error");
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  const tgt = document.getElementById("tgtLang").value.toLowerCase();
+  utter.lang = tgt.startsWith("ar") ? "ar" : tgt.split("-")[0];
+  window.speechSynthesis.speak(utter);
+});
 
 document.getElementById("swapBtn").addEventListener("click", ()=>{
   const s = document.getElementById("srcLang");
   const t = document.getElementById("tgtLang");
   if(s.value === "auto") return;
   const tmp = s.value;
-  // مطابقة تقريبية للأكواد بين القائمتين
   const map = {"EN":"EN-US"};
   s.value = t.value.split("-")[0];
   t.value = map[tmp] || tmp;
   const tmpText = srcText.value;
-  srcText.value = outText.textContent;
-  outText.textContent = tmpText;
+  srcText.value = outTextContent.textContent;
+  setOutText(tmpText);
   charCount.textContent = srcText.value.length;
+  triggerLiveTranslate();
 });
 
-document.getElementById("translateDeepLBtn").addEventListener("click", async ()=>{
-  if(!srcText.value.trim()) return showToast("الرجاء إدخال نص أولاً", "error");
-  outText.innerHTML = '<span class="loader"></span> جارٍ الترجمة...';
+async function doDeepLTranslate(silent){
+  if(!srcText.value.trim()){ if(!silent) showToast("الرجاء إدخال نص أولاً", "error"); return; }
+  if(!silent) setOutLoading("جارٍ الترجمة...");
   try{
     const data = await apiFetch("/translate/deepl", {
       method:"POST",
@@ -599,13 +774,16 @@ document.getElementById("translateDeepLBtn").addEventListener("click", async ()=
         source_lang: document.getElementById("srcLang").value
       })
     });
-    outText.textContent = data.translated_text;
-  }catch(e){ outText.textContent = "تعذّرت الترجمة."; }
-});
+    setOutText(data.translated_text);
+    saveHistory(srcText.value, data.translated_text, document.getElementById("srcLang").value, document.getElementById("tgtLang").value);
+  }catch(e){ if(!silent) setOutText("تعذّرت الترجمة."); }
+}
+
+document.getElementById("translateDeepLBtn").addEventListener("click", ()=> doDeepLTranslate(false));
 
 document.getElementById("translateAIBtn").addEventListener("click", async ()=>{
   if(!srcText.value.trim()) return showToast("الرجاء إدخال نص أولاً", "error");
-  outText.innerHTML = '<span class="loader"></span> جارٍ الترجمة الذكية...';
+  setOutLoading("جارٍ الترجمة الذكية...");
   try{
     const data = await apiFetch("/translate/ai", {
       method:"POST",
@@ -616,25 +794,26 @@ document.getElementById("translateAIBtn").addEventListener("click", async ()=>{
         provider:"groq", task:"translate"
       })
     });
-    outText.textContent = data.result;
-  }catch(e){ outText.textContent = "تعذّرت الترجمة."; }
+    setOutText(data.result);
+    saveHistory(srcText.value, data.result, document.getElementById("srcLang").value, document.getElementById("tgtLang").value);
+  }catch(e){ setOutText("تعذّرت الترجمة."); }
 });
 
 document.getElementById("correctBtn").addEventListener("click", async ()=>{
   if(!srcText.value.trim()) return showToast("الرجاء إدخال نص أولاً", "error");
-  outText.innerHTML = '<span class="loader"></span> جارٍ التصحيح...';
+  setOutLoading("جارٍ التصحيح...");
   try{
     const data = await apiFetch("/translate/ai", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ text: srcText.value, target_lang:"AR", provider:"groq", task:"correct" })
     });
-    outText.textContent = data.result;
-  }catch(e){ outText.textContent = "تعذّر التصحيح."; }
+    setOutText(data.result);
+  }catch(e){ setOutText("تعذّر التصحيح."); }
 });
 
 document.getElementById("copyOutBtn").addEventListener("click", ()=>{
-  navigator.clipboard.writeText(outText.textContent || "");
+  navigator.clipboard.writeText(outTextContent.textContent || "");
   showToast("تم نسخ النص");
 });
 
@@ -649,13 +828,79 @@ document.getElementById("compareBtn").addEventListener("click", async ()=>{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
-        text: outText.textContent, target_lang: document.getElementById("tgtLang").value,
+        text: outTextContent.textContent, target_lang: document.getElementById("tgtLang").value,
         provider:"groq", task:"compare", compare_with: compareText
       })
     });
     box.textContent = data.result;
   }catch(e){ box.textContent = "تعذّرت المقارنة."; }
 });
+
+/* ---- الترجمة اللحظية أثناء الكتابة (Debounce) ---- */
+let liveTranslateTimer = null;
+function triggerLiveTranslate(){
+  clearTimeout(liveTranslateTimer);
+  if(!srcText.value.trim()){ setOutText("ستظهر الترجمة هنا..."); liveIndicator.classList.remove("active"); return; }
+  liveIndicator.classList.add("active");
+  liveTranslateTimer = setTimeout(async ()=>{
+    await doDeepLTranslate(true);
+    liveIndicator.classList.remove("active");
+  }, 700);
+}
+srcText.addEventListener("input", triggerLiveTranslate);
+document.getElementById("srcLang").addEventListener("change", triggerLiveTranslate);
+document.getElementById("tgtLang").addEventListener("change", triggerLiveTranslate);
+
+/* ---- سجل الترجمات (محفوظ محلياً في المتصفح) ---- */
+const HISTORY_KEY = "hn_translator_history";
+const historyList = document.getElementById("historyList");
+
+function getHistory(){
+  try{ return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }catch(e){ return []; }
+}
+function saveHistory(src, out, srcLang, tgtLang){
+  if(!src.trim() || !out.trim()) return;
+  let history = getHistory();
+  // تجنّب تكرار نفس آخر عنصر
+  if(history.length && history[0].src === src && history[0].out === out) return;
+  history.unshift({ src, out, srcLang, tgtLang, ts: Date.now() });
+  history = history.slice(0, 50); // الاحتفاظ بآخر 50 عنصراً فقط
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  renderHistory();
+}
+function renderHistory(){
+  const history = getHistory();
+  if(!history.length){
+    historyList.innerHTML = '<div class="history-empty">لا توجد ترجمات محفوظة بعد</div>';
+    return;
+  }
+  historyList.innerHTML = "";
+  history.forEach((item, idx)=>{
+    const div = document.createElement("div");
+    div.className = "history-item";
+    const date = new Date(item.ts);
+    const timeStr = date.toLocaleString("ar-EG", { hour:"2-digit", minute:"2-digit", day:"2-digit", month:"2-digit" });
+    div.innerHTML = `
+      <div class="h-src">${item.src.length > 60 ? item.src.slice(0,60)+"…" : item.src}</div>
+      <div class="h-out">${item.out.length > 60 ? item.out.slice(0,60)+"…" : item.out}</div>
+      <div class="h-meta"><span>${item.srcLang} → ${item.tgtLang}</span><span>${timeStr}</span></div>
+    `;
+    div.addEventListener("click", ()=>{
+      srcText.value = item.src;
+      setOutText(item.out);
+      charCount.textContent = item.src.length;
+      showToast("تم استرجاع الترجمة");
+      window.scrollTo({ top:0, behavior:"smooth" });
+    });
+    historyList.appendChild(div);
+  });
+}
+document.getElementById("clearHistoryBtn").addEventListener("click", ()=>{
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+  showToast("تم مسح السجل");
+});
+renderHistory();
 
 /* المساعد الذكي */
 const assistantLog = document.getElementById("assistantLog");
@@ -669,7 +914,7 @@ function addMsg(text, who){
 async function sendAssistant(promptText){
   if(!promptText.trim()) return;
   addMsg(promptText, "user");
-  const base = outText.textContent && outText.textContent !== "ستظهر الترجمة هنا..." ? outText.textContent : srcText.value;
+  const base = outTextContent.textContent && outTextContent.textContent !== "ستظهر الترجمة هنا..." ? outTextContent.textContent : srcText.value;
   addMsg("...", "ai");
   try{
     const data = await apiFetch("/translate/ai", {
@@ -682,7 +927,7 @@ async function sendAssistant(promptText){
       })
     });
     assistantLog.lastChild.textContent = data.result;
-    outText.textContent = data.result;
+    setOutText(data.result);
   }catch(e){ assistantLog.lastChild.textContent = "تعذّر تنفيذ الطلب."; }
 }
 document.getElementById("assistantSendBtn").addEventListener("click", ()=>{
@@ -960,6 +1205,83 @@ document.getElementById("processGroupBtn").addEventListener("click", async ()=>{
   }catch(e){
     out.textContent = "تعذّرت معالجة المحادثة.";
   }
+});
+
+/* =========================================================
+   5) الوضع الليلي / النهاري
+   ========================================================= */
+const THEME_KEY = "hn_translator_theme";
+const themeToggle = document.getElementById("themeToggle");
+
+function applyTheme(theme){
+  if(theme === "light"){
+    document.body.setAttribute("data-theme", "light");
+    themeToggle.textContent = "☀️";
+  }else{
+    document.body.removeAttribute("data-theme");
+    themeToggle.textContent = "🌙";
+  }
+  localStorage.setItem(THEME_KEY, theme);
+}
+themeToggle.addEventListener("click", ()=>{
+  const current = document.body.getAttribute("data-theme") === "light" ? "light" : "dark";
+  applyTheme(current === "light" ? "dark" : "light");
+});
+// تطبيق الوضع المحفوظ سابقاً، أو تفضيل النظام إن لم يوجد
+(function initTheme(){
+  const saved = localStorage.getItem(THEME_KEY);
+  if(saved){ applyTheme(saved); }
+  else if(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches){ applyTheme("light"); }
+})();
+
+/* =========================================================
+   6) التقاط صورة مباشر بالكاميرا (معاينة حية داخل الصفحة)
+   ========================================================= */
+const cameraModalOverlay = document.getElementById("cameraModalOverlay");
+const cameraVideo = document.getElementById("cameraVideo");
+const cameraCanvas = document.getElementById("cameraCanvas");
+let cameraStream = null;
+
+document.getElementById("openCameraBtn").addEventListener("click", async ()=>{
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    cameraVideo.srcObject = cameraStream;
+    cameraModalOverlay.classList.add("open");
+  }catch(e){
+    showToast("تعذّر الوصول إلى الكاميرا، سيتم استخدام رفع الملفات بدلاً منها", "error");
+    document.getElementById("imageInput").click();
+  }
+});
+
+function closeCameraModal(){
+  cameraModalOverlay.classList.remove("open");
+  if(cameraStream){
+    cameraStream.getTracks().forEach(t=>t.stop());
+    cameraStream = null;
+  }
+}
+document.getElementById("closeCameraBtn").addEventListener("click", closeCameraModal);
+
+document.getElementById("captureBtn").addEventListener("click", async ()=>{
+  const w = cameraVideo.videoWidth, h = cameraVideo.videoHeight;
+  cameraCanvas.width = w; cameraCanvas.height = h;
+  const ctx = cameraCanvas.getContext("2d");
+  ctx.drawImage(cameraVideo, 0, 0, w, h);
+  cameraCanvas.toBlob(async (blob)=>{
+    const file = new File([blob], "camera-capture.jpg", { type:"image/jpeg" });
+    closeCameraModal();
+    // إرسال مباشر إلى OCR
+    const fd = new FormData();
+    fd.append("image", file);
+    fd.append("translate_to", document.getElementById("fileTargetLang").value);
+    const box = document.getElementById("ocrOut");
+    box.style.display = "block";
+    box.innerHTML = '<span class="loader"></span> جارٍ استخراج النص من الصورة الملتقطة...';
+    try{
+      const data = await apiFetch("/ocr", { method:"POST", body: fd });
+      box.innerHTML = `<b>النص المستخرج:</b>\n${data.extracted_text || "-"}\n\n<b>الترجمة:</b>\n${data.translated_text || "-"}`;
+    }catch(e){ box.textContent = "تعذّر استخراج النص."; }
+  }, "image/jpeg", 0.92);
 });
 </script>
 </body>
