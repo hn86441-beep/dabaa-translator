@@ -1,1 +1,966 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Translation Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#07080d;
+    --bg-1:#0d0f18;
+    --glass:rgba(255,255,255,0.05);
+    --glass-border:rgba(255,255,255,0.10);
+    --glass-strong:rgba(255,255,255,0.08);
+    --accent:#7c5cff;
+    --accent-2:#22d3ee;
+    --accent-3:#f472b6;
+    --text-0:#f4f5fb;
+    --text-1:#a6acc4;
+    --text-2:#6b7290;
+    --danger:#ff5c7a;
+    --success:#34d399;
+    --radius:18px;
+    --radius-sm:12px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Tajawal','Inter',sans-serif;
+    background:
+      radial-gradient(circle at 15% 10%, rgba(124,92,255,0.25), transparent 40%),
+      radial-gradient(circle at 85% 20%, rgba(34,211,238,0.18), transparent 45%),
+      radial-gradient(circle at 50% 90%, rgba(244,114,182,0.12), transparent 45%),
+      var(--bg-0);
+    color:var(--text-0);
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  ::selection{background:var(--accent); color:#fff;}
+  a{color:inherit;}
 
+  /* ---------- Header ---------- */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:22px 5vw;
+    position:sticky; top:0; z-index:50;
+    backdrop-filter:blur(18px);
+    background:rgba(7,8,13,0.55);
+    border-bottom:1px solid var(--glass-border);
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand .logo{
+    width:42px; height:42px; border-radius:12px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:flex; align-items:center; justify-content:center;
+    font-weight:900; font-size:18px; color:#fff;
+    box-shadow:0 8px 24px rgba(124,92,255,0.35);
+  }
+  .brand h1{font-size:19px; font-weight:700;}
+  .brand span{display:block; font-size:11px; color:var(--text-2); font-weight:400;}
+  .status-pill{
+    display:flex; align-items:center; gap:8px;
+    font-size:12px; color:var(--text-1);
+    background:var(--glass); border:1px solid var(--glass-border);
+    padding:7px 14px; border-radius:999px;
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--success); box-shadow:0 0 8px var(--success);}
+
+  /* ---------- Tabs ---------- */
+  nav.tabs{
+    display:flex; gap:10px; padding:24px 5vw 0; flex-wrap:wrap;
+  }
+  .tab-btn{
+    padding:11px 20px; border-radius:999px; border:1px solid var(--glass-border);
+    background:var(--glass); color:var(--text-1); font-family:inherit;
+    font-size:14px; font-weight:500; cursor:pointer; transition:.25s;
+    display:flex; align-items:center; gap:8px;
+  }
+  .tab-btn:hover{color:var(--text-0); border-color:rgba(124,92,255,0.5);}
+  .tab-btn.active{
+    background:linear-gradient(135deg,var(--accent),#5b3df0);
+    color:#fff; border-color:transparent;
+    box-shadow:0 8px 22px rgba(124,92,255,0.35);
+  }
+
+  main{padding:26px 5vw 0;}
+  .view{display:none; animation:fadein .35s ease;}
+  .view.active{display:block;}
+  @keyframes fadein{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+
+  /* ---------- Glass Card ---------- */
+  .card{
+    background:var(--glass-strong);
+    border:1px solid var(--glass-border);
+    border-radius:var(--radius);
+    padding:22px;
+    backdrop-filter:blur(20px);
+    box-shadow:0 10px 40px rgba(0,0,0,0.35);
+  }
+  .card + .card{margin-top:18px;}
+  .card h2{font-size:16px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px;}
+  .card h2 .ic{color:var(--accent-2);}
+
+  /* ---------- Translate Grid ---------- */
+  .translate-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:18px;
+  }
+  .assistant-grid{
+    display:grid; grid-template-columns:2fr 1fr; gap:18px; margin-top:18px; align-items:start;
+  }
+  @media (max-width:900px){
+    .translate-grid, .assistant-grid{grid-template-columns:1fr;}
+  }
+
+  .lang-bar{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px;
+  }
+  select{
+    background:rgba(255,255,255,0.06); color:var(--text-0);
+    border:1px solid var(--glass-border); border-radius:10px;
+    padding:9px 12px; font-family:inherit; font-size:13px; cursor:pointer;
+    outline:none;
+  }
+  .swap-btn{
+    width:36px; height:36px; border-radius:50%;
+    background:var(--glass); border:1px solid var(--glass-border);
+    color:var(--text-1); cursor:pointer; font-size:15px;
+    display:flex; align-items:center; justify-content:center;
+    transition:.2s;
+  }
+  .swap-btn:hover{color:#fff; transform:rotate(180deg); border-color:var(--accent);}
+
+  textarea, .output-box{
+    width:100%; min-height:170px; resize:vertical;
+    background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);
+    border-radius:var(--radius-sm); color:var(--text-0);
+    padding:14px; font-family:inherit; font-size:15px; line-height:1.7;
+    outline:none;
+  }
+  textarea:focus{border-color:var(--accent);}
+  .output-box{white-space:pre-wrap; overflow-y:auto;}
+  .char-count{font-size:11px; color:var(--text-2); text-align:left; margin-top:6px;}
+
+  .toolbar{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
+  button.primary{
+    background:linear-gradient(135deg,var(--accent),#5b3df0);
+    border:none; color:#fff; padding:11px 22px; border-radius:12px;
+    font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;
+    transition:.2s; box-shadow:0 8px 20px rgba(124,92,255,0.3);
+  }
+  button.primary:hover{transform:translateY(-2px); box-shadow:0 12px 26px rgba(124,92,255,0.45);}
+  button.primary:disabled{opacity:.5; cursor:not-allowed; transform:none;}
+  button.ghost{
+    background:var(--glass); border:1px solid var(--glass-border); color:var(--text-1);
+    padding:11px 18px; border-radius:12px; font-family:inherit; font-weight:500; font-size:14px;
+    cursor:pointer; transition:.2s; display:flex; align-items:center; gap:6px;
+  }
+  button.ghost:hover{color:#fff; border-color:var(--accent-2);}
+  button.icon-btn{
+    width:44px; height:44px; border-radius:50%;
+    background:var(--glass); border:1px solid var(--glass-border); color:var(--text-1);
+    cursor:pointer; font-size:17px; display:flex; align-items:center; justify-content:center; transition:.2s;
+  }
+  button.icon-btn:hover{color:#fff; border-color:var(--accent);}
+  button.icon-btn.recording{
+    background:linear-gradient(135deg,var(--danger),#c2185b); color:#fff; border-color:transparent;
+    animation:pulse 1.4s infinite;
+  }
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,92,122,.55);}70%{box-shadow:0 0 0 14px rgba(255,92,122,0);}100%{box-shadow:0 0 0 0 rgba(255,92,122,0);}}
+
+  /* ---------- AI Assistant Panel ---------- */
+  .assistant-panel{display:flex; flex-direction:column; height:100%;}
+  .assistant-log{
+    flex:1; min-height:170px; max-height:280px; overflow-y:auto;
+    display:flex; flex-direction:column; gap:10px; margin-bottom:12px;
+  }
+  .msg{padding:10px 13px; border-radius:12px; font-size:13px; line-height:1.6; max-width:92%;}
+  .msg.user{align-self:flex-end; background:linear-gradient(135deg,var(--accent),#5b3df0); color:#fff;}
+  .msg.ai{align-self:flex-start; background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); color:var(--text-0);}
+  .assistant-input{display:flex; gap:8px;}
+  .assistant-input input{
+    flex:1; background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);
+    border-radius:10px; padding:11px 14px; color:var(--text-0); font-family:inherit; font-size:13px; outline:none;
+  }
+  .assistant-input input:focus{border-color:var(--accent-2);}
+  .chip-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .chip{
+    font-size:12px; padding:6px 12px; border-radius:999px; cursor:pointer;
+    background:var(--glass); border:1px solid var(--glass-border); color:var(--text-1); transition:.2s;
+  }
+  .chip:hover{color:#fff; border-color:var(--accent-2);}
+
+  /* ---------- Upload zones ---------- */
+  .upload-zone{
+    border:2px dashed var(--glass-border); border-radius:var(--radius-sm);
+    padding:36px 20px; text-align:center; cursor:pointer; transition:.2s;
+    background:rgba(255,255,255,0.02);
+  }
+  .upload-zone:hover{border-color:var(--accent); background:rgba(124,92,255,0.06);}
+  .upload-zone .big-ic{font-size:34px; margin-bottom:10px;}
+  .upload-zone p{color:var(--text-1); font-size:13px;}
+  .upload-zone small{color:var(--text-2);}
+  .file-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--glass); border:1px solid var(--glass-border);
+    padding:10px 14px; border-radius:10px; margin-top:10px; font-size:13px;
+  }
+  .file-row .remove{color:var(--danger); cursor:pointer; font-weight:700;}
+
+  /* ---------- Voice ---------- */
+  .voice-stage{display:flex; flex-direction:column; align-items:center; gap:18px; padding:30px 0;}
+  .mic-wrap{position:relative; display:flex; align-items:center; justify-content:center;}
+  .mic-big{
+    width:96px; height:96px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:flex; align-items:center; justify-content:center; font-size:34px; color:#fff;
+    cursor:pointer; box-shadow:0 14px 40px rgba(124,92,255,0.4); transition:.2s;
+  }
+  .mic-big:hover{transform:scale(1.05);}
+  .mic-big.recording{background:linear-gradient(135deg,var(--danger),#c2185b); animation:pulse 1.4s infinite;}
+  .timer{font-size:22px; font-weight:700; color:var(--text-1); font-variant-numeric:tabular-nums;}
+
+  /* ---------- Group Chat ---------- */
+  .speaker-card{
+    display:flex; align-items:center; gap:14px;
+    background:var(--glass); border:1px solid var(--glass-border);
+    border-radius:14px; padding:14px; margin-bottom:12px;
+  }
+  .avatar{
+    width:44px; height:44px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff;
+    background:linear-gradient(135deg,var(--accent-3),var(--accent));
+  }
+  .speaker-meta{flex:1;}
+  .speaker-meta input{
+    background:transparent; border:none; border-bottom:1px solid var(--glass-border);
+    color:var(--text-0); font-family:inherit; font-weight:700; font-size:14px; padding:4px 0; outline:none; width:100%;
+  }
+  .lang-tag{
+    font-size:11px; padding:3px 10px; border-radius:999px;
+    background:rgba(34,211,238,0.15); color:var(--accent-2); border:1px solid rgba(34,211,238,0.3);
+  }
+  .conv-bubble{
+    background:var(--glass); border:1px solid var(--glass-border); border-radius:14px;
+    padding:14px 16px; margin-bottom:12px;
+  }
+  .conv-bubble .head{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .conv-bubble .head b{font-size:14px;}
+  .conv-bubble .original{color:var(--text-1); font-size:13px; margin-bottom:6px;}
+  .conv-bubble .translated{color:var(--text-0); font-size:14px; border-top:1px dashed var(--glass-border); padding-top:8px;}
+
+  .loader{
+    display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3);
+    border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .hint{
+    font-size:12px; color:var(--text-2); background:rgba(255,255,255,0.03);
+    border:1px dashed var(--glass-border); border-radius:10px; padding:10px 14px; margin-top:14px; line-height:1.7;
+  }
+
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:rgba(20,20,30,0.95); border:1px solid var(--glass-border);
+    padding:12px 22px; border-radius:12px; font-size:13px; z-index:999;
+    box-shadow:0 10px 30px rgba(0,0,0,0.4); display:none;
+  }
+  .toast.error{border-color:rgba(255,92,122,0.5); color:var(--danger);}
+  .toast.success{border-color:rgba(52,211,153,0.5); color:var(--success);}
+
+  input[type=file]{display:none;}
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">AI</div>
+    <div>
+      <h1>AI Translation Suite</h1>
+      <span>DeepL · Groq · Cohere — منصة ترجمة ذكية موحدة</span>
+    </div>
+  </div>
+  <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText">جارٍ التحقق من الاتصال...</span></div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-view="translate">💬 الترجمة الفورية</button>
+  <button class="tab-btn" data-view="files">📄 الملفات والمستندات</button>
+  <button class="tab-btn" data-view="voice">🎙️ الصوت والفيديو</button>
+  <button class="tab-btn" data-view="group">👥 المحادثة الجماعية</button>
+</nav>
+
+<main>
+
+  <!-- ======================= TRANSLATE VIEW ======================= -->
+  <section class="view active" id="view-translate">
+    <div class="card">
+      <div class="translate-grid">
+        <div>
+          <div class="lang-bar">
+            <select id="srcLang">
+              <option value="auto">🔍 اكتشاف تلقائي</option>
+              <option value="AR">العربية</option>
+              <option value="EN">English</option>
+              <option value="FR">Français</option>
+              <option value="ES">Español</option>
+              <option value="DE">Deutsch</option>
+              <option value="TR">Türkçe</option>
+              <option value="RU">Русский</option>
+              <option value="ZH">中文</option>
+            </select>
+            <span style="font-size:11px;color:var(--text-2)">من</span>
+          </div>
+          <textarea id="srcText" placeholder="اكتب النص هنا للترجمة الفورية..."></textarea>
+          <div class="char-count"><span id="charCount">0</span> حرف</div>
+        </div>
+
+        <div>
+          <div class="lang-bar">
+            <button class="swap-btn" id="swapBtn" title="تبديل اللغتين">⇄</button>
+            <select id="tgtLang">
+              <option value="AR">العربية</option>
+              <option value="EN-US">English (US)</option>
+              <option value="FR">Français</option>
+              <option value="ES">Español</option>
+              <option value="DE">Deutsch</option>
+              <option value="TR">Türkçe</option>
+              <option value="RU">Русский</option>
+              <option value="ZH">中文</option>
+            </select>
+          </div>
+          <div class="output-box" id="outText">ستظهر الترجمة هنا...</div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="primary" id="translateDeepLBtn">🌐 ترجمة عبر DeepL</button>
+        <button class="ghost" id="translateAIBtn">✨ ترجمة ذكية عبر Groq</button>
+        <button class="ghost" id="correctBtn">✅ تصحيح لغوي</button>
+        <button class="ghost" id="copyOutBtn">📋 نسخ الناتج</button>
+      </div>
+    </div>
+
+    <div class="assistant-grid">
+      <div class="card">
+        <h2><span class="ic">✨</span> المقارنة والتحسين</h2>
+        <p style="font-size:13px;color:var(--text-1);line-height:1.7;">
+          يمكنك مقارنة ترجمة DeepL بترجمة أخرى (مثلاً ترجمتك الخاصة أو ترجمة نموذج آخر)
+          والحصول على تقييم فوري من الذكاء الاصطناعي.
+        </p>
+        <textarea id="compareText" placeholder="الصق هنا ترجمة بديلة للمقارنة معها..." style="min-height:100px;margin-top:12px;"></textarea>
+        <div class="toolbar">
+          <button class="primary" id="compareBtn">⚖️ قارن الترجمتين</button>
+        </div>
+        <div class="output-box" id="compareOut" style="margin-top:12px; display:none;"></div>
+      </div>
+
+      <div class="card assistant-panel">
+        <h2><span class="ic">🤖</span> المساعد الذكي</h2>
+        <div class="chip-row">
+          <span class="chip" data-prompt="اجعل الترجمة أكثر رسمية">أكثر رسمية</span>
+          <span class="chip" data-prompt="اجعل الترجمة أكثر بساطة وودية">أبسط</span>
+          <span class="chip" data-prompt="اختصر الترجمة">اختصار</span>
+        </div>
+        <div class="assistant-log" id="assistantLog">
+          <div class="msg ai">مرحباً 👋 اسألني عن أي تعديل أو تصحيح تريده على الترجمة الحالية.</div>
+        </div>
+        <div class="assistant-input">
+          <input type="text" id="assistantInput" placeholder="مثال: عدّل الترجمة لتكون أكثر رسمية..." />
+          <button class="icon-btn" id="assistantSendBtn">➤</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= FILES VIEW ======================= -->
+  <section class="view" id="view-files">
+    <div class="card">
+      <h2><span class="ic">📄</span> رفع ملف (PDF · DOCX · Excel · TXT)</h2>
+      <div class="upload-zone" id="fileDropZone">
+        <div class="big-ic">📁</div>
+        <p>اسحب وأفلت الملف هنا أو اضغط للاختيار</p>
+        <small>الصيغ المدعومة: PDF, DOCX, XLSX, TXT, CSV</small>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf,.docx,.xlsx,.xlsm,.txt,.csv" />
+      <div id="fileRowContainer"></div>
+
+      <div class="lang-bar" style="margin-top:16px;">
+        <select id="fileTargetLang">
+          <option value="AR">العربية</option>
+          <option value="EN">English</option>
+          <option value="FR">Français</option>
+          <option value="ES">Español</option>
+          <option value="DE">Deutsch</option>
+        </select>
+        <span style="font-size:11px;color:var(--text-2)">ترجمة النص المستخرج إلى</span>
+      </div>
+
+      <div class="toolbar">
+        <button class="primary" id="extractFileBtn">📤 استخراج وترجمة</button>
+      </div>
+    </div>
+
+    <div class="card" id="fileResultCard" style="display:none;">
+      <h2><span class="ic">📃</span> النص المستخرج</h2>
+      <div class="output-box" id="fileExtractedOut" style="margin-bottom:14px;"></div>
+      <h2><span class="ic">🌐</span> النص المترجم</h2>
+      <div class="output-box" id="fileTranslatedOut"></div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2><span class="ic">🖼️</span> صورة أو كاميرا (OCR)</h2>
+      <div class="upload-zone" id="imageDropZone">
+        <div class="big-ic">📷</div>
+        <p>ارفع صورة أو التقط بالكاميرا لاستخراج النص منها</p>
+      </div>
+      <input type="file" id="imageInput" accept="image/*" capture="environment" />
+      <div id="imageRowContainer"></div>
+      <div class="toolbar">
+        <button class="primary" id="ocrBtn">🔍 استخراج النص من الصورة</button>
+      </div>
+      <div class="output-box" id="ocrOut" style="margin-top:14px; display:none;"></div>
+    </div>
+  </section>
+
+  <!-- ======================= VOICE VIEW ======================= -->
+  <section class="view" id="view-voice">
+    <div class="card">
+      <h2><span class="ic">🎙️</span> تسجيل صوتي مباشر</h2>
+      <div class="voice-stage">
+        <div class="mic-wrap">
+          <div class="mic-big" id="micBtn">🎤</div>
+        </div>
+        <div class="timer" id="recTimer">00:00</div>
+        <select id="voiceTargetLang" style="align-self:center;">
+          <option value="AR">ترجمة إلى العربية</option>
+          <option value="EN">ترجمة إلى الإنجليزية</option>
+          <option value="FR">ترجمة إلى الفرنسية</option>
+          <option value="ES">ترجمة إلى الإسبانية</option>
+        </select>
+      </div>
+      <div class="output-box" id="voiceOut" style="display:none;"></div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2><span class="ic">🎬</span> ترجمة ملفات صوتية / فيديو كبيرة</h2>
+      <div class="upload-zone" id="mediaDropZone">
+        <div class="big-ic">🎞️</div>
+        <p>ارفع ملف صوتي أو مقطع فيديو لتفريغه وترجمته</p>
+        <small>يُستخرج الصوت تلقائياً وتتم معالجته عبر Groq Whisper</small>
+      </div>
+      <input type="file" id="mediaInput" accept="audio/*,video/*" />
+      <div id="mediaRowContainer"></div>
+      <select id="mediaTargetLang" style="margin-top:12px;">
+        <option value="AR">ترجمة إلى العربية</option>
+        <option value="EN">ترجمة إلى الإنجليزية</option>
+        <option value="FR">ترجمة إلى الفرنسية</option>
+      </select>
+      <div class="toolbar">
+        <button class="primary" id="mediaTranscribeBtn">▶️ تفريغ وترجمة</button>
+      </div>
+      <div class="output-box" id="mediaOut" style="margin-top:14px; display:none;"></div>
+      <div class="hint">
+        ملاحظة: على استضافة Vercel هناك حد أقصى لزمن تنفيذ الدالة (عادة 60 ثانية على الخطط المجانية).
+        للملفات الطويلة جداً يُفضّل تقسيمها إلى مقاطع أقصر قبل الرفع لضمان معالجة ناجحة بدون Timeout.
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= GROUP CHAT VIEW ======================= -->
+  <section class="view" id="view-group">
+    <div class="card">
+      <h2><span class="ic">👥</span> إعداد المتحدثين</h2>
+      <div class="hint" style="margin-top:0; margin-bottom:16px;">
+        يقوم فصل المتحدثين الحقيقي من تسجيل واحد ممزوج (Diarization) على نماذج ذكاء اصطناعي ثقيلة
+        لا تعمل ضمن بيئة Serverless. لذلك: سجّل أو ارفع مقطعاً منفصلاً لكل متحدث، وسيقوم النظام
+        تلقائياً باكتشاف لغة كل مقطع وترجمته، ثم يعرض المحادثة كاملة ومرتّبة أدناه.
+      </div>
+      <div id="speakersContainer"></div>
+      <div class="toolbar">
+        <button class="ghost" id="addSpeakerBtn">➕ إضافة متحدث</button>
+      </div>
+
+      <select id="groupTargetLang" style="margin-top:16px;">
+        <option value="AR">ترجمة المحادثة إلى العربية</option>
+        <option value="EN">ترجمة المحادثة إلى الإنجليزية</option>
+        <option value="FR">ترجمة المحادثة إلى الفرنسية</option>
+      </select>
+
+      <div class="toolbar">
+        <button class="primary" id="processGroupBtn">🚀 معالجة المحادثة الجماعية</button>
+      </div>
+    </div>
+
+    <div class="card" id="groupResultCard" style="display:none;">
+      <h2><span class="ic">💬</span> نتيجة المحادثة</h2>
+      <div id="groupConversationOut"></div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   إعدادات عامة
+   ========================================================= */
+const API_BASE = "/api";
+const toastEl = document.getElementById("toast");
+
+function showToast(msg, type="success", duration=3200){
+  toastEl.textContent = msg;
+  toastEl.className = "toast " + type;
+  toastEl.style.display = "block";
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> toastEl.style.display = "none", duration);
+}
+
+async function apiFetch(path, options={}){
+  try{
+    const res = await fetch(API_BASE + path, options);
+    const data = await res.json().catch(()=> ({}));
+    if(!res.ok){
+      throw new Error(data.detail || `خطأ في الطلب (${res.status})`);
+    }
+    return data;
+  }catch(err){
+    showToast(err.message || "حدث خطأ غير متوقع", "error", 4500);
+    throw err;
+  }
+}
+
+/* فحص الاتصال بالسيرفر عند بدء التشغيل */
+(async () => {
+  try{
+    const data = await apiFetch("/health");
+    const dot = document.getElementById("statusDot");
+    const text = document.getElementById("statusText");
+    const allOk = data.groq_configured && data.deepl_configured;
+    dot.style.background = allOk ? "#34d399" : "#f59e0b";
+    text.textContent = allOk ? "متصل — جميع الخدمات جاهزة" : "متصل — بعض مفاتيح API غير مُعدّة";
+  }catch(e){
+    document.getElementById("statusDot").style.background = "#ff5c7a";
+    document.getElementById("statusText").textContent = "تعذّر الاتصال بالسيرفر";
+  }
+})();
+
+/* =========================================================
+   التبويبات
+   ========================================================= */
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("view-" + btn.dataset.view).classList.add("active");
+  });
+});
+
+/* =========================================================
+   1) الترجمة الفورية
+   ========================================================= */
+const srcText = document.getElementById("srcText");
+const outText = document.getElementById("outText");
+const charCount = document.getElementById("charCount");
+
+srcText.addEventListener("input", ()=> charCount.textContent = srcText.value.length);
+
+document.getElementById("swapBtn").addEventListener("click", ()=>{
+  const s = document.getElementById("srcLang");
+  const t = document.getElementById("tgtLang");
+  if(s.value === "auto") return;
+  const tmp = s.value;
+  // مطابقة تقريبية للأكواد بين القائمتين
+  const map = {"EN":"EN-US"};
+  s.value = t.value.split("-")[0];
+  t.value = map[tmp] || tmp;
+  const tmpText = srcText.value;
+  srcText.value = outText.textContent;
+  outText.textContent = tmpText;
+  charCount.textContent = srcText.value.length;
+});
+
+document.getElementById("translateDeepLBtn").addEventListener("click", async ()=>{
+  if(!srcText.value.trim()) return showToast("الرجاء إدخال نص أولاً", "error");
+  outText.innerHTML = '<span class="loader"></span> جارٍ الترجمة...';
+  try{
+    const data = await apiFetch("/translate/deepl", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        text: srcText.value,
+        target_lang: document.getElementById("tgtLang").value,
+        source_lang: document.getElementById("srcLang").value
+      })
+    });
+    outText.textContent = data.translated_text;
+  }catch(e){ outText.textContent = "تعذّرت الترجمة."; }
+});
+
+document.getElementById("translateAIBtn").addEventListener("click", async ()=>{
+  if(!srcText.value.trim()) return showToast("الرجاء إدخال نص أولاً", "error");
+  outText.innerHTML = '<span class="loader"></span> جارٍ الترجمة الذكية...';
+  try{
+    const data = await apiFetch("/translate/ai", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        text: srcText.value,
+        target_lang: document.getElementById("tgtLang").value,
+        provider:"groq", task:"translate"
+      })
+    });
+    outText.textContent = data.result;
+  }catch(e){ outText.textContent = "تعذّرت الترجمة."; }
+});
+
+document.getElementById("correctBtn").addEventListener("click", async ()=>{
+  if(!srcText.value.trim()) return showToast("الرجاء إدخال نص أولاً", "error");
+  outText.innerHTML = '<span class="loader"></span> جارٍ التصحيح...';
+  try{
+    const data = await apiFetch("/translate/ai", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ text: srcText.value, target_lang:"AR", provider:"groq", task:"correct" })
+    });
+    outText.textContent = data.result;
+  }catch(e){ outText.textContent = "تعذّر التصحيح."; }
+});
+
+document.getElementById("copyOutBtn").addEventListener("click", ()=>{
+  navigator.clipboard.writeText(outText.textContent || "");
+  showToast("تم نسخ النص");
+});
+
+document.getElementById("compareBtn").addEventListener("click", async ()=>{
+  const compareText = document.getElementById("compareText").value;
+  if(!srcText.value.trim() || !compareText.trim()) return showToast("أدخل النص الأصلي والترجمة البديلة", "error");
+  const box = document.getElementById("compareOut");
+  box.style.display = "block";
+  box.innerHTML = '<span class="loader"></span> جارٍ المقارنة...';
+  try{
+    const data = await apiFetch("/translate/ai", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        text: outText.textContent, target_lang: document.getElementById("tgtLang").value,
+        provider:"groq", task:"compare", compare_with: compareText
+      })
+    });
+    box.textContent = data.result;
+  }catch(e){ box.textContent = "تعذّرت المقارنة."; }
+});
+
+/* المساعد الذكي */
+const assistantLog = document.getElementById("assistantLog");
+function addMsg(text, who){
+  const div = document.createElement("div");
+  div.className = "msg " + who;
+  div.textContent = text;
+  assistantLog.appendChild(div);
+  assistantLog.scrollTop = assistantLog.scrollHeight;
+}
+async function sendAssistant(promptText){
+  if(!promptText.trim()) return;
+  addMsg(promptText, "user");
+  const base = outText.textContent && outText.textContent !== "ستظهر الترجمة هنا..." ? outText.textContent : srcText.value;
+  addMsg("...", "ai");
+  try{
+    const data = await apiFetch("/translate/ai", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        text: `${promptText}\n\nالنص:\n${base}`,
+        target_lang: document.getElementById("tgtLang").value,
+        provider:"groq", task:"translate"
+      })
+    });
+    assistantLog.lastChild.textContent = data.result;
+    outText.textContent = data.result;
+  }catch(e){ assistantLog.lastChild.textContent = "تعذّر تنفيذ الطلب."; }
+}
+document.getElementById("assistantSendBtn").addEventListener("click", ()=>{
+  const input = document.getElementById("assistantInput");
+  sendAssistant(input.value);
+  input.value = "";
+});
+document.getElementById("assistantInput").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){
+    sendAssistant(e.target.value);
+    e.target.value = "";
+  }
+});
+document.querySelectorAll(".chip").forEach(chip=>{
+  chip.addEventListener("click", ()=> sendAssistant(chip.dataset.prompt));
+});
+
+/* =========================================================
+   2) الملفات والمستندات
+   ========================================================= */
+function setupDropZone(zoneId, inputId, rowContainerId, onFile){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  const rowContainer = document.getElementById(rowContainerId);
+  let currentFile = null;
+
+  zone.addEventListener("click", ()=> input.click());
+  zone.addEventListener("dragover", e=>{ e.preventDefault(); zone.style.borderColor="var(--accent)"; });
+  zone.addEventListener("dragleave", ()=> zone.style.borderColor="var(--glass-border)");
+  zone.addEventListener("drop", e=>{
+    e.preventDefault(); zone.style.borderColor="var(--glass-border)";
+    if(e.dataTransfer.files.length){ handleFile(e.dataTransfer.files[0]); }
+  });
+  input.addEventListener("change", ()=>{
+    if(input.files.length) handleFile(input.files[0]);
+  });
+
+  function handleFile(file){
+    currentFile = file;
+    rowContainer.innerHTML = `<div class="file-row"><span>📎 ${file.name}</span><span class="remove">✕</span></div>`;
+    rowContainer.querySelector(".remove").addEventListener("click", ()=>{
+      currentFile = null; rowContainer.innerHTML = ""; input.value = "";
+    });
+    onFile(file);
+  }
+  return { getFile: ()=> currentFile };
+}
+
+const docZoneCtrl = setupDropZone("fileDropZone","fileInput","fileRowContainer", ()=>{});
+document.getElementById("extractFileBtn").addEventListener("click", async ()=>{
+  const file = docZoneCtrl.getFile();
+  if(!file) return showToast("الرجاء اختيار ملف أولاً", "error");
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("translate_to", document.getElementById("fileTargetLang").value);
+  document.getElementById("fileResultCard").style.display = "block";
+  document.getElementById("fileExtractedOut").innerHTML = '<span class="loader"></span> جارٍ المعالجة...';
+  document.getElementById("fileTranslatedOut").textContent = "";
+  try{
+    const data = await apiFetch("/file/extract", { method:"POST", body: fd });
+    document.getElementById("fileExtractedOut").textContent = data.extracted_text || "(لا يوجد نص)";
+    document.getElementById("fileTranslatedOut").textContent = data.translated_text || "";
+  }catch(e){
+    document.getElementById("fileExtractedOut").textContent = "تعذّرت المعالجة.";
+  }
+});
+
+const imgZoneCtrl = setupDropZone("imageDropZone","imageInput","imageRowContainer", ()=>{});
+document.getElementById("ocrBtn").addEventListener("click", async ()=>{
+  const file = imgZoneCtrl.getFile();
+  if(!file) return showToast("الرجاء اختيار صورة أولاً", "error");
+  const fd = new FormData();
+  fd.append("image", file);
+  fd.append("translate_to", document.getElementById("fileTargetLang").value);
+  const box = document.getElementById("ocrOut");
+  box.style.display = "block";
+  box.innerHTML = '<span class="loader"></span> جارٍ استخراج النص...';
+  try{
+    const data = await apiFetch("/ocr", { method:"POST", body: fd });
+    box.innerHTML = `<b>النص المستخرج:</b>\n${data.extracted_text || "-"}\n\n<b>الترجمة:</b>\n${data.translated_text || "-"}`;
+  }catch(e){ box.textContent = "تعذّر استخراج النص."; }
+});
+
+/* =========================================================
+   3) الصوت والفيديو
+   ========================================================= */
+let mediaRecorder, recordedChunks = [], recTimerInterval, recSeconds = 0;
+const micBtn = document.getElementById("micBtn");
+const recTimer = document.getElementById("recTimer");
+
+function formatTime(s){
+  const m = String(Math.floor(s/60)).padStart(2,"0");
+  const sec = String(s%60).padStart(2,"0");
+  return `${m}:${sec}`;
+}
+
+micBtn.addEventListener("click", async ()=>{
+  if(micBtn.classList.contains("recording")){
+    mediaRecorder.stop();
+    return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e=> recordedChunks.push(e.data);
+    mediaRecorder.onstop = async ()=>{
+      clearInterval(recTimerInterval);
+      micBtn.classList.remove("recording");
+      stream.getTracks().forEach(t=>t.stop());
+      const blob = new Blob(recordedChunks, { type:"audio/webm" });
+      await sendVoiceForSTT(blob);
+    };
+    mediaRecorder.start();
+    micBtn.classList.add("recording");
+    micBtn.textContent = "⏹️";
+    recSeconds = 0;
+    recTimer.textContent = "00:00";
+    recTimerInterval = setInterval(()=>{
+      recSeconds++;
+      recTimer.textContent = formatTime(recSeconds);
+    }, 1000);
+  }catch(e){
+    showToast("تعذّر الوصول إلى الميكروفون", "error");
+  }
+});
+
+async function sendVoiceForSTT(blob){
+  micBtn.textContent = "🎤";
+  const box = document.getElementById("voiceOut");
+  box.style.display = "block";
+  box.innerHTML = '<span class="loader"></span> جارٍ التفريغ والترجمة...';
+  const fd = new FormData();
+  fd.append("audio", blob, "recording.webm");
+  fd.append("translate_to", document.getElementById("voiceTargetLang").value);
+  try{
+    const data = await apiFetch("/stt", { method:"POST", body: fd });
+    box.innerHTML = `<b>اللغة المكتشفة:</b> ${data.detected_language}\n\n<b>النص الأصلي:</b>\n${data.transcript}\n\n<b>الترجمة:</b>\n${data.translated_text || "-"}`;
+  }catch(e){ box.textContent = "تعذّرت المعالجة."; }
+}
+
+const mediaZoneCtrl = setupDropZone("mediaDropZone","mediaInput","mediaRowContainer", ()=>{});
+document.getElementById("mediaTranscribeBtn").addEventListener("click", async ()=>{
+  const file = mediaZoneCtrl.getFile();
+  if(!file) return showToast("الرجاء اختيار ملف صوتي أو فيديو", "error");
+  const fd = new FormData();
+  fd.append("audio", file);
+  fd.append("translate_to", document.getElementById("mediaTargetLang").value);
+  const box = document.getElementById("mediaOut");
+  box.style.display = "block";
+  box.innerHTML = '<span class="loader"></span> جارٍ التفريغ والترجمة (قد يستغرق بعض الوقت)...';
+  try{
+    const data = await apiFetch("/stt", { method:"POST", body: fd });
+    box.innerHTML = `<b>اللغة المكتشفة:</b> ${data.detected_language}\n\n<b>النص الأصلي:</b>\n${data.transcript}\n\n<b>الترجمة:</b>\n${data.translated_text || "-"}`;
+  }catch(e){ box.textContent = "تعذّرت المعالجة. إن كان الملف كبيراً جداً حاول تقسيمه."; }
+});
+
+/* =========================================================
+   4) المحادثة الجماعية
+   ========================================================= */
+const speakersContainer = document.getElementById("speakersContainer");
+let speakerCount = 0;
+const speakerFiles = {}; // id -> File
+
+function addSpeakerRow(defaultName){
+  speakerCount++;
+  const id = "spk_" + speakerCount;
+  const row = document.createElement("div");
+  row.className = "speaker-card";
+  row.id = id;
+  row.innerHTML = `
+    <div class="avatar">${speakerCount}</div>
+    <div class="speaker-meta">
+      <input type="text" value="${defaultName || 'متحدث ' + speakerCount}" class="speakerNameInput" />
+      <div style="margin-top:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="ghost recordSpeakerBtn" style="padding:7px 14px;font-size:12px;">🎙️ سجّل</button>
+        <button class="ghost uploadSpeakerBtn" style="padding:7px 14px;font-size:12px;">📁 ارفع ملف</button>
+        <span class="lang-tag speakerStatus">بلا صوت بعد</span>
+        <input type="file" accept="audio/*" class="speakerFileInput" style="display:none;" />
+      </div>
+    </div>
+    <span class="remove" style="cursor:pointer;color:var(--danger);font-weight:700;">✕</span>
+  `;
+  speakersContainer.appendChild(row);
+
+  const fileInput = row.querySelector(".speakerFileInput");
+  const uploadBtn = row.querySelector(".uploadSpeakerBtn");
+  const recordBtn = row.querySelector(".recordSpeakerBtn");
+  const status = row.querySelector(".speakerStatus");
+  const removeBtn = row.querySelector(".remove");
+
+  uploadBtn.addEventListener("click", ()=> fileInput.click());
+  fileInput.addEventListener("change", ()=>{
+    if(fileInput.files.length){
+      speakerFiles[id] = fileInput.files[0];
+      status.textContent = "✅ " + fileInput.files[0].name;
+    }
+  });
+
+  let localRecorder, localChunks = [];
+  recordBtn.addEventListener("click", async ()=>{
+    if(recordBtn.textContent.includes("إيقاف")){
+      localRecorder.stop();
+      return;
+    }
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+      localChunks = [];
+      localRecorder = new MediaRecorder(stream);
+      localRecorder.ondataavailable = e=> localChunks.push(e.data);
+      localRecorder.onstop = ()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        const blob = new Blob(localChunks, { type:"audio/webm" });
+        speakerFiles[id] = new File([blob], id + ".webm", { type:"audio/webm" });
+        status.textContent = "✅ تم التسجيل";
+        recordBtn.textContent = "🎙️ سجّل";
+      };
+      localRecorder.start();
+      recordBtn.textContent = "⏹️ إيقاف";
+      status.textContent = "🔴 جارٍ التسجيل...";
+    }catch(e){ showToast("تعذّر الوصول إلى الميكروفون", "error"); }
+  });
+
+  removeBtn.addEventListener("click", ()=>{
+    row.remove();
+    delete speakerFiles[id];
+  });
+}
+
+document.getElementById("addSpeakerBtn").addEventListener("click", ()=> addSpeakerRow());
+// إضافة متحدثَين افتراضيين عند التحميل
+addSpeakerRow("متحدث 1");
+addSpeakerRow("متحدث 2");
+
+document.getElementById("processGroupBtn").addEventListener("click", async ()=>{
+  const rows = Array.from(speakersContainer.querySelectorAll(".speaker-card"));
+  const names = [];
+  const files = [];
+  for(const row of rows){
+    const id = row.id;
+    const name = row.querySelector(".speakerNameInput").value || id;
+    if(speakerFiles[id]){
+      names.push(name);
+      files.push(speakerFiles[id]);
+    }
+  }
+  if(files.length < 1) return showToast("الرجاء إضافة صوت واحد على الأقل", "error");
+
+  const fd = new FormData();
+  files.forEach(f => fd.append("audios", f));
+  fd.append("speakers", JSON.stringify(names));
+  fd.append("target_lang", document.getElementById("groupTargetLang").value);
+
+  const resultCard = document.getElementById("groupResultCard");
+  const out = document.getElementById("groupConversationOut");
+  resultCard.style.display = "block";
+  out.innerHTML = '<span class="loader"></span> جارٍ معالجة المحادثة...';
+
+  try{
+    const data = await apiFetch("/group-chat/process", { method:"POST", body: fd });
+    out.innerHTML = "";
+    data.conversation.forEach(turn=>{
+      const bubble = document.createElement("div");
+      bubble.className = "conv-bubble";
+      bubble.innerHTML = `
+        <div class="head">
+          <b>${turn.speaker}</b>
+          <span class="lang-tag">${turn.detected_language}</span>
+        </div>
+        <div class="original">${turn.original_text || "(لا يوجد نص مكتشف)"}</div>
+        <div class="translated">${turn.translated_text || ""}</div>
+      `;
+      out.appendChild(bubble);
+    });
+  }catch(e){
+    out.textContent = "تعذّرت معالجة المحادثة.";
+  }
+});
+</script>
+</body>
+</html>
