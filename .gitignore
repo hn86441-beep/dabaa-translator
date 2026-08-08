@@ -1,9 +1,0 @@
-__pycache__/
-*.pyc
-.venv/
-venv/
-.env
-.env.local
-.vercel/
-node_modules/
-.DS_Store
