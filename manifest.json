@@ -1,6 +1,6 @@
 {
   "name": "HN Translator",
-  "short_name": "HN Translator",
+  "short_name": "🌐HN Translator",
   "description": "منصة ترجمة ذكية موحدة — نصوص، ملفات، صوت، صور، ومحادثات جماعية",
   "start_url": "/",
   "display": "standalone",
