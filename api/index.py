@@ -53,8 +53,8 @@ DEEPL_API_KEY = os.environ.get("DEEPL_API_KEY", "")
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "")
 
 # أسماء النماذج قابلة للتعديل عبر متغيرات بيئة اختيارية (بدون تعديل الكود)
-GROQ_TEXT_MODEL = os.environ.get("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
-GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "llama-3.2-11b-vision-preview")
+GROQ_TEXT_MODEL = os.environ.get("GROQ_TEXT_MODEL", "openai/gpt-oss-120b")
+GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
 GROQ_STT_MODEL = os.environ.get("GROQ_STT_MODEL", "whisper-large-v3")
 COHERE_TEXT_MODEL = os.environ.get("COHERE_TEXT_MODEL", "command-r-plus")
 
